@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Copa FIFA em Duplas</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="topo-titulo">
+      <h1 id="titulo-campeonato">Copa FIFA em Duplas</h1>
+      <p class="subtitulo" id="subtitulo-campeonato"></p>
+    </div>
+    <nav class="barra-acoes" aria-label="Ações">
+      <button type="button" id="btn-desfazer" title="Desfazer a última alteração (Ctrl+Z)">↶ Desfazer</button>
+      <button type="button" id="btn-exportar" title="Baixar um backup em JSON">⬇ Exportar JSON</button>
+      <button type="button" id="btn-importar" title="Restaurar um backup em JSON">⬆ Importar JSON</button>
+      <input type="file" id="arquivo-importar" accept=".json,application/json" hidden>
+      <button type="button" id="btn-png-classificacao" title="Baixar a classificação como imagem (1080 px) para o grupo">🖼 PNG classificação</button>
+      <button type="button" id="btn-png-mata-mata" title="Baixar o chaveamento como imagem (1080 px) para o grupo">🖼 PNG mata-mata</button>
+      <button type="button" id="btn-telao" title="Tela cheia para a TV, alternando as telas a cada 15 s">📺 Modo telão</button>
+      <button type="button" id="btn-resetar" class="perigo" title="Apagar o campeonato inteiro e começar de novo">⟲ Resetar</button>
+    </nav>
+    <p id="status-salvamento" class="status-salvamento" aria-live="polite"></p>
+  </header>
+
+  <div id="avisos" class="avisos" aria-live="assertive"></div>
+  <div id="lembrete-backup" class="lembrete-backup" hidden></div>
+
+  <main class="painel">
+    <details id="tela-jogadores" class="tela tela-larga" open>
+      <summary class="tela-cabecalho">
+        <h2>Campeonato e jogadores <span id="resumo-jogadores" class="contador"></span></h2>
+      </summary>
+      <div id="conteudo-jogadores"></div>
+    </details>
+
+    <details id="tela-calendario" class="tela tela-larga" open>
+      <summary class="tela-cabecalho">
+        <h2>Calendário <span id="resumo-calendario" class="contador"></span></h2>
+      </summary>
+      <div id="conteudo-calendario"></div>
+    </details>
+
+    <section id="tela-jogos" class="tela">
+      <div class="tela-cabecalho">
+        <h2>Rodadas <span id="contador-jogos" class="contador"></span></h2>
+        <p class="legenda">
+          Digite o placar e aperte Tab/Enter. 0×0 conta empate, mas vale 0 ponto. "Anular" fecha um jogo sem efeito
+          (ex.: W.O. das duas duplas).
+        </p>
+      </div>
+      <div id="navegacao-semanas"></div>
+      <div id="lista-jogos" class="lista-jogos"></div>
+      <div id="agenda-jogador"></div>
+    </section>
+
+    <section id="tela-classificacao" class="tela">
+      <div class="tela-cabecalho">
+        <h2>Classificação <span id="rotulo-classificacao" class="contador"></span></h2>
+        <div id="controle-classificacao"></div>
+        <p class="legenda">
+          <span class="amostra-classificado"></span> Top 8 vai para a fase final
+          · ▲▼ variação em relação à semana anterior
+          · ⚖️ empate técnico: use ↑↓ para definir a ordem (confronto direto/sorteio)
+        </p>
+      </div>
+      <div class="tabela-rolagem">
+        <table class="classificacao">
+          <thead>
+            <tr>
+              <th class="col-pos">Pos</th>
+              <th class="col-var"></th>
+              <th class="col-jogador">Jogador</th>
+              <th title="Pontos">Pts</th>
+              <th title="Vitórias">V</th>
+              <th title="Empates">E</th>
+              <th title="Derrotas">D</th>
+              <th title="Gols pró">GP</th>
+              <th title="Gols contra">GC</th>
+              <th title="Saldo de gols">SG</th>
+              <th title="Jogos disputados">Jogos</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-classificacao"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tela-em-jogo" class="tela tela-larga">
+      <div class="tela-cabecalho">
+        <h2>O que está em jogo <span id="resumo-em-jogo" class="contador"></span></h2>
+        <p class="legenda">
+          Considera todos os resultados possíveis dos jogos pendentes (vitória, empate com gols, 0×0, derrota),
+          comparando pontos e vitórias. Saldo e gols pró só contam entre quem já não joga mais.
+        </p>
+      </div>
+      <div id="conteudo-em-jogo" class="colunas-em-jogo"></div>
+    </section>
+
+    <section id="tela-mata-mata" class="tela tela-larga">
+      <div class="tela-cabecalho">
+        <h2>Mata-mata</h2>
+        <p class="legenda">
+          Semi 1 = 1º+8º × 2º+7º · Semi 2 = 3º+6º × 4º+5º · sem empate: prorrogação e, se preciso, pênaltis
+          · final em melhor de 3 · ✎ troca uma dupla (surpresa da final). Não altera a classificação.
+        </p>
+      </div>
+      <div id="conteudo-mata-mata"></div>
+    </section>
+  </main>
+
+  <div id="telao" class="telao" hidden></div>
+
+  <!-- Scripts clássicos (sem módulos) para funcionar em file://. A ordem importa. -->
+  <script src="js/regras.js"></script>
+  <script src="js/estado.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/exportar.js"></script>
+  <script src="js/telao.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>

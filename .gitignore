@@ -1,0 +1,11 @@
+# Sistema operacional / editores
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+.claude/
+
+# Backups e imagens exportados pelo app, caso sejam salvos dentro da pasta
+*-backup-*.json
+/*.png

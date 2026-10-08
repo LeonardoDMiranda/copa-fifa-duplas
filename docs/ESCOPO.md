@@ -1,0 +1,148 @@
+# Escopo – Copa FIFA em Duplas
+
+## 1. Objetivo
+
+Aplicação local (HTML + CSS + JavaScript puro) para o organizador conduzir um campeonato de FIFA em duplas do começo ao fim:
+
+1. Cadastrar os jogadores e configurar o campeonato (pontos, jogos por jogador, semanas).
+2. Sortear o calendário inteiro de uma vez, ajustar à mão se precisar e confirmar.
+3. Lançar os placares (ou W.O., ou anular) semana a semana.
+4. Ver a classificação individual ao vivo ou ao fim de cada semana, e **o que está em jogo** (garantidos, em disputa, eliminados).
+5. Gerar e conduzir o mata-mata: semifinais, 3º lugar e final MD3.
+6. Exportar imagens (PNG) para mandar no grupo e exibir tudo num **modo telão**.
+
+**Fora do escopo:** login, servidor, multiusuário e sincronização online. Os dados ficam no navegador de quem usa, com backup em JSON.
+
+## 2. Regras de negócio
+
+Fonte única: `docs/REGULAMENTO.md`. Os valores abaixo são o padrão (`Regras.REGRAS_PADRAO`); pontos, jogos por jogador e semanas podem mudar por campeonato em `campeonato.config`.
+
+### 2.1 Aplicar um jogo de classificação a cada jogador
+
+Para cada jogador da dupla, somar à linha dele:
+
+| Situação | Pontos | V/E/D | GP / GC |
+|---|---|---|---|
+| Dupla venceu | +3 | V+1 | + gols feitos / + gols sofridos |
+| Empate com gols (≥1×1) | +1 | E+1 | idem |
+| Empate 0×0 | **+0** | E+1 | +0 / +0 |
+| Dupla perdeu | +0 | D+1 | idem |
+| W.O. a favor | +3 | V+1 | +3 / +0 |
+| W.O. contra | +0 | D+1 | +0 / +3 |
+| Jogo **anulado** (ex.: W.O. das duas duplas) | +0 | nenhum | +0 / +0 |
+
+Saldo = GP − GC. Jogo sem placar lançado não conta. Jogo anulado conta como resolvido (não fica pendente), mas não vale ponto, V/E/D, gol nem jogo disputado para ninguém.
+
+### 2.2 Ordenação
+
+1. Pontos (desc)
+2. Vitórias (desc)
+3. Saldo de gols (desc)
+4. Gols pró (desc)
+5. Confronto direto → 6. Sorteio
+
+**Os critérios 5 e 6 são decididos pelo organizador**, porque o regulamento não define como aplicar confronto direto entre jogadores num campeonato em duplas:
+
+- Jogadores empatados em todos os critérios 1 a 4 formam um **grupo de empate técnico**, marcado com ⚖️ quando começa no top 8 e alguém do grupo já jogou.
+- O organizador define a ordem com as setas ↑↓. Essa ordem fica em `desempatesManuais` e só vale enquanto o grupo continuar com exatamente os mesmos jogadores.
+- Sem ordem manual, vale a ordem alfabética como padrão provisório e o ⚖️ continua visível.
+
+### 2.3 Mata-mata
+
+- As duplas se formam pela classificação final: **Semi 1 = 1º+8º × 2º+7º**, **Semi 2 = 3º+6º × 4º+5º**. Só 8 vagas na fase final são suportadas.
+- 3º lugar = perdedores das semis. Final = vencedores das semis, em **MD3**.
+- Sem empate: cada jogo tem placar normal e, se empatar, **prorrogação** e, se ainda empatar, **pênaltis**.
+- Final MD3: termina quando uma dupla chega a 2 vitórias (o 3º jogo só aparece com 1×1).
+- **Duplas editáveis**: qualquer dupla do mata-mata pode ser trocada à mão (a "surpresa antes da final") e voltar à dupla automática depois.
+- Resultados do mata-mata **não** alteram a classificação.
+- Resultado final: 🥇 campeões (2 jogadores), 🥈 vice, 🥉 3º lugar.
+
+### 2.4 O que está em jogo
+
+Para os jogos ainda sem resultado, o app enumera todos os desfechos possíveis por jogo (vitória da dupla 1, empate com gols, 0×0, vitória da dupla 2) e compara **pontos e vitórias** em cada cenário. Só calcula com até 8 jogos pendentes (4⁸ = 65.536 cenários).
+
+- **Garantido**: em todos os cenários, (jogadores à frente + empatados em pontos e V) ≤ 7.
+- **Eliminado**: em todos os cenários, jogadores estritamente à frente ≥ 8.
+- **Em disputa**: o resto. Se a vaga depender de saldo ou gols pró, mostra "depende do saldo".
+- Se dois jogadores empatam em pontos e V e **nenhum dos dois joga mais**, o saldo e os gols pró deles já são definitivos e decidem o empate (depois, a ordem manual). Empatados em tudo e sem ordem manual: "depende do desempate".
+
+### 2.5 Sorteio do calendário
+
+Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
+
+- Entradas: jogadores, jogos por jogador (padrão 6) e semanas (padrão 8). Jogadores × jogos por jogador precisa ser divisível por 4.
+- Obrigatório: todos com o mesmo número de jogos, no máximo 1 jogo por jogador por semana e nenhum parceiro repetido. Desejável: não repetir adversário.
+- O sorteio usa uma **semente**: a mesma semente gera o mesmo calendário. O organizador pode sortear de novo e trocar jogadores à mão antes de **confirmar**.
+- Depois de confirmado, o calendário vira os jogos (`s<semana>-j<n>`) e o cadastro trava: só dá para renomear jogadores.
+
+### 2.6 Backup
+
+- Exportar/importar JSON guarda e restaura o campeonato inteiro.
+- O app lembra de exportar quando já há jogos e: nunca houve backup, uma semana nova foi concluída desde o último, ou faz 7 dias ou mais.
+
+## 3. Modelo de dados (estado salvo no `localStorage`)
+
+```js
+{
+  versao: 2,
+  campeonato: {
+    nome: "Copa FIFA em Duplas",
+    config: { pontosVitoria, pontosEmpate, pontosEmpateSemGols, vagasFaseFinal, jogosPorJogador, semanas },
+    jogadores: [ { id, nome } ],
+    sorteio: null | { semente, confirmado, rascunho?: [ { semana, dupla1, dupla2 } ] }
+  },
+  jogos: [ { id, semana, dupla1: [id, id], dupla2: [id, id],
+             resultado: null | { tipo: "placar", gols1, gols2 } | { tipo: "wo", vencedor: 1 | 2 } | { tipo: "anulado" } } ],
+  desempatesManuais: [ { jogadores: [id, ...] } ],
+  mataMata: null | { semi1, semi2, terceiro, final },  // cada um: { dupla1, dupla2, duplaManual1?, duplaManual2?, partidas: [Partida] }
+  ultimoBackup: null | { em, semanasCompletas },
+  historico: [ /* até 30 estados anteriores para o "desfazer" */ ]
+}
+// Partida = { gols1, gols2, prorrogacao1?, prorrogacao2?, penaltis1?, penaltis2? }
+```
+
+A classificação **nunca** é salva: é sempre calculada a partir dos jogadores (base zerada) + jogos com resultado.
+
+## 4. Telas
+
+1. **Campeonato e jogadores**: nome, jogos por jogador, semanas, diagnóstico da combinação e cadastro (um nome por linha; renomear e remover).
+2. **Calendário**: sortear, conferir as restrições, trocar jogadores à mão e confirmar.
+3. **Rodadas**: navegação por semana, cartões dos jogos com placar, "W.O.", "Anular" e "Limpar"; quem descansa na semana.
+4. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual.
+5. **O que está em jogo**: Garantidos / Em disputa / Eliminados.
+6. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
+7. **Barra de ações**: Desfazer, Exportar/Importar JSON, PNG da classificação e do mata-mata, Modo telão e Resetar. Lembrete de backup quando for a hora.
+
+## 5. Como o projeto foi construído
+
+O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
+
+| Fase | O que entrou |
+|---|---|
+| 1 a 4 | Classificação, lançamento de jogos com desfazer e backup, mata-mata e "o que está em jogo" |
+| 5 e 6 | Exportar PNG e modo telão |
+| 7 | Jogo anulado e núcleo configurável (pontos, jogos por jogador, semanas) |
+| 8 | Cadastro de jogadores, sorteio do calendário, rodadas por semana, classificação por semana e lembrete de backup |
+
+Novas fases seguem o mesmo jeito: uma mudança pequena por vez, com caso de teste novo ou ajustado.
+
+## 6. Testes (`testes.html`)
+
+Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os casos usam a fixture `testes/dados-exemplo.js` (32 jogadores fictícios e 7 jogos) e cobrem:
+
+| Prefixo | Assunto |
+|---|---|
+| 1 a 10 | Pontuação, desempates, empate técnico, mata-mata e "o que está em jogo" |
+| F2 a F7 | Persistência, desfazer, importação, mata-mata, PNG, telão e jogo anulado |
+| N | Configuração do campeonato e estado inicial vazio |
+| C | Cadastro de jogadores |
+| S | Sorteio e confirmação do calendário |
+| R | Rodadas e classificação por semana |
+| T | PNG e telão com qualquer número de jogadores |
+| B | Lembrete e registro de backup |
+
+## 7. Pendências
+
+- Revisar a regra do sorteio quando o regulamento do próximo campeonato sair.
+- A fase final só aceita 8 classificados (o chaveamento 1º+8º × 2º+7º é fixo).
+- Confronto direto entre jogadores num campeonato em duplas continua sendo decisão manual do organizador.

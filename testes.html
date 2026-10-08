@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Testes – Copa FIFA em Duplas</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #f4f6f8; color: #1d2733; }
+    h1 { margin: 0 0 4px; font-size: 1.4rem; }
+    #resumo { font-weight: 600; margin: 8px 0 20px; padding: 10px 14px; border-radius: 6px; }
+    #resumo.ok { background: #d9f2df; color: #145a26; }
+    #resumo.falha { background: #fbdcdc; color: #8a1616; }
+    .caso { background: #fff; border-left: 5px solid #999; border-radius: 4px; padding: 10px 14px; margin-bottom: 10px; }
+    .caso.passou { border-color: #2e9e4a; }
+    .caso.falhou { border-color: #d03030; }
+    .caso.pendente { border-color: #c9a227; }
+    .caso h2 { font-size: 1rem; margin: 0 0 6px; }
+    .caso ul { margin: 0; padding-left: 20px; font-size: .9rem; }
+    .caso li.erro { color: #b01e1e; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Testes das regras</h1>
+  <div>Casos obrigatórios de <code>docs/ESCOPO.md</code>, seção 6.</div>
+  <div id="resumo"></div>
+  <div id="casos"></div>
+
+  <script src="testes/dados-exemplo.js"></script>
+  <script src="js/regras.js"></script>
+  <script src="js/estado.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/exportar.js"></script>
+  <script src="js/telao.js"></script>
+  <script>
+    "use strict";
+
+    const { classificacaoBase, jogosSexta } = window.DADOS_INICIAIS;
+    const casos = [];
+
+    function caso(titulo, fn) { casos.push({ titulo, fn }); }
+    function pendente(titulo, motivo) { casos.push({ titulo, pendente: motivo }); }
+
+    // Monta os jogos de sexta com os resultados informados: { j1: {tipo, ...}, ... }
+    function jogosCom(resultados = {}) {
+      return jogosSexta.map((j) => ({ ...j, resultado: resultados[j.id] || null }));
+    }
+    function placar(gols1, gols2) { return { tipo: "placar", gols1, gols2 }; }
+    function wo(vencedor) { return { tipo: "wo", vencedor }; }
+
+    function classificar(resultados, desempates = Regras.desempatesDaBase(classificacaoBase)) {
+      return Regras.calcularClassificacao(classificacaoBase, jogosCom(resultados), desempates);
+    }
+    function linha(tabela, id) { return tabela.find((l) => l.id === id); }
+    function baseDe(id) { return classificacaoBase.find((l) => l.id === id); }
+
+    // Asserções: cada uma registra uma linha no relatório do caso.
+    function criarVerificador(registro) {
+      return {
+        igual(atual, esperado, descricao) {
+          const ok = JSON.stringify(atual) === JSON.stringify(esperado);
+          registro.push({ ok, texto: ok ? descricao : `${descricao} — esperado ${JSON.stringify(esperado)}, veio ${JSON.stringify(atual)}` });
+        },
+        verdadeiro(cond, descricao) {
+          registro.push({ ok: Boolean(cond), texto: descricao });
+        },
+        campos(obj, esperado, descricao) {
+          for (const [k, v] of Object.entries(esperado)) this.igual(obj[k], v, `${descricao}: ${k} = ${v}`);
+        },
+      };
+    }
+
+    // 1
+    caso("1. Base sem jogos: ordem idêntica à planilha oficial", (t) => {
+      const tabela = classificar();
+      t.igual(tabela.map((l) => l.id), classificacaoBase.map((l) => l.id), "ordem 1º Jogador 23 … 32º Jogador 01");
+      t.igual(tabela[0].nome, "Jogador 23", "1º Jogador 23");
+      t.igual(tabela[31].nome, "Jogador 01", "32º Jogador 01");
+      t.verdadeiro(tabela.every((l) => l.variacao === 0), "ninguém sobe nem desce em relação à base");
+    });
+
+    // 2
+    caso("2. j1 = 2×1 (Jogador 20 + Jogador 12 vencem)", (t) => {
+      const tabela = classificar({ j1: placar(2, 1) });
+      const p12 = linha(tabela, "p12");
+      t.campos(p12, { pontos: 15, v: 5, gp: 24, gc: 4, sg: 20, posicao: 2 }, "Jogador 12");
+      t.campos(linha(tabela, "p23"), { posicao: 1, sg: 24 }, "Jogador 23");
+      t.campos(linha(tabela, "p17"), { posicao: 3, sg: 18 }, "Jogador 17");
+      t.campos(linha(tabela, "p20"), { pontos: 12, v: 4, sg: 8 }, "Jogador 20");
+      t.igual(linha(tabela, "p29").d, baseDe("p29").d + 1, "Jogador 29 D+1");
+      t.igual(linha(tabela, "p27").d, baseDe("p27").d + 1, "Jogador 27 D+1");
+    });
+
+    // 3
+    caso("3. j2 = 0×0: empate sem gols vale 0 ponto", (t) => {
+      const tabela = classificar({ j2: placar(0, 0) });
+      for (const id of ["p31", "p21", "p05", "p25"]) {
+        const l = linha(tabela, id), b = baseDe(id);
+        t.igual(l.e, b.e + 1, `${b.nome} E+1`);
+        t.igual(l.pontos, b.pontos, `${b.nome} pontos inalterados (${b.pontos})`);
+      }
+      t.igual(linha(tabela, "p21").pontos, 10, "Jogador 21 continua com 10");
+    });
+
+    // 4
+    caso("4. j2 = 1×1: empate com gols vale 1 ponto", (t) => {
+      const tabela = classificar({ j2: placar(1, 1) });
+      for (const id of ["p31", "p21", "p05", "p25"]) {
+        t.igual(linha(tabela, id).pontos, baseDe(id).pontos + 1, `${baseDe(id).nome} +1 pt`);
+      }
+      const p21 = linha(tabela, "p21"), p24 = linha(tabela, "p24");
+      t.campos(p21, { pontos: 11, v: 3, sg: 14 }, "Jogador 21");
+      t.verdadeiro(p21.posicao < p24.posicao, `Jogador 21 (${p21.posicao}º) à frente de Jogador 24 (${p24.posicao}º)`);
+    });
+
+    // 5
+    caso("5. j5 = W.O. a favor da dupla 1", (t) => {
+      const tabela = classificar({ j5: wo(1) });
+      t.campos(linha(tabela, "p11"), { pontos: 12, v: 4, gp: 28, sg: 15 }, "Jogador 11");
+      t.igual(linha(tabela, "p04").pontos, 10, "Jogador 04 10 pts");
+      for (const id of ["p32", "p16"]) {
+        const l = linha(tabela, id), b = baseDe(id);
+        t.igual(l.d, b.d + 1, `${b.nome} D+1`);
+        t.igual(l.gc, b.gc + 3, `${b.nome} GC+3`);
+        t.igual(l.pontos, b.pontos, `${b.nome} não pontua`);
+      }
+    });
+
+    // 6
+    caso("6. Desempate por vitórias: j4 = 1×1", (t) => {
+      const tabela = classificar({ j4: placar(1, 1) });
+      const p03 = linha(tabela, "p03");
+      t.campos(p03, { pontos: 9, v: 2 }, "Jogador 03");
+      const com3v = tabela.filter((l) => l.pontos === 9 && l.v === 3);
+      t.verdadeiro(com3v.length > 0, `há ${com3v.length} jogadores com 9 pts e 3 V`);
+      t.verdadeiro(com3v.every((l) => l.posicao < p03.posicao), "Jogador 03 abaixo de todos com 9 pts e 3 V");
+    });
+
+    // 7
+    caso("7. Desempate por gols pró (base)", (t) => {
+      const tabela = classificar();
+      const p09 = linha(tabela, "p09"), p13 = linha(tabela, "p13");
+      t.campos(p09, { pontos: 9, v: 3, sg: 4, gp: 22 }, "Jogador 09");
+      t.campos(p13, { pontos: 9, v: 3, sg: 4, gp: 12 }, "Jogador 13");
+      t.verdadeiro(p09.posicao < p13.posicao, "Jogador 09 à frente de Jogador 13");
+    });
+
+    // 8
+    caso("8. Empate técnico (base): Jogador 05 × Jogador 32", (t) => {
+      const grupos = Regras.detectarEmpatesTecnicos(classificacaoBase);
+      t.igual(grupos, [["p05", "p32"]], "único empate técnico na base é Jogador 05/Jogador 32");
+
+      const tabela = classificar();
+      const bon = linha(tabela, "p05"), val = linha(tabela, "p32");
+      t.igual(bon.posicao, 8, "com o desempate inicial, Jogador 05 em 8º");
+      t.igual(val.posicao, 9, "Jogador 32 em 9º");
+      t.verdadeiro(bon.empateTecnico && bon.empateTecnico.ordemManual, "grupo marcado como empate técnico com ordem manual");
+
+      const invertida = classificar({}, [{ jogadores: ["p32", "p05"] }]);
+      t.igual(linha(invertida, "p32").posicao, 8, "ordem manual invertida põe Jogador 32 em 8º");
+
+      const semManual = classificar({}, []);
+      t.igual(linha(semManual, "p05").posicao, 8, "sem ordem manual: alfabética provisória (Jogador 05 8º)");
+      t.verdadeiro(linha(semManual, "p05").empateTecnico.ordemManual === false, "sem ordem manual: ⚖️ marcado como provisório");
+
+      const outroGrupo = classificar({}, [{ jogadores: ["p32", "p05", "p11"] }]);
+      t.igual(linha(outroGrupo, "p32").posicao, 9, "ordem manual de grupo diferente é ignorada");
+
+      const desfeito = classificar({ j2: placar(1, 1) });
+      t.igual(linha(desfeito, "p05").empateTecnico, null, "j2 = 1×1 desfaz o empate técnico de Jogador 05");
+    });
+
+    // ---------- Extras da Fase 2 ----------
+
+    caso("F2.1 Resultado inválido não conta", (t) => {
+      const base = classificar();
+      for (const r of [placar(-1, 0), placar(1.5, 0), placar("2", 1), wo(3), { tipo: "outro" }]) {
+        t.igual(classificar({ j1: r }).map((l) => [l.id, l.pontos, l.gp]), base.map((l) => [l.id, l.pontos, l.gp]),
+          `${JSON.stringify(r)} é ignorado`);
+      }
+    });
+
+    caso("F2.2 Ordem manual é descartada quando o grupo muda", (t) => {
+      const desempates = Regras.desempatesDaBase(classificacaoBase);
+      const com00 = Regras.podarDesempatesManuais(classificacaoBase, jogosCom({ j2: placar(0, 0) }), desempates);
+      t.igual(com00, desempates, "j2 = 0×0 mantém o grupo Jogador 05/Jogador 32 e a ordem manual");
+      const com11 = Regras.podarDesempatesManuais(classificacaoBase, jogosCom({ j2: placar(1, 1) }), desempates);
+      t.igual(com11, [], "j2 = 1×1 desfaz o grupo e descarta a ordem manual");
+    });
+
+    caso("F2.3 Definir ordem manual substitui a do mesmo grupo", (t) => {
+      const inicial = [{ jogadores: ["p05", "p32"] }, { jogadores: ["p19", "p16"] }];
+      const nova = Regras.definirOrdemDesempate(inicial, ["p32", "p05"]);
+      t.igual(nova, [{ jogadores: ["p19", "p16"] }, { jogadores: ["p32", "p05"] }], "uma entrada por grupo");
+      t.igual(inicial[0].jogadores, ["p05", "p32"], "não altera o array original");
+    });
+
+    caso("F2.4 Jogadores que jogam mais de uma vez", (t) => {
+      const mapa = Regras.jogosPorJogador(jogosSexta);
+      t.igual(mapa.get("p14"), ["j4", "j6", "j7"], "Jogador 14 joga 3 vezes (j4, j6, j7)");
+      t.igual(mapa.get("p12"), ["j1", "j6"], "Jogador 12 joga 2 vezes");
+      const repetem = [...mapa].filter(([, js]) => js.length > 1).map(([id]) => id).sort();
+      t.igual(repetem, ["p04", "p10", "p12", "p14", "p25", "p27"], "lista de quem repete");
+    });
+
+    // Armazenamento em memória com a interface do localStorage (não mexe nos dados reais do app).
+    function memoria(inicial = {}) {
+      const dados = { ...inicial };
+      return {
+        dados,
+        getItem: (k) => (k in dados ? dados[k] : null),
+        setItem: (k, v) => { dados[k] = String(v); },
+      };
+    }
+    // Estado v2 de teste: os 32 jogadores de 2026 (zerados) e os 7 jogos de sexta, todos na semana 1.
+    // `ajustar` recebe o objeto antes de ser salvo (para montar casos inválidos).
+    function dadosV2(ajustar) {
+      const dados = {
+        versao: 2,
+        campeonato: {
+          nome: "Copa de teste",
+          config: { ...Regras.REGRAS_PADRAO },
+          jogadores: classificacaoBase.map((l) => ({ id: l.id, nome: l.nome })),
+          sorteio: null,
+        },
+        jogos: jogosSexta.map((j) => ({ id: j.id, semana: 1, dupla1: j.dupla1.slice(), dupla2: j.dupla2.slice(), resultado: null })),
+        desempatesManuais: [],
+        mataMata: null,
+        historico: [],
+      };
+      if (ajustar) ajustar(dados);
+      return dados;
+    }
+    function memoria2026() { return memoria({ [Estado.CHAVE]: JSON.stringify(dadosV2()) }); }
+    function criarEstado(arm = memoria2026()) { return Estado.criar(arm); }
+    function lancar(est, id, resultado) {
+      return est.modificar(`teste ${id}`, (s) => { s.jogos.find((j) => j.id === id).resultado = resultado; });
+    }
+
+    caso("F2.5 Persistência: reabrir recupera os lançamentos", (t) => {
+      const arm = memoria2026();
+      const est = criarEstado(arm);
+      lancar(est, "j1", placar(2, 1));
+      lancar(est, "j5", wo(1));
+      const reaberto = Estado.criar(arm);
+      t.igual(reaberto.atual().jogos.find((j) => j.id === "j1").resultado, placar(2, 1), "j1 continua 2×1");
+      t.igual(reaberto.atual().jogos.find((j) => j.id === "j5").resultado, wo(1), "j5 continua W.O.");
+      t.igual(reaberto.atual().historico.length, 2, "histórico também é recuperado");
+      t.verdadeiro(!("classificacao" in JSON.parse(arm.dados[Estado.CHAVE])), "classificação calculada não é salva");
+    });
+
+    caso("F2.6 Desfazer volta o último lançamento", (t) => {
+      const est = criarEstado();
+      lancar(est, "j1", placar(2, 1));
+      lancar(est, "j1", placar(3, 1));
+      t.igual(est.desfazer(), "teste j1", "desfazer devolve a descrição");
+      t.igual(est.atual().jogos[0].resultado, placar(2, 1), "j1 voltou para 2×1");
+      est.desfazer();
+      t.igual(est.atual().jogos[0].resultado, null, "j1 voltou a ficar pendente");
+      t.igual(est.desfazer(), null, "sem histórico, desfazer não faz nada");
+      t.igual(lancar(est, "j1", null), false, "alteração sem efeito não entra no histórico");
+      for (let i = 0; i < 40; i++) lancar(est, "j2", placar(i % 5, 0));
+      t.igual(est.atual().historico.length, Estado.MAX_HISTORICO, `histórico limitado a ${Estado.MAX_HISTORICO}`);
+    });
+
+    caso("F2.7 Mudar o placar descarta a ordem manual do grupo (e desfazer a traz de volta)", (t) => {
+      const est = criarEstado();
+      lancar(est, "j1", placar(2, 1)); // Jogador 12 e Jogador 20 empatam em tudo
+      est.modificar("inverter", (s) => { s.desempatesManuais = Regras.definirOrdemDesempate(s.desempatesManuais, ["p20", "p12"]); });
+      t.igual(est.atual().desempatesManuais, [{ jogadores: ["p20", "p12"] }], "ordem manual guardada");
+      lancar(est, "j6", placar(1, 1)); // Jogador 12 ganha 1 ponto: o grupo se desfaz
+      t.igual(est.atual().desempatesManuais, [], "ordem manual descartada");
+      est.desfazer();
+      t.igual(est.atual().desempatesManuais, [{ jogadores: ["p20", "p12"] }], "desfazer restaura a ordem manual");
+    });
+
+    caso("F2.8 Exportar, resetar e importar restaura tudo", (t) => {
+      const est = criarEstado();
+      lancar(est, "j1", placar(2, 1));
+      lancar(est, "j3", wo(2));
+      est.modificar("inverter", (s) => { s.desempatesManuais = Regras.definirOrdemDesempate(s.desempatesManuais, ["p20", "p12"]); });
+      const backup = est.exportarJSON();
+      const foto = () => ({ campeonato: est.atual().campeonato, jogos: est.atual().jogos, desempatesManuais: est.atual().desempatesManuais });
+      const antes = foto();
+
+      est.resetar();
+      t.igual(est.atual().jogos, [], "resetar volta ao campeonato vazio: sem jogos");
+      t.igual(est.atual().campeonato.jogadores, [], "e sem jogadores");
+      t.igual(est.atual().desempatesManuais, [], "e sem desempates");
+
+      est.importarJSON(backup);
+      t.igual(foto(), antes, "importar restaura campeonato, jogos e desempates");
+      t.igual(est.ultimaAcao(), "importar backup", "importação pode ser desfeita");
+    });
+
+    caso("F2.9 Importação inválida é recusada sem alterar nada", (t) => {
+      const est = criarEstado();
+      lancar(est, "j1", placar(2, 1));
+      const antes = est.exportarJSON();
+      const tentativas = {
+        "texto que não é JSON": "{ quebrado",
+        "versão errada": JSON.stringify({ versao: 99 }),
+        "backup do formato antigo (versão 1)": JSON.stringify({ versao: 1, jogos: [] }),
+        "campeonato ausente": JSON.stringify({ versao: 2, jogos: [] }),
+        "gols negativos": JSON.stringify(dadosV2((d) => { d.jogos[0].resultado = placar(-2, 0); })),
+        "jogador desconhecido no desempate": JSON.stringify(dadosV2((d) => { d.desempatesManuais = [{ jogadores: ["x", "y"] }]; })),
+        "jogador desconhecido numa dupla": JSON.stringify(dadosV2((d) => { d.jogos[0].dupla1 = ["p20", "fulano"]; })),
+        "mesmo jogador nas duas duplas": JSON.stringify(dadosV2((d) => { d.jogos[0].dupla2 = ["p20", "p27"]; })),
+        "id de jogo repetido": JSON.stringify(dadosV2((d) => { d.jogos[1].id = "j1"; })),
+        "semana inválida": JSON.stringify(dadosV2((d) => { d.jogos[0].semana = 0; })),
+        "jogador repetido": JSON.stringify(dadosV2((d) => { d.campeonato.jogadores.push({ id: "p20", nome: "Outro Jogador 20" }); })),
+        "vagas diferentes de 8": JSON.stringify(dadosV2((d) => { d.campeonato.config.vagasFaseFinal = 4; })),
+      };
+      for (const [nome, texto] of Object.entries(tentativas)) {
+        let erro = null;
+        try { est.importarJSON(texto); } catch (e) { erro = e; }
+        t.verdadeiro(erro, `${nome}: recusado (${erro && erro.message})`);
+      }
+      t.igual(JSON.parse(est.exportarJSON()).jogos, JSON.parse(antes).jogos, "estado continua o mesmo");
+    });
+
+    caso("F6.1 Recarregar pega alterações salvas por outra janela", (t) => {
+      const arm = memoria2026();
+      const telao = criarEstado(arm);
+      const organizador = criarEstado(arm);
+      let avisos = 0;
+      telao.aoMudar(() => avisos++);
+      lancar(organizador, "j1", placar(2, 1));
+      t.igual(telao.atual().jogos[0].resultado, null, "antes de recarregar, a outra janela ainda não vê o placar");
+      telao.recarregar();
+      t.igual(telao.atual().jogos[0].resultado, placar(2, 1), "depois de recarregar, vê o j1 = 2×1");
+      t.igual(avisos, 1, "recarregar avisa a tela para redesenhar");
+    });
+
+    caso("F2.10 Dados salvos corrompidos: guarda cópia e recomeça da base", (t) => {
+      const arm = memoria({ [Estado.CHAVE]: "{ lixo" });
+      const est = Estado.criar(arm);
+      t.verdadeiro(est.status().aviso, "mostra aviso ao organizador");
+      t.verdadeiro(Object.keys(arm.dados).some((k) => k.startsWith(`${Estado.CHAVE}-corrompido-`)), "conteúdo corrompido guardado à parte");
+      t.igual(est.atual().campeonato.jogadores, [], "recomeça com um campeonato vazio");
+    });
+
+    // 9
+    caso("9. Mata-mata: prorrogação, pênaltis e final MD3", (t) => {
+      const semi = { gols1: 1, gols2: 1, prorrogacao1: 0, prorrogacao2: 0, penaltis1: 4, penaltis2: 3 };
+      const a = Regras.analisarPartida(semi);
+      t.igual(a.vencedor, 1, "1×1, prorrogação 0×0, pênaltis 4×3 → vence a dupla 1");
+      t.igual(a.decididoEm, "penaltis", "decidido nos pênaltis");
+
+      const final = Regras.analisarSerie([{ gols1: 2, gols2: 0 }, { gols1: 3, gols2: 1 }], 3);
+      t.igual(final.vencedor, 1, "final: dupla 1 faz 2×0 na série e é campeã");
+      t.igual(final.vitorias, [2, 0], "série 2×0");
+      t.igual(final.partidasVisiveis, 2, "a final termina em 2 jogos (o 3º não aparece)");
+    });
+
+    // ---------- Extras da Fase 3 ----------
+
+    caso("F3.1 Partida: etapas pendentes e empate nos pênaltis", (t) => {
+      t.igual(Regras.analisarPartida({ gols1: 2, gols2: null }).precisa, "placar", "placar incompleto");
+      t.igual(Regras.analisarPartida({ gols1: 0, gols2: 3 }).vencedor, 2, "0×3 → dupla 2 no tempo normal");
+      t.igual(Regras.analisarPartida({ gols1: 2, gols2: 2 }).precisa, "prorrogacao", "2×2 pede prorrogação");
+      t.igual(Regras.analisarPartida({ gols1: 2, gols2: 2, prorrogacao1: 0, prorrogacao2: 1 }).vencedor, 2, "prorrogação 0×1 → dupla 2");
+      t.igual(Regras.analisarPartida({ gols1: 0, gols2: 0, prorrogacao1: 1, prorrogacao2: 1 }).precisa, "penaltis", "prorrogação empatada pede pênaltis");
+      const empatePen = Regras.analisarPartida({ gols1: 0, gols2: 0, prorrogacao1: 0, prorrogacao2: 0, penaltis1: 5, penaltis2: 5 });
+      t.verdadeiro(empatePen.vencedor === null && empatePen.erro, "pênaltis 5×5 não decidem e mostram erro");
+    });
+
+    caso("F3.2 Final MD3: 3º jogo só com 1×1", (t) => {
+      t.igual(Regras.analisarSerie([], 3).partidasVisiveis, 1, "sem jogos: mostra o jogo 1");
+      const umAUm = Regras.analisarSerie([{ gols1: 1, gols2: 0 }, { gols1: 0, gols2: 2 }], 3);
+      t.igual([umAUm.vitorias, umAUm.vencedor, umAUm.partidasVisiveis], [[1, 1], null, 3], "1×1 na série: aparece o jogo 3");
+      const decidida = Regras.analisarSerie([{ gols1: 1, gols2: 0 }, { gols1: 0, gols2: 2 }, { gols1: 1, gols2: 1, prorrogacao1: 0, prorrogacao2: 0, penaltis1: 3, penaltis2: 4 }], 3);
+      t.igual([decidida.vitorias, decidida.vencedor], [[1, 2], 2], "jogo 3 nos pênaltis: dupla 2 campeã por 2×1");
+      const normal = Regras.normalizarPartidas([{ gols1: 2, gols2: 0 }, { gols1: 1, gols2: 0 }, { gols1: 0, gols2: 1 }], 3);
+      t.igual(normal.length, 2, "jogo 3 descartado quando a série já acabou em 2×0");
+      const limpa = Regras.normalizarPartidas([{ gols1: 2, gols2: 1, prorrogacao1: 0, prorrogacao2: 0, penaltis1: 3, penaltis2: 1 }], 1);
+      t.igual(limpa, [{ gols1: 2, gols2: 1 }], "prorrogação e pênaltis somem quando o tempo normal decidiu");
+    });
+
+    caso("F3.3 Chaveamento pela classificação (base)", (t) => {
+      const tabela = classificar();
+      t.igual(Regras.duplasDasSemis(tabela), {
+        semi1: [["p23", "p05"], ["p17", "p28"]],
+        semi2: [["p12", "p30"], ["p24", "p21"]],
+      }, "Semi 1 = 1º+8º × 2º+7º; Semi 2 = 3º+6º × 4º+5º");
+      const avisos = Regras.avisosParaGerarChaveamento(jogosCom(), tabela);
+      t.igual(avisos.length, 1, "base: só avisa dos 7 jogos pendentes (Jogador 05/Jogador 32 já tem ordem manual)");
+      const semManual = Regras.calcularClassificacao(classificacaoBase, jogosCom(), []);
+      t.igual(Regras.avisosParaGerarChaveamento(jogosCom(), semManual).length, 2, "sem ordem manual: avisa também do empate técnico no top 8");
+      const todos = Object.fromEntries(jogosSexta.map((j) => [j.id, placar(1, 0)]));
+      const completa = classificar(todos);
+      t.igual(Regras.avisosParaGerarChaveamento(jogosCom(todos), completa).filter((a) => a.includes("sem resultado")), [], "com todos os jogos lançados, não avisa de jogo pendente");
+    });
+
+    caso("F3.8 Corrigir um jogo da final para empate não apaga os jogos seguintes", (t) => {
+      let mm = Regras.gerarMataMata(classificar());
+      for (const [i, campo, v] of [[0, "gols1", 2], [0, "gols2", 1], [1, "gols1", 0], [1, "gols2", 1]]) {
+        mm = Regras.definirCampoPartida(mm, "final", i, campo, v);
+      }
+      mm = Regras.definirCampoPartida(mm, "final", 0, "gols2", 2); // corrige J1 de 2×1 para 2×2
+      t.igual(mm.final.partidas.length, 2, "J2 continua salvo");
+      t.igual([mm.final.partidas[1].gols1, mm.final.partidas[1].gols2], [0, 1], "J2 continua 0×1");
+      const serie = Regras.analisarSerie(mm.final.partidas, 3);
+      t.igual([serie.analises[0].precisa, serie.vencedor, serie.partidasVisiveis], ["prorrogacao", null, 2],
+        "J1 pede prorrogação, série indefinida, a tela mostra os 2 jogos");
+      mm = Regras.definirCampoPartida(mm, "final", 0, "prorrogacao1", 1);
+      mm = Regras.definirCampoPartida(mm, "final", 0, "prorrogacao2", 0);
+      const completa = Regras.analisarSerie(mm.final.partidas, 3);
+      t.igual([completa.vitorias, completa.vencedor, completa.partidasVisiveis], [[1, 1], null, 3],
+        "com a prorrogação lançada: série 1×1 e o jogo 3 aparece");
+
+      const decidida = Regras.analisarSerie([{ gols1: 1, gols2: 1 }, { gols1: 2, gols2: 0 }, { gols1: 3, gols2: 0 }], 3);
+      t.igual(decidida.vencedor, null, "2 vitórias com um jogo anterior incompleto não decidem a série");
+    });
+
+    // Monta um mata-mata a partir da base e aplica campos: [[chave, indice, campo, valor], ...]
+    function mataMataCom(campos) {
+      let mm = Regras.gerarMataMata(classificar());
+      for (const [chave, i, campo, valor] of campos) mm = Regras.definirCampoPartida(mm, chave, i, campo, valor);
+      return mm;
+    }
+
+    caso("F3.4 Avanço automático e pódio", (t) => {
+      const tabela = classificar();
+      let r = Regras.resolverMataMata(mataMataCom([]), tabela);
+      t.verdadeiro(!r.final.pronto && !r.terceiro.pronto, "antes das semis, final e 3º lugar aguardam duplas");
+
+      const mm = mataMataCom([
+        ["semi1", 0, "gols1", 1], ["semi1", 0, "gols2", 1], ["semi1", 0, "prorrogacao1", 0], ["semi1", 0, "prorrogacao2", 0],
+        ["semi1", 0, "penaltis1", 4], ["semi1", 0, "penaltis2", 3],
+        ["semi2", 0, "gols1", 0], ["semi2", 0, "gols2", 2],
+      ]);
+      r = Regras.resolverMataMata(mm, tabela);
+      t.igual(r.final.dupla1, ["p23", "p05"], "final: vencedor da Semi 1 (nos pênaltis)");
+      t.igual(r.final.dupla2, ["p24", "p21"], "final: vencedor da Semi 2");
+      t.igual(r.terceiro.dupla1, ["p17", "p28"], "3º lugar: perdedor da Semi 1");
+      t.igual(r.terceiro.dupla2, ["p12", "p30"], "3º lugar: perdedor da Semi 2");
+
+      let fim = Regras.definirCampoPartida(mm, "final", 0, "gols1", 0);
+      fim = Regras.definirCampoPartida(fim, "final", 0, "gols2", 1);
+      fim = Regras.definirCampoPartida(fim, "final", 1, "gols1", 0);
+      fim = Regras.definirCampoPartida(fim, "final", 1, "gols2", 2);
+      fim = Regras.definirCampoPartida(fim, "terceiro", 0, "gols1", 3);
+      fim = Regras.definirCampoPartida(fim, "terceiro", 0, "gols2", 2);
+      r = Regras.resolverMataMata(fim, tabela);
+      t.igual(r.podio, {
+        campeoes: ["p24", "p21"], vice: ["p23", "p05"], terceiro: ["p17", "p28"],
+      }, "pódio: campeões, vice e 3º lugar");
+      t.igual(classificar().map((l) => l.id), classificacaoBase.map((l) => l.id), "resultados do mata-mata não alteram a classificação");
+    });
+
+    caso("F3.5 Duplas editáveis (surpresa da final)", (t) => {
+      const tabela = classificar();
+      let mm = Regras.gerarMataMata(tabela);
+      mm = Regras.definirDupla(mm, "final", 1, ["p32", "p01"]);
+      let r = Regras.resolverMataMata(mm, tabela);
+      t.igual(r.final.dupla1, ["p32", "p01"], "dupla manual da final vale mesmo antes das semis");
+      t.verdadeiro(r.final.lado1.manual, "marcada como alterada manualmente");
+      mm = Regras.voltarDuplaAutomatica(mm, "final", 1, tabela);
+      r = Regras.resolverMataMata(mm, tabela);
+      t.igual([r.final.dupla1, r.final.lado1.manual], [null, false], "voltar à automática (final ainda sem semis)");
+
+      mm = Regras.definirDupla(mm, "semi1", 2, ["p32", "p28"]);
+      mm = Regras.voltarDuplaAutomatica(mm, "semi1", 2, tabela);
+      t.igual(Regras.resolverMataMata(mm, tabela).semi1.dupla2, ["p17", "p28"], "semi volta à dupla da classificação");
+
+      t.verdadeiro(Regras.validarDuplas(["p23", "p17"], ["p17", "p21"]), "recusa jogador nas duas duplas");
+      t.verdadeiro(Regras.validarDuplas(["p23", "p23"], ["p17", "p21"]), "recusa jogador repetido na dupla");
+      t.igual(Regras.validarDuplas(["p23", "p17"], ["p30", "p21"]), null, "aceita duplas válidas");
+    });
+
+    caso("F3.6 Semis congeladas: aviso quando a classificação muda", (t) => {
+      const mm = Regras.gerarMataMata(classificar());
+      const mudou = classificar({ j1: placar(2, 1) }); // Jogador 20 entra no top 8
+      const r = Regras.resolverMataMata(mm, mudou);
+      t.igual(r.semi1.dupla1, ["p23", "p05"], "duplas das semis não mudam sozinhas");
+      t.verdadeiro(r.semi1.lado1.desatualizada, "semi marcada como desatualizada");
+      const atualizado = Regras.resolverMataMata(Regras.atualizarDuplasDasSemis(mm, mudou), mudou);
+      t.verdadeiro([atualizado.semi1, atualizado.semi2].every((c) => !c.lado1.desatualizada && !c.lado2.desatualizada), "atualizar usa a classificação atual");
+    });
+
+    caso("F3.7 Mata-mata é salvo, desfeito e validado na importação", (t) => {
+      const arm = memoria2026();
+      const est = criarEstado(arm);
+      est.modificar("gerar", (s) => { s.mataMata = Regras.gerarMataMata(classificar()); });
+      est.modificar("placar", (s) => { s.mataMata = Regras.definirCampoPartida(s.mataMata, "semi1", 0, "gols1", 3); });
+      t.igual(Estado.criar(arm).atual().mataMata.semi1.partidas, [{ gols1: 3, gols2: null }], "reabrir recupera o mata-mata");
+      est.desfazer();
+      t.igual(est.atual().mataMata.semi1.partidas, [], "desfazer volta o placar do mata-mata");
+      const ruim = JSON.parse(est.exportarJSON());
+      ruim.mataMata.semi1.dupla1 = ["p23", "ninguem"];
+      let erro = null;
+      try { est.importarJSON(JSON.stringify(ruim)); } catch (e) { erro = e; }
+      t.verdadeiro(erro, `importação com dupla inválida é recusada (${erro && erro.message})`);
+    });
+
+    // 10
+    function porSituacao(situacoes, tipo) {
+      return situacoes.filter((s) => s.situacao === tipo).map((s) => s.nome);
+    }
+
+    caso("10. O que está em jogo (sem placares)", (t) => {
+      const inicio = performance.now();
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(), Regras.desempatesDaBase(classificacaoBase));
+      const ms = Math.round(performance.now() - inicio);
+      t.igual(porSituacao(sit, "garantido"), ["Jogador 23", "Jogador 17"], "garantidos: Jogador 23, Jogador 17");
+      t.igual(porSituacao(sit, "eliminado"), ["Jogador 07", "Jogador 06", "Jogador 08", "Jogador 18", "Jogador 29", "Jogador 26",
+        "Jogador 02", "Jogador 10", "Jogador 22", "Jogador 15", "Jogador 01"],
+        "eliminados: os 10 do escopo + Jogador 07 (Jogador 09, que também não joga mais, fica sempre à frente no saldo)");
+      t.igual(porSituacao(sit, "disputa").length, 19, "em disputa: os outros 19");
+      t.verdadeiro(ms < 2000, `16.384 cenários calculados em ${ms} ms`);
+    });
+
+    // ---------- Extras da Fase 4 ----------
+
+    const placaresDoDia = {
+      j1: placar(2, 1), j2: placar(1, 1), j3: placar(0, 2), j4: placar(3, 1), j5: placar(1, 0), j6: placar(0, 3), j7: placar(2, 2),
+    };
+
+    caso("F4.1 Com todos os jogos lançados, todos estão garantidos ou eliminados", (t) => {
+      const desempates = Regras.desempatesDaBase(classificacaoBase);
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(placaresDoDia), desempates);
+      t.igual(porSituacao(sit, "disputa"), [], "ninguém em disputa");
+      const top8 = classificar(placaresDoDia).slice(0, 8).map((l) => l.nome).sort();
+      t.igual(porSituacao(sit, "garantido").sort(), top8, "garantidos = top 8 da classificação");
+      t.verdadeiro(sit.every((s) => s.jogosPendentes.length === 0), "ninguém tem jogo pendente");
+    });
+
+    caso("F4.2 Jogos pendentes de cada jogador", (t) => {
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom({ j4: placar(1, 0) }));
+      const de = (id) => sit.find((s) => s.id === id).jogosPendentes;
+      t.igual(de("p14"), ["j6", "j7"], "Jogador 14: j4 lançado, faltam j6 e j7");
+      t.igual(de("p09"), [], "Jogador 09 não joga mais");
+    });
+
+    caso("F4.3 Um jogo pendente muda as situações", (t) => {
+      // j1 = 2×1: Jogador 12 vai a 15 pts e 5 V
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom({ j1: placar(2, 1) }), Regras.desempatesDaBase(classificacaoBase));
+      t.verdadeiro(porSituacao(sit, "garantido").includes("Jogador 12"), "Jogador 12 (15 pts, 5 V) passa a garantido");
+      t.verdadeiro(porSituacao(sit, "eliminado").includes("Jogador 29"), "Jogador 29 continua eliminado");
+    });
+
+    caso("F4.4 Empate total entre quem já terminou depende do desempate manual", (t) => {
+      // Base sintética: 9 jogadores sem jogos pendentes; 8º e 9º idênticos em tudo.
+      const sintetica = Array.from({ length: 9 }, (_, i) => ({
+        id: `p${i + 1}`, nome: `P${i + 1}`, pontos: i < 7 ? 20 - i : 5, v: i < 7 ? 6 : 1, e: 2, d: 0, gp: 10, gc: 5,
+      }));
+      const sem = Regras.calcularSituacoes(sintetica, []);
+      const s8 = sem.find((s) => s.id === "p8"), s9 = sem.find((s) => s.id === "p9");
+      t.igual([s8.situacao, s9.situacao], ["disputa", "disputa"], "sem ordem manual: os dois em disputa");
+      t.verdadeiro(s8.dependeDoDesempate && !s8.dependeDoSaldo, "marcado como 'depende do desempate manual', não do saldo");
+      const com = Regras.calcularSituacoes(sintetica, [], [{ jogadores: ["p9", "p8"] }]);
+      t.igual([com.find((s) => s.id === "p9").situacao, com.find((s) => s.id === "p8").situacao], ["garantido", "eliminado"],
+        "com ordem manual P9 > P8: P9 garantido, P8 eliminado");
+    });
+
+    caso("F4.6 Ordem manual de grupo com alguém que ainda joga não é usada", (t) => {
+      // 6 à frente; A, B e C idênticos (C ainda joga com D contra E + F); D, E, F bem atrás.
+      const linha = (id, pontos, v) => ({ id, nome: id.toUpperCase(), pontos, v, e: 0, d: 0, gp: 10, gc: 5 });
+      const sintetica = [
+        ...[20, 19, 18, 17, 16, 15].map((p, i) => linha(`t${i + 1}`, p, 6)),
+        linha("a", 5, 1), linha("b", 5, 1), linha("c", 5, 1),
+        linha("d", 0, 0), linha("e", 0, 0), linha("f", 0, 0),
+      ];
+      const jogos = [{ id: "x1", dupla1: ["c", "d"], dupla2: ["e", "f"], resultado: null }];
+      const sit = Regras.calcularSituacoes(sintetica, jogos, [{ jogadores: ["a", "b", "c"] }]);
+      const a = sit.find((s) => s.id === "a");
+      t.igual(a.situacao, "disputa", "A não é garantido só por estar na frente de B numa ordem que vai ser descartada");
+      t.verdadeiro(a.dependeDoDesempate, "A fica marcado como 'depende do desempate'");
+      const soAB = Regras.calcularSituacoes(sintetica, jogos, [{ jogadores: ["a", "b"] }]);
+      t.igual(soAB.find((s) => s.id === "a").situacao, "garantido", "com ordem manual só de A e B (ambos terminaram), A é garantido");
+    });
+
+    caso("F4.5 'Depende do saldo' quando o empate em pts e V envolve quem ainda joga", (t) => {
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(), Regras.desempatesDaBase(classificacaoBase));
+      const comSaldo = sit.filter((s) => s.dependeDoSaldo).map((s) => s.nome);
+      t.verdadeiro(comSaldo.length > 0, `há jogadores em disputa que dependem do saldo (${comSaldo.length})`);
+      t.verdadeiro(sit.filter((s) => s.situacao !== "disputa").every((s) => !s.dependeDoSaldo), "garantidos e eliminados nunca têm a marca");
+    });
+
+    // ---------- Jogo anulado (caso não previsto no regulamento: decisão do organizador) ----------
+
+    function anulado() { return { tipo: "anulado" }; }
+
+    caso("F7.1 Jogo anulado não altera a classificação nem conta jogo", (t) => {
+      const sem = classificar({});
+      const com = classificar({ j2: anulado() });
+      t.igual(com.map((l) => [l.id, l.pontos, l.v, l.e, l.d, l.gp, l.gc, l.jogos]),
+              sem.map((l) => [l.id, l.pontos, l.v, l.e, l.d, l.gp, l.gc, l.jogos]), "tabela idêntica à base");
+      t.igual(Regras.efeitosDoResultado(anulado())[1], { pontos: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0 }, "efeito nulo para a dupla 1");
+      t.igual(linha(com, "p21").jogos, baseDe("p21").v + baseDe("p21").e + baseDe("p21").d, "Jogador 21 não ganha jogo disputado");
+    });
+
+    caso("F7.2 Jogo anulado fecha o jogo: sem pendência, sem aviso, situações recalculadas", (t) => {
+      const jogos = jogosCom({ j2: anulado() });
+      const tabela = Regras.calcularClassificacao(classificacaoBase, jogos);
+      t.verdadeiro(!Regras.avisosParaGerarChaveamento(jogos, tabela).some((a) => a.includes("j2")), "j2 não aparece como pendente no aviso do chaveamento");
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogos, Regras.desempatesDaBase(classificacaoBase));
+      t.igual(sit.find((s) => s.id === "p31").jogosPendentes, [], "Jogador 31 não tem mais jogo pendente");
+      t.igual(sit.find((s) => s.id === "p21").jogosPendentes, [], "Jogador 21 não tem mais jogo pendente");
+      const todos = jogosSexta.map((j) => ({ ...j, resultado: anulado() }));
+      const final = Regras.calcularSituacoes(classificacaoBase, todos, Regras.desempatesDaBase(classificacaoBase));
+      t.verdadeiro(final.every((s) => s.situacao !== "disputa"), "com tudo anulado, a base decide: ninguém em disputa");
+      t.igual(final.filter((s) => s.situacao === "garantido").length, 8, "8 garantidos");
+    });
+
+    caso("F7.3 Jogo anulado é salvo, desfeito e aceito na importação", (t) => {
+      const arm = memoria2026();
+      const est = criarEstado(arm);
+      lancar(est, "j3", anulado());
+      t.igual(Estado.criar(arm).atual().jogos[2].resultado, anulado(), "reabrir recupera o jogo anulado");
+      const backup = est.exportarJSON();
+      est.resetar();
+      est.importarJSON(backup);
+      t.igual(est.atual().jogos[2].resultado, anulado(), "importar restaura o jogo anulado");
+      est.desfazer();
+      t.igual(est.atual().jogos, [], "desfazer a importação volta ao campeonato vazio de antes");
+      est.desfazer();
+      t.igual(est.atual().jogos[2].resultado, anulado(), "desfazer o reinício traz o jogo anulado de volta");
+    });
+
+    caso("F7.4 Util: classeDoLado, formatarSaldo e carimbo", (t) => {
+      t.igual(Util.classeDoLado(null, 1), "", "sem resultado: sem classe");
+      t.igual(Util.classeDoLado(placar(2, 1), 1), " vencedora", "vencedora");
+      t.igual(Util.classeDoLado(placar(2, 1), 2), " perdedora", "perdedora");
+      t.igual(Util.classeDoLado(placar(1, 1), 1), " empate", "empate");
+      t.igual(Util.classeDoLado(anulado(), 2), " anulada", "anulado");
+      t.igual(Util.formatarSaldo(3) + Util.formatarSaldo(-2) + Util.formatarSaldo(0), "+3-20", "formatarSaldo");
+      t.igual(Util.carimbo(new Date(2026, 9, 2, 8, 5, 9)), "2026-10-02-080509", "carimbo de data e hora");
+    });
+
+    // ---------- PNG (exportar.js) ----------
+
+    function pixel(canvas, x, y) {
+      return [...canvas.getContext("2d").getImageData(x, y, 1, 1).data].slice(0, 3);
+    }
+    const nomePorId = new Map(classificacaoBase.map((l) => [l.id, l.nome]));
+
+    caso("F5.1 PNG da classificação: 1080 px de largura, altura que o WhatsApp não reduz, cabeçalho desenhado", (t) => {
+      const tabela = classificar({ j1: placar(2, 1), j2: anulado() });
+      const canvas = Exportar.desenharClassificacao(tabela, { geradoEm: new Date(2026, 9, 2, 15, 30), lancados: 2, totalJogos: 7 });
+      t.igual(canvas.width, 1080, "largura 1080");
+      t.verdadeiro(canvas.height <= 1600, `altura ${canvas.height} ≤ 1600`);
+      t.igual(pixel(canvas, 10, 10), [13, 59, 102], "faixa do cabeçalho na cor primária");
+      t.verdadeiro(canvas.toDataURL("image/png").length > 20000, "imagem não está em branco");
+    });
+
+    caso("F5.2 PNG do mata-mata: sem resultados e com final decidida", (t) => {
+      const tabela = classificar({});
+      let mm = Regras.gerarMataMata(tabela);
+      const jogo = (m, chave, i, g1, g2) => Regras.definirCampoPartida(Regras.definirCampoPartida(m, chave, i, "gols1", g1), chave, i, "gols2", g2);
+      mm = jogo(mm, "semi1", 0, 2, 1);
+      mm = jogo(mm, "semi2", 0, 0, 1);
+      mm = jogo(mm, "terceiro", 0, 3, 2);
+      mm = jogo(mm, "final", 0, 1, 0);
+      mm = jogo(mm, "final", 1, 2, 0);
+      const resolvido = Regras.resolverMataMata(mm, tabela);
+      const canvas = Exportar.desenharMataMata(resolvido, nomePorId, { geradoEm: new Date(2026, 9, 2, 18, 0) });
+      t.igual(canvas.width, 1080, "largura 1080");
+      t.verdadeiro(canvas.height <= 1600, `altura ${canvas.height} ≤ 1600`);
+      t.igual(pixel(canvas, 10, 10), [13, 59, 102], "faixa do cabeçalho na cor primária");
+      t.verdadeiro(resolvido.podio.campeoes, "há campeões no pódio desenhado");
+      const vazio = Exportar.desenharMataMata(Regras.resolverMataMata(Regras.gerarMataMata(tabela), tabela), nomePorId, { geradoEm: new Date() });
+      t.igual(vazio.height, canvas.height, "mesma altura com ou sem resultados");
+    });
+
+    caso("F5.3 Nome do arquivo PNG", (t) => {
+      t.igual(Exportar.nomeArquivo("copa-fifa-classificacao", new Date(2026, 9, 2, 15, 30, 45)),
+        "copa-fifa-classificacao-2026-10-02-153045.png", "prefixo + data e hora");
+    });
+
+    // ---------- Telão (telao.js) ----------
+
+    caso("F6.2 Telão: telas, jogo anulado, mata-mata só depois de gerado e fechamento", (t) => {
+      const est = criarEstado();
+      lancar(est, "j1", placar(2, 1));
+      lancar(est, "j2", anulado());
+      const raiz = document.createElement("div");
+      raiz.id = "telao";
+      raiz.hidden = true;
+      document.body.appendChild(raiz);
+      const telao = Telao.criar(est);
+      try {
+        const clicar = (id) => raiz.querySelector(`#${id}`).click();
+        const titulo = () => raiz.querySelector("#telao-titulo").textContent;
+        telao.abrir({ telaCheia: false });
+        t.verdadeiro(telao.ativo() && !raiz.hidden, "abre visível");
+        t.verdadeiro(titulo().startsWith("Classificação") && titulo().includes("2/7"), `1ª tela: ${titulo()}`);
+        t.igual(raiz.querySelectorAll(".telao-tabela tbody tr").length, 32, "32 jogadores nas duas colunas");
+        clicar("telao-proxima");
+        t.verdadeiro(titulo().startsWith("Jogos da semana 1"), `2ª tela: ${titulo()}`);
+        t.igual(raiz.querySelectorAll(".telao-jogo").length, 7, "7 jogos");
+        t.verdadeiro(raiz.textContent.includes("ANULADO"), "jogo anulado aparece como ANULADO");
+        t.verdadeiro(raiz.textContent.includes("2 × 1"), "placar 2 × 1 aparece");
+        t.igual(raiz.querySelectorAll(".proximo").length, 1, "um único jogo marcado como PRÓXIMO");
+        clicar("telao-proxima");
+        t.verdadeiro(titulo().startsWith("Classificação"), "sem chaveamento, a tela do mata-mata não entra no rodízio");
+
+        est.modificar("gerar", (s) => {
+          s.mataMata = Regras.gerarMataMata(Regras.calcularClassificacao(classificacaoBase, s.jogos, s.desempatesManuais));
+        });
+        clicar("telao-proxima");
+        clicar("telao-proxima");
+        t.verdadeiro(titulo().startsWith("Mata-mata"), `com chaveamento: ${titulo()}`);
+        t.igual(raiz.querySelectorAll(".telao-confronto").length, 4, "4 confrontos");
+
+        clicar("telao-pausa");
+        t.verdadeiro(raiz.classList.contains("pausado"), "pausa");
+        clicar("telao-sair");
+        t.verdadeiro(!telao.ativo() && raiz.hidden && raiz.childElementCount === 0, "sair fecha e limpa o telão");
+      } finally {
+        telao.fechar();
+        raiz.remove();
+      }
+    });
+
+    // ---------- Núcleo configurável (Fase 7) ----------
+
+    caso("N1 Pontuação vem da config (vitória 2, empate 2, 0×0 vale 1)", (t) => {
+      const config = { ...Regras.REGRAS_PADRAO, pontosVitoria: 2, pontosEmpate: 2, pontosEmpateSemGols: 1 };
+      const des = Regras.desempatesDaBase(classificacaoBase);
+      const com = (resultados) => Regras.calcularClassificacao(classificacaoBase, jogosCom(resultados), des, { config });
+      t.igual(linha(com({ j1: placar(2, 1) }), "p12").pontos, baseDe("p12").pontos + 2, "vitória vale 2");
+      t.igual(linha(com({ j2: placar(1, 1) }), "p21").pontos, baseDe("p21").pontos + 2, "empate com gols vale 2");
+      t.igual(linha(com({ j2: placar(0, 0) }), "p21").pontos, baseDe("p21").pontos + 1, "0×0 vale 1");
+      t.igual(linha(com({ j5: wo(1) }), "p11").pontos, baseDe("p11").pontos + 2, "W.O. vale a vitória da config");
+      t.igual(Regras.efeitosDoResultado(placar(1, 0), config)[1].pontos, 2, "efeitosDoResultado usa a config");
+      t.igual(Regras.efeitosDoResultado(placar(1, 0))[1].pontos, 3, "sem config vale o padrão (3)");
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(), des, config);
+      t.igual(sit.length, 32, "calcularSituacoes aceita a config");
+    });
+
+    caso("N2 Variação ▲▼: ordem da base (padrão), mapa de posições anteriores ou desligada", (t) => {
+      const jogos = jogosCom({ j1: placar(2, 1) });
+      const des = Regras.desempatesDaBase(classificacaoBase);
+      const padrao = Regras.calcularClassificacao(classificacaoBase, jogos, des);
+      t.igual(linha(padrao, "p12").variacao, 1, "padrão: Jogador 12 subiu do 3º para o 2º");
+      const anteriores = new Map(classificar({}).map((l) => [l.id, l.posicao]));
+      const comMapa = Regras.calcularClassificacao(classificacaoBase, jogos, des, { posicoesAnteriores: anteriores });
+      t.igual(comMapa.map((l) => l.variacao), padrao.map((l) => l.variacao), "mapa com as posições da base dá o mesmo resultado");
+      const parcial = Regras.calcularClassificacao(classificacaoBase, jogos, des, { posicoesAnteriores: new Map([["p12", 10]]) });
+      t.igual(linha(parcial, "p12").variacao, 8, "referência própria: 10º → 2º = ▲8");
+      t.igual(linha(parcial, "p23").variacao, 0, "jogador fora do mapa não tem variação");
+      const desligada = Regras.calcularClassificacao(classificacaoBase, jogos, des, { posicoesAnteriores: null });
+      t.verdadeiro(desligada.every((l) => l.variacao === 0 && l.posicaoBase === null), "null desliga a variação");
+    });
+
+    caso("N3 Empate técnico só é sinalizado quando importa (começa no top 8 e alguém já jogou)", (t) => {
+      const base = Regras.baseDosJogadores(classificacaoBase);
+      const inicio = Regras.calcularClassificacao(base, jogosCom());
+      t.verdadeiro(inicio.every((l) => l.empateTecnico === null), "campeonato zerado: ninguém é marcado, embora os 32 empatem");
+      t.igual(inicio.map((l) => l.nome), [...classificacaoBase].map((l) => l.nome).sort((a, b) => a.localeCompare(b, "pt-BR")),
+        "a ordem provisória continua alfabética");
+      const depois = Regras.calcularClassificacao(base, jogosCom({ j1: placar(2, 1) }));
+      t.igual(depois[0].empateTecnico && depois[0].empateTecnico.grupo, ["p12", "p20"], "vencedores empatados no topo: marcados");
+      t.verdadeiro(depois[0].empateTecnico.ordemManual === false, "sem ordem manual: provisório");
+      const derrotados = depois.filter((l) => l.id === "p27" || l.id === "p29");
+      t.verdadeiro(derrotados.every((l) => l.empateTecnico === null), "derrotados empatados lá embaixo: sem marca");
+      const manual = Regras.calcularClassificacao(base, jogosCom({ j1: placar(2, 1) }), [{ jogadores: ["p20", "p12"] }]);
+      t.igual(manual.slice(0, 2).map((l) => l.id), ["p20", "p12"], "ordem manual é aplicada");
+    });
+
+    caso("N4 'O que está em jogo' recusa cenários demais (mais de 8 pendentes)", (t) => {
+      t.igual(Regras.MAX_PENDENTES_SITUACOES, 8, "limite de 8 jogos pendentes");
+      const ids = classificacaoBase.map((l) => l.id);
+      const jogos = Array.from({ length: 9 }, (_, i) => ({
+        id: `x${i}`, semana: 1, resultado: null,
+        dupla1: [ids[(4 * i) % 32], ids[(4 * i + 1) % 32]], dupla2: [ids[(4 * i + 2) % 32], ids[(4 * i + 3) % 32]],
+      }));
+      t.igual(Regras.calcularSituacoes(classificacaoBase, jogos), null, "9 pendentes: devolve null");
+      jogos[0].resultado = placar(1, 0);
+      t.verdadeiro(Array.isArray(Regras.calcularSituacoes(classificacaoBase, jogos.slice(0, 8).map((j, i) => (i < 6 ? { ...j, resultado: placar(1, 0) } : j)))),
+        "com 8 jogos (2 pendentes) calcula normalmente");
+    });
+
+    caso("N5 Config: validação, padrão e base dos jogadores", (t) => {
+      t.igual(Regras.validarConfig(Regras.REGRAS_PADRAO), null, "padrão é válido");
+      t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, vagasFaseFinal: 4 }), "só 8 vagas é aceito");
+      t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, pontosVitoria: -1 }), "pontos negativos recusados");
+      t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, semanas: 0 }), "0 semanas recusado");
+      t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, jogosPorJogador: 2.5 }), "jogos por jogador precisa ser inteiro");
+      t.igual(Regras.normalizarConfig({ pontosVitoria: 2 }), { ...Regras.REGRAS_PADRAO, pontosVitoria: 2 }, "config parcial é completada com o padrão");
+      t.verdadeiro(Object.isFrozen(Regras.REGRAS_PADRAO), "padrão congelado (não dá para alterar sem querer)");
+      const base = Regras.baseDosJogadores([{ id: "a", nome: "A", extra: 1 }, { id: "b", nome: "B" }]);
+      t.igual(base, [
+        { id: "a", nome: "A", pontos: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0 },
+        { id: "b", nome: "B", pontos: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0 },
+      ], "base zerada só com os campos da classificação");
+    });
+
+    caso("N6 Estado inicial é um campeonato vazio e não mexe nos dados antigos de 2026", (t) => {
+      const arm = memoria({ "copa-fifa-2026": "dados antigos" });
+      const est = Estado.criar(arm);
+      const e = est.atual();
+      t.igual(e.versao, 2, "versão 2");
+      t.igual(e.campeonato.jogadores, [], "sem jogadores");
+      t.igual(e.jogos, [], "sem jogos");
+      t.igual(e.campeonato.sorteio, null, "sem sorteio");
+      t.igual(e.campeonato.config, { ...Regras.REGRAS_PADRAO }, "config padrão");
+      t.igual(e.mataMata, null, "sem mata-mata");
+      est.modificar("renomear", (s) => { s.campeonato.nome = "Copa FIFA 2027"; });
+      t.igual(Estado.criar(arm).atual().campeonato.nome, "Copa FIFA 2027", "alteração é salva e recuperada");
+      t.igual(arm.dados["copa-fifa-2026"], "dados antigos", "chave antiga continua intacta");
+      t.verdadeiro(Estado.CHAVE !== "copa-fifa-2026", "chave nova");
+      let erro = null;
+      try { est.importarJSON(JSON.stringify({ versao: 1, jogos: [] })); } catch (x) { erro = x; }
+      t.verdadeiro(erro && erro.message.includes("formato antigo"), `backup v1 recusado com mensagem clara (${erro && erro.message})`);
+    });
+
+    // ---------- Cadastro de jogadores (Fase 8) ----------
+
+    caso("C1 Nomes: normalização, comparação sem acento/maiúscula e ids estáveis", (t) => {
+      t.igual(Regras.normalizarNome("  João   Exemplo \t"), "João Exemplo", "tira espaços sobrando");
+      t.igual(Regras.chaveDoNome("João  EXEMPLO"), Regras.chaveDoNome("joao exemplo"), "sem diferenciar acento, maiúscula e espaços");
+      t.igual(Regras.gerarIdJogador("João Exemplo", []), "joao-exemplo", "slug do nome");
+      t.igual(Regras.gerarIdJogador("Time Tr4", []), "time-tr4", "números são mantidos");
+      t.igual(Regras.gerarIdJogador("Ana", ["ana"]), "ana-2", "id repetido ganha sufixo");
+      t.igual(Regras.gerarIdJogador("Ana", ["ana", "ana-2"]), "ana-3", "e o sufixo continua subindo");
+      t.igual(Regras.gerarIdJogador("???", []), "jogador", "nome só com símbolos vira 'jogador'");
+      t.igual(Regras.interpretarListaNomes("Ana\r\n\n  Bia  \n\nCarlos Eduardo\n"), ["Ana", "Bia", "Carlos Eduardo"], "lista colada: uma linha por nome, sem vazias");
+    });
+
+    caso("C2 Adicionar jogadores: ordem, duplicados e nomes inválidos", (t) => {
+      const antes = [{ id: "ana", nome: "Ana" }];
+      const r = Regras.adicionarJogadores(antes, ["Bia", "ana", "ÁNA", "Bia ", "", "João Exemplo", "x".repeat(31)]);
+      t.igual(r.jogadores.map((j) => j.nome), ["Ana", "Bia", "João Exemplo"], "adiciona na ordem e ignora o resto");
+      t.igual(r.jogadores.map((j) => j.id), ["ana", "bia", "joao-exemplo"], "ids gerados");
+      t.igual(r.adicionados, ["Bia", "João Exemplo"], "lista dos adicionados");
+      t.igual(r.ignorados.map((i) => i.nome), ["ana", "ÁNA", "Bia", "x".repeat(31)], "lista dos ignorados (linha vazia some sem aviso)");
+      t.verdadeiro(r.ignorados.every((i) => i.motivo), "cada ignorado traz o motivo");
+      t.igual(antes, [{ id: "ana", nome: "Ana" }], "não altera a lista original");
+      t.verdadeiro(Regras.validarNomeJogador("   ", []), "nome em branco é recusado");
+    });
+
+    caso("C3 Renomear e remover", (t) => {
+      const lista = [{ id: "ana", nome: "Ana" }, { id: "bia", nome: "Bia" }];
+      t.igual(Regras.renomearJogador(lista, "ana", "Ana Paula").jogadores, [{ id: "ana", nome: "Ana Paula" }, { id: "bia", nome: "Bia" }], "renomeia mantendo o id");
+      t.igual(Regras.renomearJogador(lista, "ana", "ANA").jogadores[0].nome, "ANA", "pode mudar só a caixa do próprio nome");
+      t.verdadeiro(Regras.renomearJogador(lista, "ana", " bía ").erro, "nome de outro jogador (sem acento/caixa) é recusado");
+      t.verdadeiro(Regras.renomearJogador(lista, "zzz", "Novo").erro, "jogador inexistente");
+      t.verdadeiro(Regras.renomearJogador(lista, "ana", "").erro, "nome vazio");
+      t.igual(Regras.removerJogador(lista, "ana"), [{ id: "bia", nome: "Bia" }], "remove");
+      t.igual(lista.length, 2, "lista original intacta");
+    });
+
+    caso("C4 Diagnóstico do campeonato (jogadores × jogos por jogador × semanas)", (t) => {
+      const jogadoresDe = (n) => Array.from({ length: n }, (_, i) => ({ id: `j${i}`, nome: `J${i}` }));
+      const ok = Regras.diagnosticarCampeonato(jogadoresDe(32));
+      t.campos(ok, { jogadores: 32, totalJogos: 48, jogosPorSemanaMin: 6, jogosPorSemanaMax: 6, pronto: true }, "32 × 6 × 8");
+      t.igual(ok.problemas, [], "sem problemas");
+      const trinta = Regras.diagnosticarCampeonato(jogadoresDe(30));
+      t.campos(trinta, { totalJogos: 45, jogosPorSemanaMin: 5, jogosPorSemanaMax: 6, pronto: true }, "30 × 6 × 8: 45 jogos, 5 a 6 por semana");
+      const trintaEUm = Regras.diagnosticarCampeonato(jogadoresDe(31));
+      t.verdadeiro(!trintaEUm.pronto && trintaEUm.problemas[0].includes("não fecha"), "31 × 6 = 186 não divide em jogos de 4");
+      t.verdadeiro(Regras.diagnosticarCampeonato(jogadoresDe(6)).problemas.some((p) => p.includes("pelo menos 8")), "menos de 8 jogadores");
+      t.verdadeiro(Regras.diagnosticarCampeonato(jogadoresDe(0)).problemas.length > 0, "campeonato vazio não está pronto");
+      const config = (extra) => ({ ...Regras.REGRAS_PADRAO, ...extra });
+      t.verdadeiro(Regras.diagnosticarCampeonato(jogadoresDe(32), config({ jogosPorJogador: 9 })).problemas.some((p) => p.includes("uma vez por semana")),
+        "mais jogos por jogador do que semanas");
+      t.verdadeiro(Regras.diagnosticarCampeonato(jogadoresDe(8), config({ jogosPorJogador: 8 })).problemas.some((p) => p.includes("repetir parceiro")),
+        "mais jogos do que parceiros possíveis");
+      t.igual(Regras.diagnosticarCampeonato(jogadoresDe(24), config({ jogosPorJogador: 4, semanas: 6 })).totalJogos, 24, "config própria: 24 × 4 ÷ 4 = 24 jogos");
+    });
+
+    caso("C5 Cadastro trava com o calendário confirmado ou com jogos", (t) => {
+      const livre = { sorteio: null };
+      t.igual(Regras.cadastroTravado(livre, []), false, "sem sorteio nem jogos: livre");
+      t.igual(Regras.cadastroTravado({ sorteio: { semente: 1, confirmado: false } }, []), false, "sorteio ainda não confirmado: livre");
+      t.igual(Regras.cadastroTravado({ sorteio: { semente: 1, confirmado: true } }, []), true, "sorteio confirmado: travado");
+      t.igual(Regras.cadastroTravado(livre, [{ id: "j1" }]), true, "com jogos: travado");
+    });
+
+    // ---------- Sorteio do calendário (Fase 9) ----------
+
+    const jogadoresFicticios = (n) => Array.from({ length: n }, (_, i) => ({ id: `j${i}`, nome: `J${i}` }));
+    const configDe = (jogosPorJogador, semanas) => ({ ...Regras.REGRAS_PADRAO, jogosPorJogador, semanas });
+    const sortear = (jogadores, jogosPorJogador, semanas, semente) => Regras.gerarCalendario(jogadores, { jogosPorJogador, semanas, semente });
+
+    caso("S1 Jogos por semana: total dividido nas semanas, as primeiras ficam com a sobra", (t) => {
+      t.igual(Regras.jogosPorSemana(48, 8), [6, 6, 6, 6, 6, 6, 6, 6], "48 jogos em 8 semanas");
+      t.igual(Regras.jogosPorSemana(45, 8), [6, 6, 6, 6, 6, 5, 5, 5], "45 jogos em 8 semanas");
+      t.igual(Regras.jogosPorSemana(45, 8).reduce((a, b) => a + b, 0), 45, "a soma fecha");
+    });
+
+    caso("S2 Sorteio 32 jogadores × 6 jogos × 8 semanas respeita o regulamento", (t) => {
+      const jogadores = classificacaoBase.map((l) => ({ id: l.id, nome: l.nome }));
+      for (const semente of [1, 2, 3, 12345, 987654321]) {
+        const r = sortear(jogadores, 6, 8, semente);
+        t.verdadeiro(r.calendario && !r.erro, `semente ${semente}: gerou calendário`);
+        const a = Regras.avaliarCalendario(jogadores, r.calendario, configDe(6, 8));
+        t.verdadeiro(a.pronto, `semente ${semente}: sem violações ${a.violacoes.join("; ")}`);
+        t.igual(r.calendario.length, 48, `semente ${semente}: 48 jogos`);
+        t.igual([a.minJogos, a.maxJogos], [6, 6], `semente ${semente}: todos com 6 jogos`);
+        t.igual(a.jogosPorSemana, [6, 6, 6, 6, 6, 6, 6, 6], `semente ${semente}: 6 jogos por semana`);
+        t.igual(a.parceirosRepetidos, [], `semente ${semente}: nenhum parceiro repetido`);
+        t.verdadeiro(a.adversariosRepetidos.pares <= 2, `semente ${semente}: adversários repetidos ${a.adversariosRepetidos.pares} (≤ 2)`);
+      }
+    });
+
+    caso("S3 Sorteio é reproduzível: mesma semente, mesmo calendário; outra semente, outro", (t) => {
+      const jogadores = jogadoresFicticios(32);
+      const a = JSON.stringify(sortear(jogadores, 6, 8, 42));
+      t.igual(JSON.stringify(sortear(jogadores, 6, 8, 42)), a, "mesma semente repete");
+      t.verdadeiro(JSON.stringify(sortear(jogadores, 6, 8, 43)) !== a, "semente diferente muda");
+      const original = JSON.stringify(jogadores);
+      t.igual(JSON.stringify(jogadores), original, "não altera a lista de jogadores");
+    });
+
+    caso("S4 Outros tamanhos de campeonato (e tempo razoável)", (t) => {
+      const inicio = Date.now();
+      for (const [n, jogos, semanas] of [[24, 6, 8], [28, 6, 8], [30, 6, 8], [16, 4, 6], [20, 5, 8], [12, 3, 4]]) {
+        const jogadores = jogadoresFicticios(n);
+        const r = sortear(jogadores, jogos, semanas, 7);
+        const a = Regras.avaliarCalendario(jogadores, r.calendario || [], configDe(jogos, semanas));
+        t.verdadeiro(r.calendario && a.pronto, `${n} jogadores × ${jogos} jogos × ${semanas} semanas: respeita o regulamento ${a.violacoes.slice(0, 2).join("; ")}`);
+        if (r.calendario) t.igual(r.calendario.length, n * jogos / 4, `${n}×${jogos}: ${n * jogos / 4} jogos`);
+      }
+      const trinta = Regras.avaliarCalendario(jogadoresFicticios(30), sortear(jogadoresFicticios(30), 6, 8, 7).calendario, configDe(6, 8));
+      t.igual(trinta.jogosPorSemana, [6, 6, 6, 6, 6, 5, 5, 5], "30 jogadores: semanas com 6 e 5 jogos");
+      t.verdadeiro(Date.now() - inicio < 8000, `tempo total ${Date.now() - inicio} ms (< 8 s)`);
+    });
+
+    caso("S5 Combinação impossível devolve erro claro", (t) => {
+      const r31 = sortear(jogadoresFicticios(31), 6, 8, 1);
+      t.verdadeiro(r31.erro && r31.erro.includes("não fecha") && !r31.calendario, `31 jogadores: ${r31.erro}`);
+      t.verdadeiro(sortear(jogadoresFicticios(6), 6, 8, 1).erro, "poucos jogadores");
+      t.verdadeiro(sortear(jogadoresFicticios(32), 9, 8, 1).erro, "mais jogos que semanas");
+    });
+
+    caso("S6 avaliarCalendario aponta cada violação", (t) => {
+      const jogadores = jogadoresFicticios(8);
+      const cfg = configDe(2, 2);
+      const ok = [
+        { semana: 1, dupla1: ["j0", "j1"], dupla2: ["j2", "j3"] }, { semana: 1, dupla1: ["j4", "j5"], dupla2: ["j6", "j7"] },
+        { semana: 2, dupla1: ["j0", "j2"], dupla2: ["j4", "j6"] }, { semana: 2, dupla1: ["j1", "j3"], dupla2: ["j5", "j7"] },
+      ];
+      t.verdadeiro(Regras.avaliarCalendario(jogadores, ok, cfg).pronto, "calendário correto não tem violações");
+      const parceiro = ok.map((j) => ({ ...j }));
+      parceiro[2] = { semana: 2, dupla1: ["j0", "j1"], dupla2: ["j4", "j6"] };
+      parceiro[3] = { semana: 2, dupla1: ["j2", "j3"], dupla2: ["j5", "j7"] };
+      const a1 = Regras.avaliarCalendario(jogadores, parceiro, cfg);
+      t.igual(a1.parceirosRepetidos.map((p) => p.jogadores.join("+")), ["J0+J1", "J2+J3"], "parceiros repetidos");
+      t.verdadeiro(!a1.pronto, "parceiro repetido é violação");
+      const duas = ok.concat([{ semana: 2, dupla1: ["j0", "j4"], dupla2: ["j1", "j5"] }]);
+      t.verdadeiro(Regras.avaliarCalendario(jogadores, duas, cfg).violacoes.some((v) => v.includes("mais de uma vez na semana 2")), "dois jogos na mesma semana");
+      t.verdadeiro(Regras.avaliarCalendario(jogadores, ok.slice(0, 3), cfg).violacoes.some((v) => v.includes("tem 1 jogo")), "jogador com jogos a menos");
+      t.verdadeiro(Regras.avaliarCalendario(jogadores, ok.concat([{ semana: 5, dupla1: ["j0", "j1"], dupla2: ["j2", "j3"] }]), cfg).violacoes.some((v) => v.includes("semana 5")), "semana fora do campeonato");
+      const adv = Regras.avaliarCalendario(jogadores, [
+        { semana: 1, dupla1: ["j0", "j1"], dupla2: ["j2", "j3"] }, { semana: 2, dupla1: ["j0", "j4"], dupla2: ["j2", "j5"] },
+      ], configDe(1, 2));
+      t.igual(adv.adversariosRepetidos, { pares: 1, maxVezes: 2 }, "J0 enfrentou J2 duas vezes");
+    });
+
+    caso("S7 Trocar jogador no calendário", (t) => {
+      const cal = [
+        { semana: 1, dupla1: ["a", "b"], dupla2: ["c", "d"] },
+        { semana: 1, dupla1: ["e", "f"], dupla2: ["g", "h"] },
+        { semana: 2, dupla1: ["a", "e"], dupla2: ["b", "f"] },
+      ];
+      const copia = JSON.stringify(cal);
+      t.igual(Regras.trocarJogadorNoCalendario(cal, 0, 1, 0, "e")[0].dupla1, ["e", "b"], "novo jogador entra no jogo");
+      t.igual(Regras.trocarJogadorNoCalendario(cal, 0, 1, 0, "e")[1].dupla1, ["a", "f"], "quem jogava em outro jogo da semana fica no lugar de quem saiu");
+      t.igual(Regras.trocarJogadorNoCalendario(cal, 0, 1, 0, "b")[0].dupla1, ["b", "a"], "troca dentro do mesmo jogo");
+      t.igual(Regras.trocarJogadorNoCalendario(cal, 0, 2, 1, "z")[0].dupla2, ["c", "z"], "quem descansava entra e quem saiu passa a descansar");
+      t.igual(Regras.trocarJogadorNoCalendario(cal, 0, 1, 0, "a"), cal.map((j) => ({ ...j })), "trocar pelo mesmo jogador não muda nada");
+      t.igual(Regras.trocarJogadorNoCalendario(cal, 0, 1, 0, "e")[2], cal[2], "outras semanas não são afetadas");
+      t.igual(JSON.stringify(cal), copia, "calendário original não é alterado");
+    });
+
+    caso("S8 Calendário confirmado vira os jogos da classificação", (t) => {
+      const jogos = Regras.calendarioParaJogos([
+        { semana: 2, dupla1: ["a", "b"], dupla2: ["c", "d"] },
+        { semana: 1, dupla1: ["e", "f"], dupla2: ["g", "h"] },
+        { semana: 1, dupla1: ["a", "c"], dupla2: ["b", "d"] },
+      ]);
+      t.igual(jogos.map((j) => j.id), ["s1-j1", "s1-j2", "s2-j1"], "ids por semana, na ordem do sorteio");
+      t.igual(jogos.map((j) => j.semana), [1, 1, 2], "ordenados por semana");
+      t.verdadeiro(jogos.every((j) => j.resultado === null), "todos pendentes");
+      t.igual(jogos[0].dupla1, ["e", "f"], "duplas preservadas");
+    });
+
+    caso("S9 Estado: rascunho do sorteio é salvo, desfeito, validado e vira jogos ao confirmar", (t) => {
+      const arm = memoria({ [Estado.CHAVE]: JSON.stringify(dadosV2((d) => { d.jogos = []; })) });
+      const est = Estado.criar(arm);
+      const jogadores = est.atual().campeonato.jogadores;
+      const r = sortear(jogadores, 6, 8, 99);
+      est.modificar("sortear", (s) => { s.campeonato.sorteio = { semente: 99, confirmado: false, rascunho: r.calendario }; });
+      const reaberto = Estado.criar(arm).atual().campeonato;
+      t.igual(reaberto.sorteio.rascunho, r.calendario, "reabrir recupera o rascunho");
+      t.igual(Regras.cadastroTravado(reaberto, []), false, "rascunho ainda não trava o cadastro");
+
+      const ruim = JSON.parse(est.exportarJSON());
+      ruim.campeonato.sorteio.rascunho[0].dupla1 = ["p23", "ninguem"];
+      let erro = null;
+      try { est.importarJSON(JSON.stringify(ruim)); } catch (e) { erro = e; }
+      t.verdadeiro(erro, `rascunho com jogador desconhecido é recusado (${erro && erro.message})`);
+      const foraDaSemana = JSON.parse(est.exportarJSON());
+      foraDaSemana.campeonato.sorteio.rascunho[0].semana = 9;
+      erro = null;
+      try { est.importarJSON(JSON.stringify(foraDaSemana)); } catch (e) { erro = e; }
+      t.verdadeiro(erro, `rascunho fora das semanas é recusado (${erro && erro.message})`);
+
+      est.modificar("confirmar", (s) => {
+        s.jogos = Regras.calendarioParaJogos(s.campeonato.sorteio.rascunho);
+        s.campeonato.sorteio = { semente: 99, confirmado: true };
+      });
+      const e = est.atual();
+      t.igual(e.jogos.length, 48, "48 jogos criados");
+      t.verdadeiro(Regras.cadastroTravado(e.campeonato, e.jogos), "cadastro travado");
+      t.verdadeiro(!("rascunho" in e.campeonato.sorteio), "sorteio confirmado não guarda rascunho");
+      est.desfazer();
+      t.igual(est.atual().jogos, [], "desfazer a confirmação volta aos jogos vazios");
+      t.igual(est.atual().campeonato.sorteio.confirmado, false, "e ao sorteio em análise");
+    });
+
+    // ---------- Rodadas e classificação por semana (Fase 10) ----------
+
+    // Jogos de sexta distribuídos em 3 semanas, com a base zerada (como num campeonato novo).
+    const SEMANA_DO_JOGO = { j1: 1, j2: 1, j3: 2, j4: 2, j5: 3, j6: 3, j7: 3 };
+    function jogosEmSemanas(resultados = {}) {
+      return jogosSexta.map((j) => ({ id: j.id, semana: SEMANA_DO_JOGO[j.id], dupla1: j.dupla1, dupla2: j.dupla2, resultado: resultados[j.id] || null }));
+    }
+    const baseZerada = () => Regras.baseDosJogadores(classificacaoBase);
+
+    caso("R1 Progresso por semana, semana em andamento e última semana com resultado", (t) => {
+      const jogos = jogosEmSemanas({ j1: placar(2, 1), j2: anulado(), j3: wo(2) });
+      const progresso = Regras.progressoPorSemana(jogos, 8);
+      t.igual(progresso.slice(0, 4), [
+        { semana: 1, total: 2, resolvidos: 2 }, { semana: 2, total: 2, resolvidos: 1 },
+        { semana: 3, total: 3, resolvidos: 0 }, { semana: 4, total: 0, resolvidos: 0 },
+      ], "total e resolvidos por semana (anulado e W.O. contam como resolvidos)");
+      t.igual(progresso.length, 8, "uma entrada por semana do campeonato");
+      t.igual(Regras.semanaAtual(jogos), 2, "semana em andamento = primeira com jogo pendente");
+      t.igual(Regras.semanaAtual(jogosEmSemanas()), 1, "nada lançado: semana 1");
+      const todos = Object.fromEntries(jogosSexta.map((j) => [j.id, placar(1, 0)]));
+      t.igual(Regras.semanaAtual(jogosEmSemanas(todos)), 3, "tudo resolvido: a última semana");
+      t.igual(Regras.semanaAtual([]), null, "sem jogos: null");
+      t.igual(Regras.ultimaSemanaComResultado(jogos), 2, "última semana com resultado");
+      t.igual(Regras.ultimaSemanaComResultado(jogosEmSemanas()), null, "sem resultados: null");
+      t.igual(Regras.semanaDoJogo({ id: "x" }), 1, "jogo sem semana conta como semana 1");
+    });
+
+    caso("R2 Classificação por semana: só os jogos até a semana, variação em relação à semana anterior", (t) => {
+      const jogos = jogosEmSemanas({ j1: placar(2, 1), j3: placar(3, 0) });
+      const ate1 = Regras.classificacaoPorSemana(baseZerada(), jogos, [], undefined, 1);
+      t.igual(linha(ate1, "p01").pontos, 0, "após a semana 1, o jogo da semana 2 ainda não conta");
+      t.igual(linha(ate1, "p12").pontos, 3, "mas o da semana 1 conta");
+      t.verdadeiro(ate1.every((l) => l.variacao === 0), "semana 1: sem semana anterior, sem variação");
+      const ate2 = Regras.classificacaoPorSemana(baseZerada(), jogos, [], undefined, 2);
+      t.igual(linha(ate2, "p01").pontos, 3, "após a semana 2, o jogo da semana 2 conta");
+      t.igual(linha(ate2, "p01").variacao, 2, "Jogador 01 subiu do 3º para o 1º");
+      t.igual(linha(ate2, "p12").variacao, -2, "Jogador 12 caiu do 1º para o 3º");
+      const aoVivo = Regras.classificacaoPorSemana(baseZerada(), jogos, []);
+      t.igual(aoVivo.map((l) => [l.id, l.posicao, l.variacao]), ate2.map((l) => [l.id, l.posicao, l.variacao]), "ao vivo = após a última semana com resultado");
+      const soSemana1 = Regras.classificacaoPorSemana(baseZerada(), jogosEmSemanas({ j1: placar(2, 1) }), []);
+      t.verdadeiro(soSemana1.every((l) => l.variacao === 0), "ao vivo com resultados só na semana 1: sem variação");
+      const semana3Parcial = Regras.classificacaoPorSemana(baseZerada(), jogosEmSemanas({ j1: placar(2, 1), j5: placar(1, 0) }), []);
+      t.igual(linha(semana3Parcial, "p11").variacao, linha(semana3Parcial, "p11").posicaoBase - linha(semana3Parcial, "p11").posicao, "variação = posição anterior − posição atual");
+      t.verdadeiro(linha(semana3Parcial, "p11").posicaoBase > 2, "posição anterior vem da classificação antes da semana 3");
+      const config = { ...Regras.REGRAS_PADRAO, pontosVitoria: 2 };
+      t.igual(linha(Regras.classificacaoPorSemana(baseZerada(), jogos, [], config, 1), "p12").pontos, 2, "usa a config");
+    });
+
+    caso("R3 Aviso do chaveamento resume jogos pendentes por semana quando são muitos", (t) => {
+      const poucos = jogosEmSemanas();
+      const tabela = Regras.calcularClassificacao(baseZerada(), poucos);
+      const aviso = Regras.avisosParaGerarChaveamento(poucos, tabela).find((a) => a.includes("sem resultado"));
+      t.verdadeiro(aviso.includes("j1") && aviso.includes("j7"), `poucos pendentes: lista os ids (${aviso})`);
+      const jogadores = classificacaoBase.map((l) => ({ id: l.id, nome: l.nome }));
+      const jogos = Regras.calendarioParaJogos(Regras.gerarCalendario(jogadores, { jogosPorJogador: 6, semanas: 8, semente: 5 }).calendario);
+      const muitos = Regras.avisosParaGerarChaveamento(jogos, Regras.calcularClassificacao(baseZerada(), jogos)).find((a) => a.includes("sem resultado"));
+      t.verdadeiro(muitos.startsWith("48 jogo(s)") && muitos.includes("semana 1: 6") && muitos.includes("semana 8: 6"), `muitos pendentes: resume por semana (${muitos})`);
+    });
+
+    // ---------- Telão, PNG e backup (Fase 11) ----------
+
+    caso("T1 PNG da classificação cabe em 1600 px com qualquer número de jogadores", (t) => {
+      t.igual(Exportar.alturaDaLinha(32), 39, "32 jogadores: linha de 39 px (como antes)");
+      t.igual(Exportar.alturaDaLinha(12), 39, "poucos jogadores: não passa de 39 px");
+      t.verdadeiro(Exportar.alturaDaLinha(50) < 39, "50 jogadores: linhas menores");
+      for (const n of [8, 32, 40, 50]) {
+        const tabela = Regras.calcularClassificacao(Regras.baseDosJogadores(jogadoresFicticios(n)), []);
+        const canvas = Exportar.desenharClassificacao(tabela, { geradoEm: new Date(2026, 9, 2, 15, 30), nome: "Copa de teste", semana: null, lancados: 0, totalJogos: 0 });
+        t.verdadeiro(canvas.width === 1080 && canvas.height <= 1600, `${n} jogadores: ${canvas.width}×${canvas.height} (altura ≤ 1600)`);
+      }
+      const tabela = Regras.calcularClassificacao(Regras.baseDosJogadores(jogadoresFicticios(32)), []);
+      const semana = Exportar.desenharClassificacao(tabela, { geradoEm: new Date(), nome: "Copa de teste", semana: 3, lancados: 18, totalJogos: 18 });
+      t.igual(semana.height, 1594, "32 jogadores continuam com 1594 px de altura");
+    });
+
+    caso("T2 Util.slug para nomes de arquivo", (t) => {
+      t.igual(Util.slug("Copa FIFA 2027 – FIFA em Duplas"), "copa-fifa-2027-fifa-em-duplas", "tira acento, símbolos e espaços");
+      t.igual(Util.slug("Copa Açaí!"), "copa-acai", "acentos viram letras simples");
+      t.igual(Util.slug("???"), "campeonato", "nome sem letras vira 'campeonato'");
+    });
+
+    caso("T3 Telão: nome do campeonato, jogos só da semana em andamento, telas conforme o que existe", (t) => {
+      const vazio = Estado.criar(memoria());
+      const jogosEm2Semanas = (d) => { d.jogos.forEach((j, i) => { j.semana = i < 2 ? 1 : 2; }); d.campeonato.nome = "Copa FIFA 2027"; };
+      const arm = memoria({ [Estado.CHAVE]: JSON.stringify(dadosV2(jogosEm2Semanas)) });
+      const est = Estado.criar(arm);
+      const raiz = document.createElement("div");
+      raiz.id = "telao";
+      raiz.hidden = true;
+      document.body.appendChild(raiz);
+      const telao = Telao.criar(est);
+      try {
+        const clicar = (id) => raiz.querySelector(`#${id}`).click();
+        const titulo = () => raiz.querySelector("#telao-titulo").textContent;
+        telao.abrir({ telaCheia: false });
+        t.igual(raiz.querySelector(".marca").textContent, "Copa FIFA 2027", "marca = nome do campeonato");
+        t.verdadeiro(titulo().includes("0/7 jogos lançados") && !titulo().includes("sexta"), `classificação: ${titulo()}`);
+        clicar("telao-proxima");
+        t.verdadeiro(titulo().startsWith("Jogos da semana 1") && titulo().includes("0/2"), `semana 1 em andamento: ${titulo()}`);
+        t.igual(raiz.querySelectorAll(".telao-jogo").length, 2, "só os 2 jogos da semana 1");
+        t.igual(raiz.querySelector(".telao-jogos").getAttribute("style"), "--n: 2", "grade com 2 linhas");
+        lancar(est, "j1", placar(1, 0));
+        lancar(est, "j2", placar(2, 2));
+        t.verdadeiro(titulo().startsWith("Jogos da semana 2") && titulo().includes("0/5"), `semana 1 completa: passa para a ${titulo()}`);
+        t.igual(raiz.querySelectorAll(".telao-jogo").length, 5, "5 jogos da semana 2");
+        t.igual(raiz.querySelector(".telao-jogos").getAttribute("style"), "--n: 5", "grade com 5 linhas");
+        t.igual(raiz.querySelectorAll(".proximo").length, 1, "um jogo marcado como PRÓXIMO");
+        clicar("telao-sair");
+
+        const raiz2 = document.createElement("div");
+        raiz2.id = "telao";
+        raiz2.hidden = true;
+        raiz.remove();
+        document.body.appendChild(raiz2);
+        const telaoVazio = Telao.criar(vazio);
+        telaoVazio.abrir({ telaCheia: false });
+        t.igual([...raiz2.querySelectorAll(".telao-telas span")].map((s) => s.textContent), ["Classificação"], "sem jogos nem mata-mata: só a classificação no rodízio");
+        telaoVazio.fechar();
+        raiz2.remove();
+      } finally {
+        telao.fechar();
+        raiz.remove();
+      }
+    });
+
+    caso("B1 Lembrete de backup", (t) => {
+      const camp = { jogadores: [{ id: "a", nome: "A" }], config: { ...Regras.REGRAS_PADRAO } };
+      const jogo = (id, semana, resultado) => ({ id, semana, dupla1: ["a", "b"], dupla2: ["c", "d"], resultado });
+      const agora = new Date("2026-10-20T12:00:00Z");
+      const dia = (n) => new Date(agora.getTime() - n * 86400000).toISOString();
+      const aberto = [jogo("s1-j1", 1, null), jogo("s2-j1", 2, null)];
+      t.igual(Regras.precisaDeBackup({ ...camp, jogadores: [] }, aberto, null, agora), null, "sem jogadores: nada a perder");
+      t.igual(Regras.precisaDeBackup(camp, [], null, agora), null, "sem jogos (só cadastro/sorteio): não lembra");
+      t.verdadeiro(Regras.precisaDeBackup(camp, aberto, null, agora).mensagem.includes("nenhum backup"), "nunca exportou");
+      t.igual(Regras.precisaDeBackup(camp, aberto, { em: dia(2), semanasCompletas: 0 }, agora), null, "backup de 2 dias atrás, nada novo: ok");
+      t.verdadeiro(Regras.precisaDeBackup(camp, aberto, { em: dia(8), semanasCompletas: 0 }, agora).mensagem.includes("8 dias"), "backup de 8 dias atrás");
+      t.igual(Regras.precisaDeBackup(camp, aberto, { em: dia(6), semanasCompletas: 0 }, agora), null, "6 dias ainda não lembra");
+      const semana1 = [jogo("s1-j1", 1, placar(1, 0)), jogo("s2-j1", 2, null)];
+      t.verdadeiro(Regras.precisaDeBackup(camp, semana1, { em: dia(0), semanasCompletas: 0 }, agora).mensagem.includes("1ª semana"), "semana concluída depois do backup");
+      t.igual(Regras.precisaDeBackup(camp, semana1, { em: dia(0), semanasCompletas: 1 }, agora), null, "backup já feito depois de concluir a semana");
+      t.igual(Regras.contarSemanasCompletas([jogo("a", 1, placar(1, 0)), jogo("b", 1, null), jogo("c", 2, anulado())], 8), 1, "contagem: só semanas com todos os jogos resolvidos");
+    });
+
+    caso("B2 Registro do backup é salvo, fora do desfazer, e validado", (t) => {
+      const arm = memoria2026();
+      const est = criarEstado(arm);
+      t.igual(est.ultimoBackup(), null, "começa sem backup");
+      est.registrarBackup({ em: "2026-10-05T10:00:00.000Z", semanasCompletas: 2 });
+      lancar(est, "j1", placar(1, 0));
+      t.igual(est.ultimoBackup(), { em: "2026-10-05T10:00:00.000Z", semanasCompletas: 2 }, "alterar o campeonato não apaga o registro");
+      est.desfazer();
+      t.igual(est.ultimoBackup().semanasCompletas, 2, "desfazer não desfaz o backup");
+      t.igual(Estado.criar(arm).ultimoBackup(), est.ultimoBackup(), "reabrir recupera o registro");
+      t.igual(JSON.parse(est.exportarJSON()).ultimoBackup.em, "2026-10-05T10:00:00.000Z", "o JSON exportado traz a data");
+      const ruim = JSON.parse(est.exportarJSON());
+      ruim.ultimoBackup = { em: "ontem", semanasCompletas: "x" };
+      const outro = criarEstado();
+      outro.importarJSON(JSON.stringify(ruim));
+      t.igual(outro.ultimoBackup(), null, "registro inválido no arquivo importado é ignorado (e o do estado atual é mantido)");
+      est.registrarBackup({ em: "lixo" });
+      t.igual(est.ultimoBackup(), null, "data inválida vira null");
+    });
+
+    // Execução e relatório
+    let passaram = 0, falharam = 0, pendentes = 0;
+    const container = document.getElementById("casos");
+    for (const c of casos) {
+      const div = document.createElement("div");
+      const h2 = document.createElement("h2");
+      const ul = document.createElement("ul");
+      let status;
+      if (c.pendente) {
+        status = "pendente";
+        pendentes++;
+        const li = document.createElement("li");
+        li.textContent = `Pendente: ${c.pendente}.`;
+        ul.appendChild(li);
+      } else {
+        const registro = [];
+        try {
+          c.fn(criarVerificador(registro));
+        } catch (erro) {
+          registro.push({ ok: false, texto: `Exceção: ${erro.message}` });
+        }
+        const ok = registro.length > 0 && registro.every((r) => r.ok);
+        status = ok ? "passou" : "falhou";
+        ok ? passaram++ : falharam++;
+        for (const r of registro) {
+          const li = document.createElement("li");
+          li.textContent = `${r.ok ? "✔" : "✘"} ${r.texto}`;
+          if (!r.ok) li.className = "erro";
+          ul.appendChild(li);
+        }
+      }
+      div.className = `caso ${status}`;
+      h2.textContent = `${status === "passou" ? "✅" : status === "falhou" ? "❌" : "⏳"} ${c.titulo}`;
+      div.append(h2, ul);
+      container.appendChild(div);
+    }
+
+    const resumo = document.getElementById("resumo");
+    resumo.textContent = `${passaram} passaram, ${falharam} falharam` + (pendentes ? `, ${pendentes} pendentes (fases futuras)` : "");
+    resumo.className = falharam ? "falha" : "ok";
+    document.title = `${falharam ? "❌" : "✅"} Testes – Copa FIFA em Duplas`;
+  </script>
+</body>
+</html>
