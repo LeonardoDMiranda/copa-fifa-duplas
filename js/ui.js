@@ -610,7 +610,7 @@
     return { texto: `empate ${placar}`, classe: "empate" };
   }
 
-  function agendaDoJogador(atual) {
+  function agendaDoJogador(atual, tabela) {
     const cfg = atual.campeonato.config;
     if (agendaJogador && !nomePorId.has(agendaJogador)) agendaJogador = null;
     const ordenados = [...nomePorId].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
@@ -624,7 +624,7 @@
     let corpo = null;
     if (agendaJogador) {
       const numeros = numerosNaSemana(atual.jogos);
-      const linhaDele = calcularTabela(atual).find((l) => l.id === agendaJogador);
+      const linhaDele = tabela.find((l) => l.id === agendaJogador);
       const jogosDele = atual.jogos.filter((j) => j.dupla1.includes(agendaJogador) || j.dupla2.includes(agendaJogador));
       corpo = el("div", {},
         el("p", { class: "legenda", id: "agenda-resumo" },
@@ -649,7 +649,7 @@
       corpo);
   }
 
-  function renderizarJogos(atual) {
+  function renderizarJogos(atual, tabela) {
     const lista = document.getElementById("lista-jogos");
     const navegacao = document.getElementById("navegacao-semanas");
     const agenda = document.getElementById("agenda-jogador");
@@ -666,7 +666,7 @@
     lista.replaceChildren(...atual.jogos
       .filter((j) => Regras.semanaDoJogo(j) === semana)
       .map((jogo) => cartaoJogo(jogo, numeros.get(jogo.id))));
-    agenda.replaceChildren(agendaDoJogador(atual));
+    agenda.replaceChildren(agendaDoJogador(atual, tabela));
     const lancados = atual.jogos.filter((j) => j.resultado).length;
     document.getElementById("contador-jogos").textContent = `${lancados}/${atual.jogos.length} lançados`;
   }
@@ -838,8 +838,9 @@
 
   // ---------- o que está em jogo ----------
 
-  // O cálculo enumera até 65.536 cenários (~0,5 s): só refaz quando jogos, desempates ou
-  // jogadores mudam. Devolve null se houver pendentes demais (ver Regras.MAX_PENDENTES_SITUACOES).
+  // O cálculo enumera até Regras.MAX_CENARIOS_SITUACOES cenários: só refaz quando jogos,
+  // desempates ou jogadores mudam. Devolve null se houver pendentes demais
+  // (ver Regras.limitePendentesSituacoes).
   let cacheSituacoes = { chave: null, valor: null };
   function situacoesDe(atual) {
     const chave = JSON.stringify([atual.jogos.map((j) => j.resultado), atual.desempatesManuais, atual.campeonato]);
@@ -891,7 +892,7 @@
       document.getElementById("resumo-em-jogo").textContent = "";
       document.getElementById("conteudo-em-jogo").replaceChildren(el("p", { class: "legenda mensagem-em-jogo" },
         atual.jogos.length
-          ? `Disponível quando faltarem até ${Regras.MAX_PENDENTES_SITUACOES} jogos (faltam ${pendentes}).`
+          ? `Disponível quando faltarem até ${Regras.limitePendentesSituacoes(atual.campeonato.config)} jogos (faltam ${pendentes}).`
           : "Ainda não há jogos."));
       return;
     }
@@ -902,7 +903,7 @@
       colunas[s.situacao].push(itemEmJogo(s, linha, atual.jogos));
     }
     document.getElementById("resumo-em-jogo").textContent = pendentes
-      ? `${pendentes} jogo(s) pendente(s) · ${(4 ** pendentes).toLocaleString("pt-BR")} cenários`
+      ? `${pendentes} jogo(s) pendente(s) · ${Regras.contarCenarios(pendentes, atual.campeonato.config).toLocaleString("pt-BR")} cenários`
       : "todos os jogos lançados";
 
     const coluna = (tipo, titulo) => el("div", { class: `coluna-em-jogo ${tipo}`, id: `coluna-${tipo}` },
@@ -933,8 +934,13 @@
     return dupla.map((id) => nomePorId.get(id)).join(" + ");
   }
 
+  // Depois de cada alteração, guarda as duplas que jogaram o 3º lugar e a final (ver
+  // Regras.fixarDuplasJogadas): corrigir uma semi não passa esses placares para outra dupla.
   function modificarMataMata(descricao, alterar) {
-    if (!estado.modificar(descricao, (s) => { s.mataMata = alterar(s.mataMata); })) renderizar();
+    const mudou = estado.modificar(descricao, (s) => {
+      s.mataMata = Regras.fixarDuplasJogadas(alterar(s.mataMata), tabelaAtual(), config());
+    });
+    if (!mudou) renderizar();
   }
 
   function painelGerar(atual, tabela) {
@@ -969,15 +975,39 @@
     estado.modificar("apagar chaveamento", (s) => { s.mataMata = null; });
   }
 
+  // Trocar duplas de um confronto que já tem placar: os placares ficam e passam a valer para as novas.
+  function confirmarTrocaComPlacar(confrontos) {
+    const comPlacar = confrontos.filter((c) => c.partidas.length && (c.lado1.desatualizada || c.lado2.desatualizada));
+    if (!comPlacar.length) return true;
+    return confirm(`${comPlacar.map((c) => ROTULOS[c.chave]).join(" e ")} já tem placar lançado. `
+      + "Os placares continuam e passam a valer para as novas duplas.\n\nTrocar as duplas mesmo assim?");
+  }
+
   function barraMataMata(mm, tabela) {
-    const desatualizado = [mm.semi1, mm.semi2].some((c) => c.lado1.desatualizada || c.lado2.desatualizada);
+    const semis = [mm.semi1, mm.semi2];
+    const finais = [mm.final, mm.terceiro];
+    const desatualizado = semis.some((c) => c.lado1.desatualizada || c.lado2.desatualizada);
+    const finaisDesatualizadas = finais.some((c) => c.lado1.desatualizada || c.lado2.desatualizada);
     return el("div", { class: "barra-mata-mata" },
       desatualizado && el("div", { class: "alerta" },
         "⚠️ A classificação mudou depois de gerar o chaveamento: as duplas automáticas das semis não batem mais com ela. ",
         el("button", {
           type: "button", id: "btn-atualizar-semis",
-          onclick: () => modificarMataMata("atualizar duplas das semis", (m) => Regras.atualizarDuplasDasSemis(m, tabelaAtual())),
+          onclick: () => {
+            if (!confirmarTrocaComPlacar(semis)) return;
+            modificarMataMata("atualizar duplas das semis", (m) => Regras.atualizarDuplasDasSemis(m, tabelaAtual()));
+          },
         }, "Usar duplas da classificação atual")),
+      finaisDesatualizadas && el("div", { class: "alerta" },
+        "⚠️ O resultado de uma semifinal mudou depois de lançar placares da final ou do 3º lugar: "
+        + "as duplas que jogaram não são mais as que saem das semis. ",
+        el("button", {
+          type: "button", id: "btn-atualizar-finais",
+          onclick: () => {
+            if (!confirmarTrocaComPlacar(finais)) return;
+            modificarMataMata("atualizar duplas da final e do 3º lugar", (m) => Regras.atualizarDuplasDasFinais(m, tabelaAtual(), config()));
+          },
+        }, "Usar duplas que saem das semis")),
       el("button", { type: "button", id: "btn-apagar-chave", class: "perigo discreto", onclick: apagarChaveamento }, "Apagar chaveamento"));
   }
 
@@ -1351,7 +1381,11 @@
     setTimeout(executarRenderAgendado, 0);
   }
 
-  document.addEventListener("pointerdown", (ev) => { if (ev.button === 0) mousePressionado = true; }, true);
+  // No <select>, a lista de opções do navegador pode engolir o pointerup: ele não entra na espera
+  // (a escolha chega pelo "change", depois de soltar).
+  document.addEventListener("pointerdown", (ev) => {
+    if (ev.button === 0 && !(ev.target instanceof HTMLSelectElement)) mousePressionado = true;
+  }, true);
   document.addEventListener("pointerup", soltarMouse, true);
   document.addEventListener("pointercancel", soltarMouse, true);
   window.addEventListener("blur", soltarMouse);
@@ -1370,7 +1404,7 @@
     renderizarLembreteBackup(atual);
     renderizarJogadores(atual);
     renderizarCalendario(atual);
-    renderizarJogos(atual);
+    renderizarJogos(atual, tabela);
     controleClassificacao(ultimaSemana);
     document.getElementById("rotulo-classificacao").textContent = semanaClassificacao === null ? "" : `após a semana ${semanaClassificacao}`;
     renderizarClassificacao(tabelaVista, semanaClassificacao === null);
@@ -1412,7 +1446,8 @@
   document.getElementById("btn-telao").addEventListener("click", () => telao.abrir());
   document.addEventListener("keydown", (ev) => {
     if (telao.ativo()) return;
-    const digitando = ev.target instanceof HTMLInputElement || ev.target instanceof HTMLSelectElement;
+    const digitando = ev.target instanceof HTMLInputElement || ev.target instanceof HTMLSelectElement
+      || ev.target instanceof HTMLTextAreaElement;
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z" && !digitando) {
       ev.preventDefault();
       desfazer();

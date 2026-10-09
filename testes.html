@@ -47,7 +47,13 @@
     function placar(gols1, gols2) { return { tipo: "placar", gols1, gols2 }; }
     function wo(vencedor) { return { tipo: "wo", vencedor }; }
 
-    function classificar(resultados, desempates = Regras.desempatesDaBase(classificacaoBase)) {
+    // A fixture é uma classificação que já tem jogos: a ordem do array vale como desempate manual
+    // inicial para os empates técnicos que já existem nela (ex.: Jogador 05 à frente de Jogador 32).
+    function desempatesDaBase(base) {
+      return Regras.detectarEmpatesTecnicos(base).map((ids) => ({ jogadores: ids }));
+    }
+
+    function classificar(resultados, desempates = desempatesDaBase(classificacaoBase)) {
       return Regras.calcularClassificacao(classificacaoBase, jogosCom(resultados), desempates);
     }
     function linha(tabela, id) { return tabela.find((l) => l.id === id); }
@@ -180,7 +186,7 @@
     });
 
     caso("F2.2 Ordem manual é descartada quando o grupo muda", (t) => {
-      const desempates = Regras.desempatesDaBase(classificacaoBase);
+      const desempates = desempatesDaBase(classificacaoBase);
       const com00 = Regras.podarDesempatesManuais(classificacaoBase, jogosCom({ j2: placar(0, 0) }), desempates);
       t.igual(com00, desempates, "j2 = 0×0 mantém o grupo Jogador 05/Jogador 32 e a ordem manual");
       const com11 = Regras.podarDesempatesManuais(classificacaoBase, jogosCom({ j2: placar(1, 1) }), desempates);
@@ -192,14 +198,6 @@
       const nova = Regras.definirOrdemDesempate(inicial, ["p32", "p05"]);
       t.igual(nova, [{ jogadores: ["p19", "p16"] }, { jogadores: ["p32", "p05"] }], "uma entrada por grupo");
       t.igual(inicial[0].jogadores, ["p05", "p32"], "não altera o array original");
-    });
-
-    caso("F2.4 Jogadores que jogam mais de uma vez", (t) => {
-      const mapa = Regras.jogosPorJogador(jogosSexta);
-      t.igual(mapa.get("p14"), ["j4", "j6", "j7"], "Jogador 14 joga 3 vezes (j4, j6, j7)");
-      t.igual(mapa.get("p12"), ["j1", "j6"], "Jogador 12 joga 2 vezes");
-      const repetem = [...mapa].filter(([, js]) => js.length > 1).map(([id]) => id).sort();
-      t.igual(repetem, ["p04", "p10", "p12", "p14", "p25", "p27"], "lista de quem repete");
     });
 
     // Armazenamento em memória com a interface do localStorage (não mexe nos dados reais do app).
@@ -307,6 +305,7 @@
         "mesmo jogador nas duas duplas": JSON.stringify(dadosV2((d) => { d.jogos[0].dupla2 = ["p20", "p27"]; })),
         "id de jogo repetido": JSON.stringify(dadosV2((d) => { d.jogos[1].id = "j1"; })),
         "semana inválida": JSON.stringify(dadosV2((d) => { d.jogos[0].semana = 0; })),
+        "semana além das semanas do campeonato": JSON.stringify(dadosV2((d) => { d.jogos[0].semana = 9; })),
         "jogador repetido": JSON.stringify(dadosV2((d) => { d.campeonato.jogadores.push({ id: "p20", nome: "Outro Jogador 20" }); })),
         "vagas diferentes de 8": JSON.stringify(dadosV2((d) => { d.campeonato.config.vagasFaseFinal = 4; })),
       };
@@ -493,6 +492,35 @@
       t.verdadeiro(erro, `importação com dupla inválida é recusada (${erro && erro.message})`);
     });
 
+    caso("F3.9 Final com placar guarda as duplas que jogaram: corrigir uma semi não troca a dupla sem aviso", (t) => {
+      const tabela = classificar();
+      const fixar = (m) => Regras.fixarDuplasJogadas(m, tabela);
+      const lancarMM = (m, chave, i, g1, g2) =>
+        fixar(Regras.definirCampoPartida(Regras.definirCampoPartida(m, chave, i, "gols1", g1), chave, i, "gols2", g2));
+      let mm = fixar(Regras.gerarMataMata(tabela));
+      mm = lancarMM(mm, "semi1", 0, 2, 1); // Jogador 23 + Jogador 05 vencem
+      mm = lancarMM(mm, "semi2", 0, 0, 1); // Jogador 24 + Jogador 21 vencem
+      t.igual(mm.final.dupla1, null, "final sem placar: nada guardado, segue as semis");
+      mm = lancarMM(mm, "final", 0, 2, 1);
+      t.igual([mm.final.dupla1, mm.final.dupla2], [["p23", "p05"], ["p24", "p21"]], "o primeiro placar da final guarda as duplas");
+
+      mm = lancarMM(mm, "semi1", 0, 1, 2); // corrige a Semi 1: vencem Jogador 17 + Jogador 28
+      let r = Regras.resolverMataMata(mm, tabela);
+      t.igual(r.final.dupla1, ["p23", "p05"], "a final continua com a dupla que jogou");
+      t.verdadeiro(r.final.lado1.desatualizada && !r.final.lado2.desatualizada, "e a dupla 1 fica marcada como desatualizada");
+      t.igual(r.final.lado1.automatica, ["p17", "p28"], "a automática passa a ser o novo vencedor da Semi 1");
+      t.igual(r.terceiro.dupla1, ["p23", "p05"], "3º lugar sem placar segue as semis");
+
+      r = Regras.resolverMataMata(Regras.atualizarDuplasDasFinais(mm, tabela), tabela);
+      t.igual(r.final.dupla1, ["p17", "p28"], "atualizar troca pela dupla que sai das semis");
+      t.igual(r.final.partidas, [{ gols1: 2, gols2: 1 }], "e mantém os placares");
+      t.verdadeiro(!r.final.lado1.desatualizada, "sem aviso depois de atualizar");
+
+      const limpo = fixar(Regras.definirCampoPartida(Regras.definirCampoPartida(mm, "final", 0, "gols1", null), "final", 0, "gols2", null));
+      t.igual([limpo.final.partidas, limpo.final.dupla1], [[], null], "apagar o placar da final descarta as duplas guardadas");
+      t.igual(Regras.resolverMataMata(limpo, tabela).final.dupla1, ["p17", "p28"], "e ela volta a seguir as semis");
+    });
+
     // 10
     function porSituacao(situacoes, tipo) {
       return situacoes.filter((s) => s.situacao === tipo).map((s) => s.nome);
@@ -500,7 +528,7 @@
 
     caso("10. O que está em jogo (sem placares)", (t) => {
       const inicio = performance.now();
-      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(), Regras.desempatesDaBase(classificacaoBase));
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(), desempatesDaBase(classificacaoBase));
       const ms = Math.round(performance.now() - inicio);
       t.igual(porSituacao(sit, "garantido"), ["Jogador 23", "Jogador 17"], "garantidos: Jogador 23, Jogador 17");
       t.igual(porSituacao(sit, "eliminado"), ["Jogador 07", "Jogador 06", "Jogador 08", "Jogador 18", "Jogador 29", "Jogador 26",
@@ -517,7 +545,7 @@
     };
 
     caso("F4.1 Com todos os jogos lançados, todos estão garantidos ou eliminados", (t) => {
-      const desempates = Regras.desempatesDaBase(classificacaoBase);
+      const desempates = desempatesDaBase(classificacaoBase);
       const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(placaresDoDia), desempates);
       t.igual(porSituacao(sit, "disputa"), [], "ninguém em disputa");
       const top8 = classificar(placaresDoDia).slice(0, 8).map((l) => l.nome).sort();
@@ -534,7 +562,7 @@
 
     caso("F4.3 Um jogo pendente muda as situações", (t) => {
       // j1 = 2×1: Jogador 12 vai a 15 pts e 5 V
-      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom({ j1: placar(2, 1) }), Regras.desempatesDaBase(classificacaoBase));
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom({ j1: placar(2, 1) }), desempatesDaBase(classificacaoBase));
       t.verdadeiro(porSituacao(sit, "garantido").includes("Jogador 12"), "Jogador 12 (15 pts, 5 V) passa a garantido");
       t.verdadeiro(porSituacao(sit, "eliminado").includes("Jogador 29"), "Jogador 29 continua eliminado");
     });
@@ -566,15 +594,45 @@
       const a = sit.find((s) => s.id === "a");
       t.igual(a.situacao, "disputa", "A não é garantido só por estar na frente de B numa ordem que vai ser descartada");
       t.verdadeiro(a.dependeDoDesempate, "A fica marcado como 'depende do desempate'");
+      // Ordem manual só de A e B (os dois terminaram), mas C pode perder (ou empatar 0×0) e ficar
+      // igual a eles em pontos e V: aí o grupo vira A, B e C e a ordem manual deixa de valer.
       const soAB = Regras.calcularSituacoes(sintetica, jogos, [{ jogadores: ["a", "b"] }]);
-      t.igual(soAB.find((s) => s.id === "a").situacao, "garantido", "com ordem manual só de A e B (ambos terminaram), A é garantido");
+      const aSoAB = soAB.find((s) => s.id === "a");
+      t.igual(aSoAB.situacao, "disputa", "ordem manual de A e B não garante A enquanto C ainda pode empatar com eles");
+      t.verdadeiro(aSoAB.dependeDoSaldo, "A fica marcado como 'depende do saldo' (o de C)");
+      const cLonge = sintetica.map((l) => (l.id === "c" ? { ...l, pontos: 3, v: 0 } : l)); // C não chega a 5 pts e 1 V
+      const semC = Regras.calcularSituacoes(cLonge, jogos, [{ jogadores: ["a", "b"] }]);
+      t.igual(semC.find((s) => s.id === "a").situacao, "garantido", "se C não pode empatar com eles, a ordem manual de A e B garante A");
     });
 
     caso("F4.5 'Depende do saldo' quando o empate em pts e V envolve quem ainda joga", (t) => {
-      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(), Regras.desempatesDaBase(classificacaoBase));
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(), desempatesDaBase(classificacaoBase));
       const comSaldo = sit.filter((s) => s.dependeDoSaldo).map((s) => s.nome);
       t.verdadeiro(comSaldo.length > 0, `há jogadores em disputa que dependem do saldo (${comSaldo.length})`);
       t.verdadeiro(sit.filter((s) => s.situacao !== "disputa").every((s) => !s.dependeDoSaldo), "garantidos e eliminados nunca têm a marca");
+    });
+
+    caso("F4.7 Jogo anulado entra nos cenários quando vale diferente do 0×0", (t) => {
+      const padrao = Regras.REGRAS_PADRAO;
+      t.igual(Regras.limitePendentesSituacoes(padrao), 8, "pontuação padrão: anulado = 0×0, 4 desfechos, até 8 jogos");
+      t.igual(Regras.contarCenarios(3, padrao), 64, "3 jogos pendentes = 4³ cenários");
+      const zeroAZeroVale1 = { ...padrao, pontosEmpateSemGols: 1 };
+      t.igual(Regras.contarCenarios(1, zeroAZeroVale1), 4, "0×0 valendo 1 (igual ao empate com gols): o anulado é o 4º desfecho");
+      const tudoDiferente = { ...padrao, pontosEmpate: 2, pontosEmpateSemGols: 1 };
+      t.igual(Regras.contarCenarios(1, tudoDiferente), 5, "empate 2, 0×0 1 e anulado 0: 5 desfechos");
+      t.igual(Regras.limitePendentesSituacoes(tudoDiferente), 6, "com 5 desfechos, até 6 jogos (5⁶ = 15.625 cenários)");
+
+      // 7 à frente; X já terminou com 4 pts e 1 V; R1+R2 × R3+R4 (todos com 4 pts e 1 V) ainda jogam.
+      // Com 0×0 valendo 1, só o jogo anulado deixa os quatro rivais empatados com X.
+      const linha = (id, pontos, v) => ({ id, nome: id.toUpperCase(), pontos, v, e: 0, d: 0, gp: 10, gc: 5 });
+      const sintetica = [
+        ...[20, 19, 18, 17, 16, 15, 14].map((p, i) => linha(`t${i + 1}`, p, 6)),
+        linha("x", 4, 1), linha("r1", 4, 1), linha("r2", 4, 1), linha("r3", 4, 1), linha("r4", 4, 1),
+      ];
+      const jogos = [{ id: "y1", dupla1: ["r1", "r2"], dupla2: ["r3", "r4"], resultado: null }];
+      const x = Regras.calcularSituacoes(sintetica, jogos, [], zeroAZeroVale1).find((s) => s.id === "x");
+      t.igual(x.situacao, "disputa", "X não está eliminado: se o jogo dos rivais for anulado, ele ainda alcança a 8ª vaga");
+      t.verdadeiro(x.dependeDoSaldo, "e depende do saldo");
     });
 
     // ---------- Jogo anulado (caso não previsto no regulamento: decisão do organizador) ----------
@@ -594,11 +652,11 @@
       const jogos = jogosCom({ j2: anulado() });
       const tabela = Regras.calcularClassificacao(classificacaoBase, jogos);
       t.verdadeiro(!Regras.avisosParaGerarChaveamento(jogos, tabela).some((a) => a.includes("j2")), "j2 não aparece como pendente no aviso do chaveamento");
-      const sit = Regras.calcularSituacoes(classificacaoBase, jogos, Regras.desempatesDaBase(classificacaoBase));
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogos, desempatesDaBase(classificacaoBase));
       t.igual(sit.find((s) => s.id === "p31").jogosPendentes, [], "Jogador 31 não tem mais jogo pendente");
       t.igual(sit.find((s) => s.id === "p21").jogosPendentes, [], "Jogador 21 não tem mais jogo pendente");
       const todos = jogosSexta.map((j) => ({ ...j, resultado: anulado() }));
-      const final = Regras.calcularSituacoes(classificacaoBase, todos, Regras.desempatesDaBase(classificacaoBase));
+      const final = Regras.calcularSituacoes(classificacaoBase, todos, desempatesDaBase(classificacaoBase));
       t.verdadeiro(final.every((s) => s.situacao !== "disputa"), "com tudo anulado, a base decide: ninguém em disputa");
       t.igual(final.filter((s) => s.situacao === "garantido").length, 8, "8 garantidos");
     });
@@ -717,7 +775,7 @@
 
     caso("N1 Pontuação vem da config (vitória 2, empate 2, 0×0 vale 1)", (t) => {
       const config = { ...Regras.REGRAS_PADRAO, pontosVitoria: 2, pontosEmpate: 2, pontosEmpateSemGols: 1 };
-      const des = Regras.desempatesDaBase(classificacaoBase);
+      const des = desempatesDaBase(classificacaoBase);
       const com = (resultados) => Regras.calcularClassificacao(classificacaoBase, jogosCom(resultados), des, { config });
       t.igual(linha(com({ j1: placar(2, 1) }), "p12").pontos, baseDe("p12").pontos + 2, "vitória vale 2");
       t.igual(linha(com({ j2: placar(1, 1) }), "p21").pontos, baseDe("p21").pontos + 2, "empate com gols vale 2");
@@ -725,13 +783,15 @@
       t.igual(linha(com({ j5: wo(1) }), "p11").pontos, baseDe("p11").pontos + 2, "W.O. vale a vitória da config");
       t.igual(Regras.efeitosDoResultado(placar(1, 0), config)[1].pontos, 2, "efeitosDoResultado usa a config");
       t.igual(Regras.efeitosDoResultado(placar(1, 0))[1].pontos, 3, "sem config vale o padrão (3)");
-      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom(), des, config);
+      // Essa pontuação tem 5 desfechos diferentes (empate, 0×0 e anulado valem 2, 1 e 0): até 6 pendentes.
+      t.igual(Regras.calcularSituacoes(classificacaoBase, jogosCom(), des, config), null, "7 pendentes = 5⁷ cenários: passa do limite");
+      const sit = Regras.calcularSituacoes(classificacaoBase, jogosCom({ j1: placar(2, 1) }), des, config);
       t.igual(sit.length, 32, "calcularSituacoes aceita a config");
     });
 
     caso("N2 Variação ▲▼: ordem da base (padrão), mapa de posições anteriores ou desligada", (t) => {
       const jogos = jogosCom({ j1: placar(2, 1) });
-      const des = Regras.desempatesDaBase(classificacaoBase);
+      const des = desempatesDaBase(classificacaoBase);
       const padrao = Regras.calcularClassificacao(classificacaoBase, jogos, des);
       t.igual(linha(padrao, "p12").variacao, 1, "padrão: Jogador 12 subiu do 3º para o 2º");
       const anteriores = new Map(classificar({}).map((l) => [l.id, l.posicao]));
@@ -1169,10 +1229,26 @@
       const ruim = JSON.parse(est.exportarJSON());
       ruim.ultimoBackup = { em: "ontem", semanasCompletas: "x" };
       const outro = criarEstado();
+      outro.registrarBackup({ em: "2026-10-01T10:00:00.000Z", semanasCompletas: 1 });
       outro.importarJSON(JSON.stringify(ruim));
-      t.igual(outro.ultimoBackup(), null, "registro inválido no arquivo importado é ignorado (e o do estado atual é mantido)");
+      t.igual(outro.ultimoBackup(), null, "registro inválido no arquivo importado vira null (o do campeonato anterior não fica)");
       est.registrarBackup({ em: "lixo" });
       t.igual(est.ultimoBackup(), null, "data inválida vira null");
+    });
+
+    caso("B3 Resetar e importar não herdam o registro de backup do campeonato anterior", (t) => {
+      const est = criarEstado();
+      lancar(est, "j1", placar(1, 0));
+      est.registrarBackup({ em: "2026-10-05T10:00:00.000Z", semanasCompletas: 8 });
+      const backup = est.exportarJSON();
+      est.resetar();
+      t.igual(est.ultimoBackup(), null, "resetar apaga o registro: o campeonato novo ainda não tem backup");
+      est.importarJSON(backup);
+      t.igual(est.ultimoBackup(), { em: "2026-10-05T10:00:00.000Z", semanasCompletas: 8 }, "importar traz o registro que veio no arquivo");
+      const semRegistro = JSON.parse(backup);
+      semRegistro.ultimoBackup = null;
+      est.importarJSON(JSON.stringify(semRegistro));
+      t.igual(est.ultimoBackup(), null, "arquivo sem registro: fica sem registro");
     });
 
     // Execução e relatório

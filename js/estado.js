@@ -103,7 +103,9 @@
       if (!j || !textoNaoVazio(j.id)) throw new Error("jogo sem id.");
       if (vistos.has(j.id)) throw new Error(`jogo repetido: ${j.id}.`);
       vistos.add(j.id);
-      if (!Number.isInteger(j.semana) || j.semana < 1) throw new Error(`semana inválida no jogo ${j.id}.`);
+      if (!Number.isInteger(j.semana) || j.semana < 1 || j.semana > config.semanas) {
+        throw new Error(`semana inválida no jogo ${j.id} (o campeonato tem ${config.semanas} semanas).`);
+      }
       for (const dupla of [j.dupla1, j.dupla2]) {
         if (!Array.isArray(dupla) || dupla.length !== 2 || !dupla.every((id) => idsJogadores.has(id))) {
           throw new Error(`dupla inválida no jogo ${j.id}.`);
@@ -296,16 +298,28 @@
         s.desempatesManuais = importado.desempatesManuais;
         s.mataMata = importado.mataMata;
       });
+      // O registro do backup é do campeonato: passa a valer o que veio no arquivo.
+      trocarRegistroDeBackup(importado.ultimoBackup);
     }
 
     function resetar() {
       const inicial = estadoInicial();
-      return modificar("resetar", (s) => {
+      const mudou = modificar("resetar", (s) => {
         s.campeonato = inicial.campeonato;
         s.jogos = inicial.jogos;
         s.desempatesManuais = inicial.desempatesManuais;
         s.mataMata = inicial.mataMata;
       });
+      // Campeonato novo: o backup do anterior não vale para ele.
+      trocarRegistroDeBackup(null);
+      return mudou;
+    }
+
+    function trocarRegistroDeBackup(registro) {
+      if (JSON.stringify(estado.ultimoBackup) === JSON.stringify(registro)) return;
+      estado = { ...estado, ultimoBackup: registro };
+      salvar();
+      notificar();
     }
 
     // O registro do backup não entra no desfazer (exportar e depois desfazer não "desexporta").

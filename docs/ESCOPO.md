@@ -54,17 +54,19 @@ Saldo = GP − GC. Jogo sem placar lançado não conta. Jogo anulado conta como 
 - Sem empate: cada jogo tem placar normal e, se empatar, **prorrogação** e, se ainda empatar, **pênaltis**.
 - Final MD3: termina quando uma dupla chega a 2 vitórias (o 3º jogo só aparece com 1×1).
 - **Duplas editáveis**: qualquer dupla do mata-mata pode ser trocada à mão (a "surpresa antes da final") e voltar à dupla automática depois.
+- **Duplas guardadas**: as das semis ficam fixas desde a geração do chaveamento; as do 3º lugar e da final ficam fixas a partir do primeiro placar lançado. Se a classificação ou o resultado de uma semi mudar depois, o app avisa e oferece trocar pelas duplas novas (os placares lançados continuam e passam a valer para elas).
 - Resultados do mata-mata **não** alteram a classificação.
 - Resultado final: 🥇 campeões (2 jogadores), 🥈 vice, 🥉 3º lugar.
 
 ### 2.4 O que está em jogo
 
-Para os jogos ainda sem resultado, o app enumera todos os desfechos possíveis por jogo (vitória da dupla 1, empate com gols, 0×0, vitória da dupla 2) e compara **pontos e vitórias** em cada cenário. Só calcula com até 8 jogos pendentes (4⁸ = 65.536 cenários).
+Para os jogos ainda sem resultado, o app enumera todos os desfechos possíveis por jogo (vitória da dupla 1, empate com gols, 0×0, jogo anulado, vitória da dupla 2; o W.O. vale o mesmo que a vitória) e compara **pontos e vitórias** em cada cenário. Desfechos que dão os mesmos pontos e V contam uma vez só (com a pontuação padrão, o anulado é igual ao 0×0, e sobram 4). Só calcula até 65.536 cenários: com a pontuação padrão, até 8 jogos pendentes.
 
 - **Garantido**: em todos os cenários, (jogadores à frente + empatados em pontos e V) ≤ 7.
 - **Eliminado**: em todos os cenários, jogadores estritamente à frente ≥ 8.
 - **Em disputa**: o resto. Se a vaga depender de saldo ou gols pró, mostra "depende do saldo".
 - Se dois jogadores empatam em pontos e V e **nenhum dos dois joga mais**, o saldo e os gols pró deles já são definitivos e decidem o empate (depois, a ordem manual). Empatados em tudo e sem ordem manual: "depende do desempate".
+- A ordem manual entre esses dois só vale no cenário em que ninguém que ainda joga empata com eles em pontos e V. Se alguém empata, o grupo pode mudar e a ordem manual ser descartada: "depende do saldo".
 
 ### 2.5 Sorteio do calendário
 
@@ -79,6 +81,7 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
 
 - Exportar/importar JSON guarda e restaura o campeonato inteiro.
 - O app lembra de exportar quando já há jogos e: nunca houve backup, uma semana nova foi concluída desde o último, ou faz 7 dias ou mais.
+- O registro do último backup é do campeonato: resetar apaga o registro, e importar traz o que veio no arquivo.
 
 ## 3. Modelo de dados (estado salvo no `localStorage`)
 

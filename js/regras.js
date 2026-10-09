@@ -20,8 +20,10 @@
   });
   const VAGAS_FASE_FINAL = REGRAS_PADRAO.vagasFaseFinal;
 
-  // "O que está em jogo" enumera 4^n cenários: 4^8 = 65.536 (~0,5 s). Acima disso não calcula.
-  const MAX_PENDENTES_SITUACOES = 8;
+  // "O que está em jogo" enumera todos os cenários dos jogos pendentes (desfechos^pendentes).
+  // Acima de 65.536 cenários não calcula: com a pontuação padrão (4 desfechos), 8 jogos.
+  const MAX_CENARIOS_SITUACOES = 4 ** 8;
+  const MAX_PENDENTES_SITUACOES = limitePendentesSituacoes(REGRAS_PADRAO);
 
   // Completa uma config parcial com o padrão.
   function normalizarConfig(parcial) {
@@ -156,13 +158,6 @@
     return b.every((id) => conjunto.has(id));
   }
 
-  // A ordem do array da base é a da planilha oficial; ela vale como desempate
-  // manual inicial para os empates técnicos que já existem na base
-  // (ex.: Jogador 05 à frente de Jogador 32).
-  function desempatesDaBase(base) {
-    return detectarEmpatesTecnicos(base).map((ids) => ({ jogadores: ids }));
-  }
-
   // Classificação = base + jogos com resultado. Nunca é guardada no estado.
   // opcoes (todas opcionais):
   //   config: parâmetros do campeonato (padrão: REGRAS_PADRAO)
@@ -220,18 +215,6 @@
       ...desempatesManuais.filter((dm) => !mesmoConjunto(dm.jogadores, ordem)),
       { jogadores: ordem.slice() },
     ];
-  }
-
-  // Map id do jogador -> ids dos jogos em que ele joga (na ordem dos jogos).
-  function jogosPorJogador(jogos) {
-    const mapa = new Map();
-    for (const jogo of jogos) {
-      for (const id of [...jogo.dupla1, ...jogo.dupla2]) {
-        if (!mapa.has(id)) mapa.set(id, []);
-        mapa.get(id).push(jogo.id);
-      }
-    }
-    return mapa;
   }
 
   // ---------- Cadastro de jogadores ----------
@@ -610,7 +593,8 @@
   }
 
   // Estrutura inicial do mata-mata. As duplas das semis ficam congeladas na geração;
-  // as do 3º lugar e da final saem dos resultados das semis (null = automática).
+  // as do 3º lugar e da final saem dos resultados das semis (null = automática) e ficam
+  // congeladas quando o confronto ganha placar (ver fixarDuplasJogadas).
   function gerarMataMata(classificacao) {
     const semis = duplasDasSemis(classificacao);
     const confronto = (duplas) => ({
@@ -791,6 +775,40 @@
     return novo;
   }
 
+  // 3º lugar e final: quando o confronto ganha o primeiro placar, as duplas automáticas que
+  // jogaram ficam guardadas. Assim, corrigir depois o resultado de uma semi não passa os placares
+  // já lançados para outra dupla sem aviso (a dupla fica "desatualizada"). Sem placar, volta a
+  // seguir as semis. Duplas manuais não mudam. Retorna um NOVO mata-mata.
+  function fixarDuplasJogadas(mataMata, classificacao, config = REGRAS_PADRAO) {
+    const resolvido = resolverMataMata(mataMata, classificacao, config);
+    const novo = clonarMataMata(mataMata);
+    for (const chave of ["terceiro", "final"]) {
+      const c = novo[chave];
+      for (const lado of [1, 2]) {
+        if (c[`duplaManual${lado}`]) continue;
+        if (!c.partidas.length) {
+          c[`dupla${lado}`] = null;
+        } else if (!c[`dupla${lado}`]) {
+          const automatica = resolvido[chave][`lado${lado}`].automatica;
+          c[`dupla${lado}`] = automatica ? automatica.slice() : null;
+        }
+      }
+    }
+    return novo;
+  }
+
+  // 3º lugar e final: troca as duplas automáticas guardadas pelas que saem hoje das semis.
+  // Os placares já lançados continuam e passam a valer para as novas duplas.
+  function atualizarDuplasDasFinais(mataMata, classificacao, config = REGRAS_PADRAO) {
+    const novo = clonarMataMata(mataMata);
+    for (const chave of ["terceiro", "final"]) {
+      for (const lado of [1, 2]) {
+        if (!novo[chave][`duplaManual${lado}`]) novo[chave][`dupla${lado}`] = null;
+      }
+    }
+    return fixarDuplasJogadas(novo, classificacao, config);
+  }
+
   function mesmaDupla(a, b) {
     if (!a || !b) return a === b;
     return mesmoConjunto(a, b);
@@ -800,13 +818,17 @@
   function resolverMataMata(mataMata, classificacao, config = REGRAS_PADRAO) {
     const semisAtuais = classificacao.length >= config.vagasFaseFinal ? duplasDasSemis(classificacao) : {};
 
+    // congelada: a dupla guardada vale no lugar da automática (semis sempre; 3º lugar e final
+    // depois do primeiro placar, se a dupla foi guardada por fixarDuplasJogadas).
     function resolver(chave, automaticas, congelada) {
       const c = mataMata[chave];
       const lado = (n) => {
         const manual = Boolean(c[`duplaManual${n}`]);
         const automatica = automaticas[n - 1] || null;
-        const dupla = manual || congelada ? c[`dupla${n}`] : automatica;
-        return { dupla, manual, automatica, desatualizada: congelada && !manual && !mesmaDupla(dupla, automatica) };
+        const guardada = c[`dupla${n}`];
+        const usaGuardada = manual || (congelada && Boolean(guardada));
+        const dupla = usaGuardada ? guardada : automatica;
+        return { dupla, manual, automatica, desatualizada: usaGuardada && !manual && !mesmaDupla(dupla, automatica) };
       };
       const lado1 = lado(1), lado2 = lado(2);
       const serie = analisarSerie(c.partidas, MELHOR_DE[chave]);
@@ -829,8 +851,8 @@
 
     const semi1 = resolver("semi1", semisAtuais.semi1 || [], true);
     const semi2 = resolver("semi2", semisAtuais.semi2 || [], true);
-    const terceiro = resolver("terceiro", [semi1.perdedora, semi2.perdedora], false);
-    const final = resolver("final", [semi1.vencedora, semi2.vencedora], false);
+    const terceiro = resolver("terceiro", [semi1.perdedora, semi2.perdedora], mataMata.terceiro.partidas.length > 0);
+    const final = resolver("final", [semi1.vencedora, semi2.vencedora], mataMata.final.partidas.length > 0);
     return {
       semi1, semi2, terceiro, final,
       podio: { campeoes: final.vencedora, vice: final.perdedora, terceiro: terceiro.vencedora },
@@ -912,32 +934,56 @@
   // ---------- O que está em jogo ----------
 
   // Desfechos possíveis de um jogo pendente, só pelo que importa aqui (pontos e vitórias):
-  // [pontos dupla 1, V dupla 1, pontos dupla 2, V dupla 2]
+  // [pontos dupla 1, V dupla 1, pontos dupla 2, V dupla 2]. O W.O. vale o mesmo que a vitória
+  // e o jogo anulado não dá nada a ninguém. Desfechos iguais (ex.: anulado e 0x0 com a
+  // pontuação padrão) entram uma vez só, para não repetir cenários.
   function desfechosPossiveis(config) {
     const { pontosVitoria: pv, pontosEmpate: pe, pontosEmpateSemGols: p0 } = config;
-    return [
-      [pv, 1, 0, 0], // vitória da dupla 1
+    const todos = [
+      [pv, 1, 0, 0], // vitória (ou W.O.) da dupla 1
       [pe, 0, pe, 0], // empate com gols
       [p0, 0, p0, 0], // 0x0
-      [0, 0, pv, 1], // vitória da dupla 2
+      [0, 0, 0, 0], // anulado
+      [0, 0, pv, 1], // vitória (ou W.O.) da dupla 2
     ];
+    const vistos = new Set();
+    return todos.filter((d) => {
+      const chave = d.join("|");
+      if (vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
+    });
+  }
+
+  // Quantos jogos pendentes "o que está em jogo" aceita com essa pontuação.
+  function limitePendentesSituacoes(config = REGRAS_PADRAO) {
+    const desfechos = desfechosPossiveis(config).length;
+    let n = 0;
+    while (desfechos ** (n + 1) <= MAX_CENARIOS_SITUACOES) n++;
+    return n;
+  }
+
+  function contarCenarios(pendentes, config = REGRAS_PADRAO) {
+    return desfechosPossiveis(config).length ** pendentes;
   }
 
   // Para cada jogador: garantido, em disputa ou eliminado na zona de classificação (top 8).
-  // Enumera todos os desfechos dos jogos pendentes (até 4^7 cenários) e, em cada um,
-  // compara pontos e vitórias. Saldo e gols pró só entram entre dois jogadores que não
-  // jogam mais (os números deles já são definitivos); se aí empatarem em tudo, vale a
-  // ordem manual do organizador, se houver e se todos do grupo já tiverem terminado.
+  // Enumera todos os desfechos dos jogos pendentes (até MAX_CENARIOS_SITUACOES cenários) e, em
+  // cada um, compara pontos e vitórias. Saldo e gols pró só entram entre dois jogadores que não
+  // jogam mais (os números deles já são definitivos); se aí empatarem em tudo, vale a ordem
+  // manual do organizador, se todos do grupo já tiverem terminado e se, no cenário, ninguém que
+  // ainda joga empatar com eles em pontos e V (aí o grupo muda e a ordem manual é descartada).
   //   Garantido: em todos os cenários, (à frente + empatados) ≤ 7.
   //   Eliminado: em todos os cenários, à frente ≥ 8.
   // Retorna [{ id, nome, situacao: "garantido"|"disputa"|"eliminado",
   //            dependeDoSaldo, dependeDoDesempate, jogosPendentes: [ids] }] na ordem da base,
-  // ou null se houver mais de MAX_PENDENTES_SITUACOES jogos pendentes (cenários demais).
+  // ou null se houver mais jogos pendentes do que limitePendentesSituacoes(config).
   function calcularSituacoes(base, jogos, desempatesManuais = [], config = REGRAS_PADRAO) {
     const pendentes = jogos.filter((j) => !efeitosDoResultado(j.resultado, config));
-    if (pendentes.length > MAX_PENDENTES_SITUACOES) return null;
-    const atual = aplicarJogos(base, jogos, config);
     const DESFECHOS = desfechosPossiveis(config);
+    const totalCenarios = DESFECHOS.length ** pendentes.length;
+    if (totalCenarios > MAX_CENARIOS_SITUACOES) return null;
+    const atual = aplicarJogos(base, jogos, config);
     const VAGAS = config.vagasFaseFinal;
     const n = atual.length;
     const indice = new Map(atual.map((l, i) => [l.id, i]));
@@ -965,17 +1011,21 @@
     // desempate[p][q] (só quando p e q empatam em pontos e V):
     //   >0 q fica à frente de p; <0 p fica à frente; 0 indefinido.
     // tipoEmpate[p][q]: "saldo" (alguém ainda joga) ou "manual" (empate total entre quem já terminou).
-    const desempate = [], tipoEmpate = [];
+    // viaOrdemManual[p][q]: o desempate veio só da ordem manual (saldo e gols pró iguais).
+    const desempate = [], tipoEmpate = [], viaOrdemManual = [];
     for (let p = 0; p < n; p++) {
       desempate.push(new Int32Array(n));
+      viaOrdemManual.push(new Uint8Array(n));
       tipoEmpate.push([]);
       for (let q = 0; q < n; q++) {
         if (p === q) continue;
         if (!terminou[p] || !terminou[q]) { tipoEmpate[p][q] = "saldo"; continue; }
         const lp = atual[p], lq = atual[q];
-        const d = saldo(lq) - saldo(lp) || lq.gp - lp.gp || ordemManual(lp.id, lq.id);
+        const pelosNumeros = saldo(lq) - saldo(lp) || lq.gp - lp.gp;
+        const d = pelosNumeros || ordemManual(lp.id, lq.id);
         desempate[p][q] = d;
         if (d === 0) tipoEmpate[p][q] = "manual";
+        else if (!pelosNumeros) viaOrdemManual[p][q] = 1;
       }
     }
 
@@ -985,7 +1035,13 @@
     const dependeDoDesempate = new Array(n).fill(false);
     const pontos = new Int32Array(n), vitorias = new Int32Array(n);
     const duplas = pendentes.map((j) => [j.dupla1.map((id) => indice.get(id)), j.dupla2.map((id) => indice.get(id))]);
-    const totalCenarios = DESFECHOS.length ** pendentes.length;
+
+    // Em cada cenário, ordena por pontos e V (chave = pontos × fator + V, com o fator maior que
+    // qualquer V possível) e só compara par a par dentro de cada grupo empatado. A ordem muda
+    // pouco de um cenário para o seguinte, então a ordenação por inserção é quase linear.
+    const fator = 1 + Math.max(0, ...atual.map((l, i) => l.v + jogosPendentes[i].length));
+    const chave = new Float64Array(n);
+    const ordem = Int32Array.from({ length: n }, (_, i) => i);
 
     for (let cenario = 0; cenario < totalCenarios; cenario++) {
       for (let i = 0; i < n; i++) { pontos[i] = atual[i].pontos; vitorias[i] = atual[i].v; }
@@ -997,27 +1053,50 @@
         for (const i of d2) { pontos[i] += d[2]; vitorias[i] += d[3]; }
       }
 
-      for (let p = 0; p < n; p++) {
-        let frente = 0, empatadosSaldo = 0, empatadosManual = 0;
-        for (let q = 0; q < n; q++) {
-          if (q === p) continue;
-          if (pontos[q] > pontos[p] || (pontos[q] === pontos[p] && vitorias[q] > vitorias[p])) frente++;
-          else if (pontos[q] === pontos[p] && vitorias[q] === vitorias[p]) {
-            const d = desempate[p][q];
+      for (let i = 0; i < n; i++) chave[i] = pontos[i] * fator + vitorias[i];
+      for (let k = 1; k < n; k++) {
+        const x = ordem[k], cx = chave[x];
+        let m = k - 1;
+        while (m >= 0 && chave[ordem[m]] < cx) { ordem[m + 1] = ordem[m]; m--; }
+        ordem[m + 1] = x;
+      }
+
+      // Percorre os grupos empatados em pontos e V; `inicio` = quantos estão estritamente à frente.
+      for (let inicio = 0; inicio < n;) {
+        if (inicio >= VAGAS) {
+          // Daqui para baixo, todos têm pelo menos 8 à frente.
+          for (let k = inicio; k < n; k++) semprePrimeiros8[ordem[k]] = false;
+          break;
+        }
+        let fim = inicio + 1;
+        while (fim < n && chave[ordem[fim]] === chave[ordem[inicio]]) fim++;
+        let alguemAindaJoga = false;
+        for (let k = inicio; k < fim; k++) if (!terminou[ordem[k]]) alguemAindaJoga = true;
+
+        for (let k = inicio; k < fim; k++) {
+          const p = ordem[k];
+          let frente = inicio, empatadosSaldo = 0, empatadosManual = 0;
+          for (let m = inicio; m < fim; m++) {
+            const q = ordem[m];
+            if (q === p) continue;
+            // Com alguém que ainda joga no mesmo grupo, a ordem manual entre os dois pode ser
+            // descartada (o grupo muda): o desfecho depende do saldo de quem ainda joga.
+            const d = viaOrdemManual[p][q] && alguemAindaJoga ? 0 : desempate[p][q];
             if (d > 0) frente++;
             else if (d === 0) {
               if (tipoEmpate[p][q] === "manual") empatadosManual++;
               else empatadosSaldo++;
             }
           }
+          const empatados = empatadosSaldo + empatadosManual;
+          if (frente + empatados > VAGAS - 1) semprePrimeiros8[p] = false;
+          if (frente < VAGAS) sempreFora[p] = false;
+          if (frente < VAGAS && frente + empatados >= VAGAS) {
+            if (empatadosSaldo) dependeDoSaldo[p] = true;
+            if (empatadosManual) dependeDoDesempate[p] = true;
+          }
         }
-        const empatados = empatadosSaldo + empatadosManual;
-        if (frente + empatados > VAGAS - 1) semprePrimeiros8[p] = false;
-        if (frente < VAGAS) sempreFora[p] = false;
-        if (frente < VAGAS && frente + empatados >= VAGAS) {
-          if (empatadosSaldo) dependeDoSaldo[p] = true;
-          if (empatadosManual) dependeDoDesempate[p] = true;
-        }
+        inicio = fim;
       }
     }
 
@@ -1043,6 +1122,9 @@
     REGRAS_PADRAO,
     VAGAS_FASE_FINAL,
     MAX_PENDENTES_SITUACOES,
+    MAX_CENARIOS_SITUACOES,
+    limitePendentesSituacoes,
+    contarCenarios,
     normalizarConfig,
     validarConfig,
     baseDosJogadores,
@@ -1081,16 +1163,16 @@
     definirDupla,
     voltarDuplaAutomatica,
     atualizarDuplasDasSemis,
+    fixarDuplasJogadas,
+    atualizarDuplasDasFinais,
     resolverMataMata,
     efeitosDoResultado,
     aplicarJogo,
     aplicarJogos,
     podarDesempatesManuais,
     definirOrdemDesempate,
-    jogosPorJogador,
     compararCriterios,
     detectarEmpatesTecnicos,
-    desempatesDaBase,
     calcularClassificacao,
   };
 })();
