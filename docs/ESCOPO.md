@@ -126,6 +126,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 5 e 6 | Exportar PNG e modo telão |
 | 7 | Jogo anulado e núcleo configurável (pontos, jogos por jogador, semanas) |
 | 8 | Cadastro de jogadores, sorteio do calendário, rodadas por semana, classificação por semana e lembrete de backup |
+| 9 | Código da interface dividido em um arquivo por tela (`js/telas/`), sem mudança para o usuário |
 
 Novas fases seguem o mesmo jeito: uma mudança pequena por vez, com caso de teste novo ou ajustado.
 

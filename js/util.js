@@ -1,4 +1,4 @@
-// Utilitários de apresentação compartilhados por ui.js, telao.js e exportar.js.
+// Utilitários de apresentação compartilhados por ui.js, js/telas/*.js, telao.js e exportar.js.
 // Regras de negócio NÃO ficam aqui: elas ficam em regras.js.
 
 (function () {
@@ -18,6 +18,16 @@
     }
     e.append(...filhos.flat().filter((f) => f !== null && f !== undefined && f !== false));
     return e;
+  }
+
+  const MAX_GOLS = 99;
+
+  // Texto digitado num campo de placar: { vazio } | { invalido } | { valor }.
+  function lerGols(texto) {
+    const t = texto.trim();
+    if (t === "") return { vazio: true };
+    if (!/^\d+$/.test(t) || Number(t) > MAX_GOLS) return { invalido: true };
+    return { valor: Number(t) };
   }
 
   function formatarSaldo(sg) {
@@ -50,5 +60,5 @@
     return " empate";
   }
 
-  globalThis.Util = { el, formatarSaldo, dois, carimbo, slug, classeDoLado };
+  globalThis.Util = { el, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado };
 })();

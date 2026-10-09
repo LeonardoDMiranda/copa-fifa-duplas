@@ -44,8 +44,9 @@ css/style.css
 testes/dados-exemplo.js  # fixture de teste: dados fictícios (não é carregado pelo app)
 js/regras.js        # FUNÇÕES PURAS: pontuação, classificação, desempate, mata-mata, "o que está em jogo"
 js/estado.js        # estado v2 (campeonato, jogadores, jogos): carregar/salvar localStorage, desfazer, exportar/importar JSON
-js/util.js          # helpers de apresentação compartilhados (el, formatarSaldo, carimbo, classeDoLado)
-js/ui.js            # renderização e eventos
+js/util.js          # helpers de apresentação compartilhados (el, lerGols, formatarSaldo, carimbo, classeDoLado)
+js/telas/*.js       # uma tela cada (jogadores, calendario, rodadas, classificacao, em-jogo, mata-mata): Telas.<nome>.criar(app)
+js/ui.js            # orquestração: cria o estado e as telas, redesenho, foco, cabeçalho e barra de ações
 js/exportar.js      # geração de PNG via Canvas API
 js/telao.js         # modo telão (tela cheia, alterna telas); também abre sozinho em index.html#telao
 ```

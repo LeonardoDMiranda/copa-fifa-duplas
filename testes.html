@@ -686,6 +686,16 @@
       t.igual(Util.carimbo(new Date(2026, 9, 2, 8, 5, 9)), "2026-10-02-080509", "carimbo de data e hora");
     });
 
+    caso("F7.5 Util.lerGols: texto do campo de placar", (t) => {
+      t.igual(Util.lerGols("  "), { vazio: true }, "em branco é vazio");
+      t.igual(Util.lerGols(" 3 "), { valor: 3 }, "número com espaços");
+      t.igual(Util.lerGols("0"), { valor: 0 }, "zero vale");
+      t.igual(Util.lerGols(String(Util.MAX_GOLS)), { valor: Util.MAX_GOLS }, "o máximo vale");
+      t.igual(Util.lerGols("100"), { invalido: true }, "acima do máximo é inválido");
+      t.igual(Util.lerGols("-1"), { invalido: true }, "negativo é inválido");
+      t.igual(Util.lerGols("abc"), { invalido: true }, "letras são inválidas");
+    });
+
     // ---------- PNG (exportar.js) ----------
 
     function pixel(canvas, x, y) {
