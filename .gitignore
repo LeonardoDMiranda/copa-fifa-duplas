@@ -6,6 +6,9 @@ desktop.ini
 .idea/
 .claude/
 
+# Saídas do Playwright MCP (logs, snapshots e downloads dos testes no navegador)
+.playwright-mcp/
+
 # Backups e imagens exportados pelo app, caso sejam salvos dentro da pasta
 *-backup-*.json
 /*.png
