@@ -979,7 +979,7 @@
   function confirmarTrocaComPlacar(confrontos) {
     const comPlacar = confrontos.filter((c) => c.partidas.length && (c.lado1.desatualizada || c.lado2.desatualizada));
     if (!comPlacar.length) return true;
-    return confirm(`${comPlacar.map((c) => ROTULOS[c.chave]).join(" e ")} já tem placar lançado. `
+    return confirm(`${comPlacar.map((c) => ROTULOS[c.chave]).join(" e ")} já ${comPlacar.length > 1 ? "têm" : "tem"} placar lançado. `
       + "Os placares continuam e passam a valer para as novas duplas.\n\nTrocar as duplas mesmo assim?");
   }
 

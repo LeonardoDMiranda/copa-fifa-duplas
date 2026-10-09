@@ -439,8 +439,15 @@ body.telao-ativo { overflow: hidden; }
 .telao-telas { display: flex; gap: .6vw; font-size: 1.8vh; color: var(--telao-suave); margin: 0 .6vw; }
 .telao-telas .ativa { color: #fff; font-weight: 700; text-decoration: underline; text-underline-offset: .5vh; }
 
-/* Classificação: 2 colunas de 16 */
-.telao-duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 3vw; height: 100%; }
+/* Classificação: 2 colunas. Linha de 4.85vh (cabem 16 por coluna, 32 jogadores); com mais, divide
+   a área útil (~82vh) pelo número de linhas por coluna (--linhas, definido em telao.js) e a fonte acompanha. */
+.telao-duas-colunas {
+  --altura-linha: min(4.85vh, calc(82vh / var(--linhas, 16)));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3vw;
+  height: 100%;
+}
 .telao-tabela { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; table-layout: fixed; }
 .telao-tabela th {
   font-size: 1.9vh;
@@ -451,10 +458,10 @@ body.telao-ativo { overflow: hidden; }
   text-align: center;
 }
 .telao-tabela td {
-  height: 4.85vh;
+  height: var(--altura-linha, 4.85vh);
   padding: 0 .5vw;
   text-align: center;
-  font-size: 2.8vh;
+  font-size: min(2.8vh, calc(var(--altura-linha, 4.85vh) * .58));
   border-bottom: 1px solid rgba(255, 255, 255, .08);
 }
 .telao-tabela .pos { width: 4.2vw; font-weight: 700; text-align: left; }
@@ -510,7 +517,8 @@ body.telao-ativo { overflow: hidden; }
 .telao-placar small { font-size: 1.8vh; font-weight: 700; color: var(--telao-ambar); }
 
 /* Mata-mata */
-.telao-chave { display: grid; grid-template-columns: 1.1fr 1.1fr .9fr; gap: 2.5vw; height: 100%; }
+/* minmax(0, …): nome longo vira "…" em vez de alargar a coluna para fora da tela. */
+.telao-chave { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, .9fr); gap: 2.5vw; height: 100%; }
 .telao-chave h2 {
   margin: .6vh 0 1vh;
   font-size: 2.3vh;
@@ -558,6 +566,8 @@ body.telao-ativo { overflow: hidden; }
 .telao-degrau .medalha { font-size: 6vh; line-height: 1; }
 .telao-degrau .titulo { font-size: 1.9vh; font-weight: 700; text-transform: uppercase; color: var(--telao-suave); }
 .telao-degrau .nomes { font-size: 3.4vh; font-weight: 700; }
+.telao-degrau .texto-degrau { min-width: 0; }
+.telao-degrau .nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .telao-degrau.ouro:not(.vazio) { background: rgba(230, 195, 74, .22); border-color: #e6c34a; }
 .telao-degrau.ouro:not(.vazio) .nomes { font-size: 4.4vh; }
 .telao-degrau.prata:not(.vazio) { background: rgba(184, 194, 207, .16); border-color: #b8c2cf; }

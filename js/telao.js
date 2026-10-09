@@ -139,8 +139,10 @@
             el("td", {}, String(l.gp)),
             el("td", {}, String(l.jogos)));
         })));
+      // --linhas: linhas por coluna; com jogadores demais, a altura da linha diminui para caber.
       const meio = Math.ceil(tabela.length / 2);
-      return el("div", { class: "telao-duas-colunas" }, tabelaDe(tabela.slice(0, meio)), tabelaDe(tabela.slice(meio)));
+      return el("div", { class: "telao-duas-colunas", style: `--linhas: ${Math.max(meio, 1)}` },
+        tabelaDe(tabela.slice(0, meio)), tabelaDe(tabela.slice(meio)));
     }
 
     // `jogos` = só os jogos da semana em andamento; a grade se ajusta ao número deles.
@@ -186,9 +188,10 @@
     function podio(p) {
       const degrau = (classe, medalha, titulo, dupla) => el("div", { class: `telao-degrau ${classe}${dupla ? "" : " vazio"}` },
         el("span", { class: "medalha" }, medalha),
-        el("div", {},
+        el("div", { class: "texto-degrau" },
           el("div", { class: "titulo" }, titulo),
-          el("div", { class: "nomes" }, dupla ? dupla.map((id) => nomePorId.get(id)).join(" e ") : "a definir")));
+          // Um jogador por linha: nome longo vira "…" em vez de empurrar os outros degraus para fora.
+          el("div", { class: "nomes" }, dupla ? dupla.map((id) => el("div", { class: "nome" }, nomePorId.get(id))) : "a definir")));
       return el("div", { class: "telao-podio" },
         degrau("ouro", "🥇", "Campeões", p.campeoes),
         degrau("prata", "🥈", "Vice", p.vice),

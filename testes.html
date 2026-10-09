@@ -1169,6 +1169,7 @@
         telao.abrir({ telaCheia: false });
         t.igual(raiz.querySelector(".marca").textContent, "Copa FIFA 2027", "marca = nome do campeonato");
         t.verdadeiro(titulo().includes("0/7 jogos lançados") && !titulo().includes("sexta"), `classificação: ${titulo()}`);
+        t.igual(raiz.querySelector(".telao-duas-colunas").getAttribute("style"), "--linhas: 16", "classificação: 32 jogadores = 16 linhas por coluna");
         clicar("telao-proxima");
         t.verdadeiro(titulo().startsWith("Jogos da semana 1") && titulo().includes("0/2"), `semana 1 em andamento: ${titulo()}`);
         t.igual(raiz.querySelectorAll(".telao-jogo").length, 2, "só os 2 jogos da semana 1");
