@@ -439,12 +439,14 @@ body.telao-ativo { overflow: hidden; }
 .telao-telas { display: flex; gap: .6vw; font-size: 1.8vh; color: var(--telao-suave); margin: 0 .6vw; }
 .telao-telas .ativa { color: #fff; font-weight: 700; text-decoration: underline; text-underline-offset: .5vh; }
 
-/* Classificação: 2 colunas. Linha de 4.85vh (cabem 16 por coluna, 32 jogadores); com mais, divide
-   a área útil (~82vh) pelo número de linhas por coluna (--linhas, definido em telao.js) e a fonte acompanha. */
+/* Classificação: 2 colunas. A área útil (~84vh) é dividida pelo número de linhas por coluna
+   (--linhas, definido em telao.js), até 5.4vh por linha: com 32 jogadores ocupa a tela; com
+   poucos, as linhas não esticam (align-items: start); com muitos, encolhem e a fonte acompanha. */
 .telao-duas-colunas {
-  --altura-linha: min(4.85vh, calc(82vh / var(--linhas, 16)));
+  --altura-linha: min(5.4vh, calc(84vh / var(--linhas, 16)));
   display: grid;
   grid-template-columns: 1fr 1fr;
+  align-items: start;
   gap: 3vw;
   height: 100%;
 }
@@ -458,10 +460,10 @@ body.telao-ativo { overflow: hidden; }
   text-align: center;
 }
 .telao-tabela td {
-  height: var(--altura-linha, 4.85vh);
+  height: var(--altura-linha, 5.25vh);
   padding: 0 .5vw;
   text-align: center;
-  font-size: min(2.8vh, calc(var(--altura-linha, 4.85vh) * .58));
+  font-size: min(2.8vh, calc(var(--altura-linha, 5.25vh) * .58));
   border-bottom: 1px solid rgba(255, 255, 255, .08);
 }
 .telao-tabela .pos { width: 4.2vw; font-weight: 700; text-align: left; }

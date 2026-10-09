@@ -203,7 +203,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 11.3 | Espaço, → e ←. | Pausa/continua; avança; volta. |
 | 11.4 | Esc. | Sai do telão. Ctrl+Z não desfaz nada enquanto o telão está aberto. |
 | 11.5 | Abrir `index.html#telao` numa segunda janela e lançar placares na primeira. | O telão atualiza sozinho. |
-| 11.6 | Telão com 8 e com 40 jogadores. | Tudo cabe na tela. |
+| 11.6 **(R)** | Telão com 8, 32, 40 e 60 jogadores (nomes de 30 caracteres), em 1920×1080 e 1280×720. | Tudo cabe na tela, nada passa da borda. Com 8, as linhas ficam no tamanho normal no topo (não esticam); com 32, ocupam a tela; com mais, encolhem. |
 
 ## 12. Várias janelas e robustez
 
@@ -242,7 +242,8 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 - **Não executados:** 1.1 (abrir por `file://`, só à mão) e 1.5 (modo avião, só à mão). Pelo Playwright,
   o carregamento fez 8 pedidos, todos locais.
 - **Observações (não são falhas):**
-  - Telão com 8 jogadores: as linhas esticam para ocupar a tela inteira (~19% da altura cada).
+  - Telão com 8 jogadores: as linhas esticavam para ocupar a tela inteira (~19% da altura cada).
+    Corrigido depois: a tabela não estica mais, e a linha vai até 5.4vh.
   - Telão: a barra de controles cobre a última linha por 3 s depois de mexer o mouse.
   - 9.7: resetar e desfazer devolvia o campeonato, mas não o registro do backup (o lembrete
     reaparecia). Corrigido depois: desfazer o resetar ou o importar devolve o registro.
