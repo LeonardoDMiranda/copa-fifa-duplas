@@ -201,6 +201,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 11.1 | Clicar em "Modo telão". | Abre em tela cheia com a classificação. |
 | 11.2 | Esperar 15 s. | Passa para a próxima tela (só as que têm conteúdo: classificação; jogos depois do calendário; mata-mata depois do chaveamento). A barra de progresso avança. |
 | 11.3 | Espaço, → e ←. | Pausa/continua; avança; volta. |
+| 11.3b **(R)** | Mexer o mouse e pausar (a barra de controles fica visível), em cada tela. | A barra aparece na faixa do rodapé, abaixo do conteúdo: não cobre a última linha da classificação, os jogos nem o mata-mata. |
 | 11.4 | Esc. | Sai do telão. Ctrl+Z não desfaz nada enquanto o telão está aberto. |
 | 11.5 | Abrir `index.html#telao` numa segunda janela e lançar placares na primeira. | O telão atualiza sozinho. |
 | 11.6 **(R)** | Telão com 8, 32, 40 e 60 jogadores (nomes de 30 caracteres), em 1920×1080 e 1280×720. | Tudo cabe na tela, nada passa da borda. Com 8, as linhas ficam no tamanho normal no topo (não esticam); com 32, ocupam a tela; com mais, encolhem. |
@@ -244,6 +245,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 - **Observações (não são falhas):**
   - Telão com 8 jogadores: as linhas esticavam para ocupar a tela inteira (~19% da altura cada).
     Corrigido depois: a tabela não estica mais, e a linha vai até 5.4vh.
-  - Telão: a barra de controles cobre a última linha por 3 s depois de mexer o mouse.
+  - Telão: a barra de controles cobria a última linha por 3 s depois de mexer o mouse (e o tempo
+    todo com o telão pausado). Corrigido depois: os controles têm uma faixa reservada no rodapé.
   - 9.7: resetar e desfazer devolvia o campeonato, mas não o registro do backup (o lembrete
     reaparecia). Corrigido depois: desfazer o resetar ou o importar devolve o registro.

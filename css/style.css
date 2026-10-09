@@ -407,13 +407,15 @@ body.telao-ativo { overflow: hidden; }
 
 .telao-conteudo { flex: 1; min-height: 0; padding: 0 3vw 1.5vh; overflow: hidden; }
 
-.telao-rodape { position: relative; }
-.telao-progresso { height: .6vh; background: rgba(255, 255, 255, .1); }
+/* Faixa reservada para os controles: eles aparecem só aqui e nunca cobrem o conteúdo
+   (nem com o telão pausado, quando ficam sempre visíveis). A barra de progresso fica no pé. */
+.telao-rodape { position: relative; height: 7vh; flex: none; }
+.telao-progresso { position: absolute; left: 0; right: 0; bottom: 0; height: .6vh; background: rgba(255, 255, 255, .1); }
 #telao-barra { height: 100%; width: 0; background: var(--telao-verde); transition: width .25s linear; }
 .telao-controles {
   position: absolute;
   left: 50%;
-  bottom: 1.6vh;
+  bottom: .6vh;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -439,11 +441,11 @@ body.telao-ativo { overflow: hidden; }
 .telao-telas { display: flex; gap: .6vw; font-size: 1.8vh; color: var(--telao-suave); margin: 0 .6vw; }
 .telao-telas .ativa { color: #fff; font-weight: 700; text-decoration: underline; text-underline-offset: .5vh; }
 
-/* Classificação: 2 colunas. A área útil (~84vh) é dividida pelo número de linhas por coluna
+/* Classificação: 2 colunas. A área útil (~80vh) é dividida pelo número de linhas por coluna
    (--linhas, definido em telao.js), até 5.4vh por linha: com 32 jogadores ocupa a tela; com
    poucos, as linhas não esticam (align-items: start); com muitos, encolhem e a fonte acompanha. */
 .telao-duas-colunas {
-  --altura-linha: min(5.4vh, calc(84vh / var(--linhas, 16)));
+  --altura-linha: min(5.4vh, calc(80vh / var(--linhas, 16)));
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: start;
@@ -460,10 +462,10 @@ body.telao-ativo { overflow: hidden; }
   text-align: center;
 }
 .telao-tabela td {
-  height: var(--altura-linha, 5.25vh);
+  height: var(--altura-linha, 5vh);
   padding: 0 .5vw;
   text-align: center;
-  font-size: min(2.8vh, calc(var(--altura-linha, 5.25vh) * .58));
+  font-size: min(2.8vh, calc(var(--altura-linha, 5vh) * .58));
   border-bottom: 1px solid rgba(255, 255, 255, .08);
 }
 .telao-tabela .pos { width: 4.2vw; font-weight: 700; text-align: left; }
