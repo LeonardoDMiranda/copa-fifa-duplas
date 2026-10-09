@@ -1252,6 +1252,35 @@
       t.igual(est.ultimoBackup(), null, "arquivo sem registro: fica sem registro");
     });
 
+    caso("B4 Desfazer o resetar ou o importar devolve o registro de backup do campeonato", (t) => {
+      const arm = memoria2026();
+      const est = criarEstado(arm);
+      const r1 = { em: "2026-10-05T10:00:00.000Z", semanasCompletas: 1 };
+      lancar(est, "j1", placar(1, 0));
+      est.registrarBackup(r1);
+      const arquivo = JSON.parse(est.exportarJSON());
+      est.resetar();
+      t.igual(est.ultimoBackup(), null, "resetar apaga o registro");
+      const reaberto = criarEstado(arm);
+      reaberto.desfazer();
+      t.igual(reaberto.atual().jogos[0].resultado, placar(1, 0), "desfazer o resetar (depois de reabrir o app) devolve o campeonato");
+      t.igual(reaberto.ultimoBackup(), r1, "e devolve o registro do backup dele");
+
+      const r2 = { em: "2026-10-07T10:00:00.000Z", semanasCompletas: 1 };
+      arquivo.ultimoBackup = r2;
+      arquivo.jogos[1].resultado = placar(3, 3);
+      reaberto.importarJSON(JSON.stringify(arquivo));
+      t.igual(reaberto.ultimoBackup(), r2, "importar traz o registro do arquivo");
+      reaberto.desfazer();
+      t.igual(reaberto.ultimoBackup(), r1, "desfazer o importar devolve o registro anterior");
+
+      const r3 = { em: "2026-10-08T10:00:00.000Z", semanasCompletas: 1 };
+      lancar(reaberto, "j2", placar(2, 0));
+      reaberto.registrarBackup(r3);
+      reaberto.desfazer();
+      t.igual(reaberto.ultimoBackup(), r3, "desfazer uma ação comum não \"desexporta\"");
+    });
+
     // Execução e relatório
     let passaram = 0, falharam = 0, pendentes = 0;
     const container = document.getElementById("casos");

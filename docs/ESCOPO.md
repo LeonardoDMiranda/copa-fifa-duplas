@@ -81,7 +81,7 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
 
 - Exportar/importar JSON guarda e restaura o campeonato inteiro.
 - O app lembra de exportar quando já há jogos e: nunca houve backup, uma semana nova foi concluída desde o último, ou faz 7 dias ou mais.
-- O registro do último backup é do campeonato: resetar apaga o registro, e importar traz o que veio no arquivo.
+- O registro do último backup é do campeonato: resetar apaga o registro, e importar traz o que veio no arquivo. Desfazer o resetar ou o importar devolve o registro anterior; desfazer qualquer outra ação não mexe nele.
 
 ## 3. Modelo de dados (estado salvo no `localStorage`)
 

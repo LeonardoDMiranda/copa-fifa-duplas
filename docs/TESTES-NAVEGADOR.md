@@ -176,13 +176,13 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 9.4 | Backup com 7 dias ou mais (ajustar a data de `ultimoBackup` no `localStorage`). | Lembrete "Faz N dias desde o último backup." |
 | 9.5 | "Dispensar". | O lembrete some até a mensagem mudar ou a página ser recarregada. |
 | 9.6 **(R)** | Resetar (botão "Resetar"). | Pede confirmação; aceitando, volta ao cadastro vazio, avisa "Campeonato reiniciado: tudo vazio." e `ultimoBackup` fica `null`. |
-| 9.7 | Resetar e desfazer. | O campeonato volta. O registro do backup não volta (não entra no desfazer), então o lembrete reaparece. |
+| 9.7 **(R)** | Exportar, resetar e desfazer. | O campeonato e o registro do backup voltam: o lembrete não reaparece. |
 | 9.8 **(R)** | Importar um backup exportado. | "Backup importado: <arquivo>"; campeonato igual ao exportado; `ultimoBackup` igual ao do arquivo; sem lembrete. |
 | 9.9 **(R)** | Importar um backup sem `ultimoBackup`. | O registro fica `null` e o lembrete aparece. |
 | 9.10 **(R)** | Importar um backup com um jogo na semana 9 (campeonato de 8 semanas). | "Não foi possível importar: semana inválida no jogo ... (o campeonato tem 8 semanas)." O estado atual não muda. |
 | 9.11 | Importar um arquivo que não é JSON. | "Não foi possível importar: o arquivo não é um JSON válido." |
 | 9.12 | Importar um backup da versão 1. | "Não foi possível importar: este backup é do formato antigo (versão 1, ...)". |
-| 9.13 | Importar e depois desfazer. | Volta o campeonato de antes da importação. |
+| 9.13 **(R)** | Importar e depois desfazer. | Volta o campeonato de antes da importação, com o registro de backup dele. |
 | 9.14 | "Reiniciar campeonato" (no cadastro travado). | Mesmo comportamento do "Resetar". |
 
 ## 10. Imagens (PNG)
@@ -244,4 +244,5 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 - **Observações (não são falhas):**
   - Telão com 8 jogadores: as linhas esticam para ocupar a tela inteira (~19% da altura cada).
   - Telão: a barra de controles cobre a última linha por 3 s depois de mexer o mouse.
-  - 9.7: resetar e desfazer devolve o campeonato, mas não o registro do backup (o lembrete reaparece).
+  - 9.7: resetar e desfazer devolvia o campeonato, mas não o registro do backup (o lembrete
+    reaparecia). Corrigido depois: desfazer o resetar ou o importar devolve o registro.

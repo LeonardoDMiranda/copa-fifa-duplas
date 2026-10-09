@@ -204,7 +204,9 @@
     const historico = [];
     for (const snap of Array.isArray(obj.historico) ? obj.historico : []) {
       try {
-        historico.push({ descricao: String(snap.descricao || "alteração"), ...validarConteudo(snap) });
+        const entrada = { descricao: String(snap.descricao || "alteração"), ...validarConteudo(snap) };
+        if ("ultimoBackup" in snap) entrada.ultimoBackup = validarBackup(snap.ultimoBackup);
+        historico.push(entrada);
       } catch (_) {
         // snapshot antigo inválido: descarta só ele
       }
@@ -277,8 +279,11 @@
     function desfazer() {
       if (!estado.historico.length) return null;
       const historico = estado.historico.slice();
-      const { descricao, ...anterior } = historico.pop();
-      estado = { versao: VERSAO, ...clonar(anterior), ultimoBackup: estado.ultimoBackup, historico };
+      const entrada = historico.pop();
+      const { descricao, ultimoBackup: registroAnterior, ...anterior } = entrada;
+      // Só resetar e importar guardam o registro na entrada (ver trocarRegistroDeBackup).
+      const ultimoBackup = "ultimoBackup" in entrada ? registroAnterior : estado.ultimoBackup;
+      estado = { versao: VERSAO, ...clonar(anterior), ultimoBackup, historico };
       salvar();
       notificar();
       return descricao;
@@ -292,14 +297,14 @@
         throw new Error("o arquivo não é um JSON válido.");
       }
       const importado = validarEstado(obj);
-      modificar("importar backup", (s) => {
+      const mudou = modificar("importar backup", (s) => {
         s.campeonato = importado.campeonato;
         s.jogos = importado.jogos;
         s.desempatesManuais = importado.desempatesManuais;
         s.mataMata = importado.mataMata;
       });
       // O registro do backup é do campeonato: passa a valer o que veio no arquivo.
-      trocarRegistroDeBackup(importado.ultimoBackup);
+      trocarRegistroDeBackup(importado.ultimoBackup, mudou);
     }
 
     function resetar() {
@@ -311,13 +316,21 @@
         s.mataMata = inicial.mataMata;
       });
       // Campeonato novo: o backup do anterior não vale para ele.
-      trocarRegistroDeBackup(null);
+      trocarRegistroDeBackup(null, mudou);
       return mudou;
     }
 
-    function trocarRegistroDeBackup(registro) {
-      if (JSON.stringify(estado.ultimoBackup) === JSON.stringify(registro)) return;
-      estado = { ...estado, ultimoBackup: registro };
+    // Troca o registro junto com o campeonato (resetar, importar). Se a ação entrou no histórico,
+    // a entrada guarda o registro anterior: desfazer a ação devolve o campeonato e o registro dele.
+    function trocarRegistroDeBackup(registro, entrouNoHistorico) {
+      const anterior = estado.ultimoBackup;
+      if (JSON.stringify(anterior) === JSON.stringify(registro)) return;
+      let historico = estado.historico;
+      if (entrouNoHistorico) {
+        historico = historico.slice();
+        historico[historico.length - 1] = { ...historico[historico.length - 1], ultimoBackup: anterior };
+      }
+      estado = { ...estado, ultimoBackup: registro, historico };
       salvar();
       notificar();
     }
