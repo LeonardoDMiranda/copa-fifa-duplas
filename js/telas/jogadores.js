@@ -10,7 +10,6 @@
 
     let rascunhoNomes = ""; // nomes digitados/colados e ainda não adicionados
     let renomeando = null; // { id, valor } do jogador em edição
-    let travadoAntes; // para abrir/fechar a seção quando o estado muda
 
     function adicionarNomes() {
       if (cadastroTravado()) return;
@@ -132,11 +131,6 @@
       const diag = Regras.diagnosticarCampeonato(camp.jogadores, camp.config);
       if (renomeando && !camp.jogadores.some((j) => j.id === renomeando.id)) renomeando = null;
 
-      const detalhes = document.getElementById("tela-jogadores");
-      if (travado !== travadoAntes) {
-        detalhes.open = !travado;
-        travadoAntes = travado;
-      }
       document.getElementById("resumo-jogadores").textContent =
         `${diag.jogadores} jogador(es)${travado ? " · calendário confirmado" : ""}`;
 

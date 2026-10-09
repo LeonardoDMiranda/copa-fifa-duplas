@@ -38,14 +38,67 @@ main.painel {
   max-width: 1500px;
   margin: 0 auto;
   padding: 20px 16px 40px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 20px;
-  align-items: start;
+}
+
+/* ---------- abas ---------- */
+
+.abas {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borda);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
+}
+.abas-lista { max-width: 1500px; margin: 0 auto; padding: 0 16px; display: flex; gap: 2px; overflow-x: auto; }
+button.aba-btn {
+  padding: 11px 16px 9px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--texto-suave);
+  font-size: .95rem;
+  white-space: nowrap;
+}
+button.aba-btn:hover:not(:disabled) { background: #f0f4f9; border-color: transparent; color: var(--texto); }
+button.aba-btn[aria-selected="true"] { color: var(--primaria); border-bottom-color: var(--primaria); font-weight: 600; }
+button.aba-btn:focus-visible { outline: 2px solid var(--primaria); outline-offset: -2px; }
+.indicador {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--fundo);
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+.indicador:empty { display: none; }
+
+.aba { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+.aba[hidden] { display: none; }
+
+/* Rodadas: jogos + top 8 ao vivo ao lado (embaixo em telas estreitas). */
+@media (min-width: 1100px) {
+  .aba-rodadas { grid-template-columns: minmax(0, 1fr) 300px; }
+  .painel-top { position: sticky; top: 64px; }
 }
 @media (min-width: 1200px) {
-  main.painel { grid-template-columns: minmax(420px, 5fr) minmax(0, 6fr); }
+  .aba-classificacao { grid-template-columns: minmax(420px, 5fr) minmax(0, 6fr); }
 }
+
+.painel-top h3 { margin: 0 0 8px; font-size: 1rem; }
+.painel-top[hidden] { display: none; }
+.tabela-top { width: 100%; border-collapse: collapse; font-size: .88rem; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
+.tabela-top th, .tabela-top td { padding: 4px 6px; text-align: center; border-bottom: 1px solid var(--borda); white-space: nowrap; }
+.tabela-top th { font-size: .72rem; text-transform: uppercase; color: var(--texto-suave); }
+.tabela-top .col-jogador { text-align: left; width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tabela-top .col-pos { font-weight: 600; }
+.tabela-top .col-pts { font-weight: 700; }
+.tabela-top tr.classificado td { background: var(--classificado); }
+.tabela-top tr.classificado td:first-child { box-shadow: inset 3px 0 0 var(--classificado-borda); }
+.tabela-top tr.linha-corte td { border-bottom: 2px solid var(--classificado-borda); }
+.tabela-top tr.perseguidor td { color: var(--texto-suave); }
 
 .tela {
   background: var(--superficie);
@@ -114,10 +167,47 @@ button:disabled { opacity: .45; cursor: default; }
 button.discreto { background: transparent; }
 button.perigo { color: var(--desce); }
 
-.barra-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
-.barra-acoes button { background: rgba(255, 255, 255, .12); color: #fff; border-color: rgba(255, 255, 255, .3); }
-.barra-acoes button:hover:not(:disabled) { background: rgba(255, 255, 255, .25); border-color: #fff; }
-.barra-acoes button.perigo { color: #ffc9c9; }
+.barra-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.barra-acoes > button, .menu > summary {
+  font-size: .9rem;
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  cursor: pointer;
+}
+.barra-acoes > button:hover:not(:disabled), .menu > summary:hover { background: rgba(255, 255, 255, .25); border-color: #fff; }
+.menu > summary:focus-visible, .barra-acoes > button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+/* Menus do cabeçalho: <details> com a lista por cima do conteúdo. */
+.menu { position: relative; }
+.menu > summary { list-style: none; user-select: none; }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu[open] > summary { background: rgba(255, 255, 255, .25); border-color: #fff; }
+.menu-itens {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  min-width: 230px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: var(--superficie);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+}
+.menu-itens button { border: none; background: transparent; text-align: left; padding: 7px 10px; }
+.menu-itens button:hover:not(:disabled) { background: #f0f4f9; }
+.menu-itens hr { width: 100%; margin: 4px 0; border: none; border-top: 1px solid var(--borda); }
+/* Tela estreita: os botões quebram linha e o menu pode ficar à esquerda; a lista ocupa a largura do cabeçalho. */
+@media (max-width: 600px) {
+  .topo { position: relative; }
+  .menu { position: static; }
+  .menu-itens { left: 16px; right: 16px; top: auto; margin-top: 4px; }
+}
 
 .status-salvamento { flex-basis: 100%; margin: 0; font-size: .8rem; opacity: .75; text-align: right; }
 .status-salvamento.erro { opacity: 1; color: #ffd166; font-weight: 600; }
@@ -146,7 +236,8 @@ button.perigo { color: var(--desce); }
 
 /* ---------- rodadas (jogos da semana) ---------- */
 
-.lista-jogos { display: flex; flex-direction: column; gap: 10px; }
+/* No notebook, a semana inteira cabe em duas colunas. */
+.lista-jogos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); gap: 10px; align-items: start; }
 
 .jogo {
   border: 1px solid var(--borda);
@@ -256,8 +347,6 @@ input.gols.invalido { border-color: var(--desce); background: #fdecec; }
 }
 
 /* ---------- mata-mata ---------- */
-
-.tela-larga { grid-column: 1 / -1; }
 
 button.primario { background: var(--primaria); color: #fff; border-color: var(--primaria); font-weight: 600; }
 button.primario:hover:not(:disabled) { background: #155a99; border-color: #155a99; }
@@ -580,12 +669,6 @@ body.telao-ativo { overflow: hidden; }
 
 /* ---------- campeonato e jogadores ---------- */
 
-details.tela > summary { cursor: pointer; list-style: none; }
-details.tela > summary::-webkit-details-marker { display: none; }
-details.tela > summary h2 { display: inline; }
-details.tela > summary h2::before { content: "▸ "; color: var(--texto-suave); }
-details.tela[open] > summary h2::before { content: "▾ "; }
-
 .config-campeonato { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 20px; margin: 14px 0 8px; }
 .campo-config { display: flex; flex-direction: column; gap: 3px; font-size: .8rem; color: var(--texto-suave); }
 .campo-config input {
@@ -658,6 +741,7 @@ button.chip-semana.selecionada { outline: 2px solid var(--primaria); outline-off
 .resultado-agenda.empate, .resultado-agenda.anulada { color: var(--texto-suave); }
 
 #controle-classificacao { margin: 6px 0 10px; }
+#controle-classificacao select { align-self: flex-start; font: inherit; padding: 4px 8px; border: 1px solid var(--borda); border-radius: 5px; }
 
 .mensagem-em-jogo { grid-column: 1 / -1; }
 

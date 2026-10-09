@@ -9,7 +9,6 @@
     const { estado, nomePorId, avisar, renderizar, cadastroTravado } = app;
 
     let editandoSlot = null; // { indice, lado, pos } do jogador do rascunho em troca
-    let confirmadoAntes; // para abrir/fechar a seção quando o estado muda
 
     function sortear() {
       if (cadastroTravado()) return;
@@ -46,6 +45,7 @@
         s.jogos = Regras.calendarioParaJogos(sorteio.rascunho);
         s.campeonato.sorteio = { semente: sorteio.semente, confirmado: true };
       });
+      app.irParaAba("rodadas"); // próximo passo: lançar os jogos
     }
 
     function trocarNoRascunho(indice, lado, pos, novoId) {
@@ -138,11 +138,6 @@
       const rascunho = !confirmado && camp.sorteio ? camp.sorteio.rascunho || null : null;
       if (editandoSlot && (!rascunho || !rascunho[editandoSlot.indice])) editandoSlot = null;
 
-      const detalhes = document.getElementById("tela-calendario");
-      if (confirmado !== confirmadoAntes) {
-        detalhes.open = !confirmado;
-        confirmadoAntes = confirmado;
-      }
       const resumo = document.getElementById("resumo-calendario");
       resumo.textContent = confirmado ? `confirmado · ${atual.jogos.length} jogos` : rascunho ? "sorteio em análise" : "";
 
@@ -164,7 +159,7 @@
       const semanas = Array.from({ length: camp.config.semanas }, (_, i) => i + 1);
       alvo.replaceChildren(
         confirmado
-          ? el("p", { class: "legenda" }, `Calendário confirmado${camp.sorteio ? ` (semente ${camp.sorteio.semente})` : ""}. Os jogos são lançados na seção de jogos.`)
+          ? el("p", { class: "legenda" }, `Calendário confirmado${camp.sorteio ? ` (semente ${camp.sorteio.semente})` : ""}. Os jogos são lançados na aba Rodadas.`)
           : el("div", { class: "acoes-calendario" },
               el("button", { type: "button", id: "btn-sortear", onclick: sortear }, "🎲 Sortear de novo"),
               el("button", { type: "button", id: "btn-confirmar-calendario", class: "primario", onclick: confirmarCalendario }, "✔ Confirmar calendário"),

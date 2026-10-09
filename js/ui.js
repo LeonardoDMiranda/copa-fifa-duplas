@@ -1,5 +1,5 @@
-// Orquestração da tela: cria o estado e as telas (js/telas/*.js), agenda o redesenho, cuida do
-// cabeçalho, do lembrete de backup e da barra de ações. Regras de negócio ficam em regras.js;
+// Orquestração da tela: cria o estado e as telas (js/telas/*.js), agenda o redesenho, cuida das
+// abas, do cabeçalho, do lembrete de backup e da barra de ações. Regras de negócio ficam em regras.js;
 // estado em estado.js.
 
 (function () {
@@ -77,6 +77,7 @@
     avisar,
     renderizar,
     focarDepois(id) { focoPendente = id; },
+    irParaAba,
     cadastroTravado,
     nomesDupla,
     numerosNaSemana,
@@ -101,6 +102,74 @@
   // Volta as telas para a visão padrão (semana em andamento, classificação ao vivo...).
   function reiniciarVisoes() {
     for (const tela of Object.values(telas)) if (tela.reiniciarVisao) tela.reiniciarVisao();
+  }
+
+  // ---------- abas ----------
+
+  // Cada aba mostra uma ou mais telas; só as telas da aba visível são redesenhadas.
+  const ABAS = [
+    { id: "jogadores", telas: ["jogadores"] },
+    { id: "calendario", telas: ["calendario"] },
+    { id: "rodadas", telas: ["rodadas"] },
+    { id: "classificacao", telas: ["classificacao", "emJogo"] },
+    { id: "mata-mata", telas: ["mataMata"] },
+  ];
+  const ABA_POR_ID = new Map(ABAS.map((a) => [a.id, a]));
+
+  // A aba ativa fica no endereço (#rodadas...): voltar/avançar do navegador funciona.
+  function abaDaUrl() {
+    const id = decodeURIComponent(location.hash.slice(1));
+    return ABA_POR_ID.has(id) ? id : null;
+  }
+
+  // Aba que interessa na etapa atual do campeonato.
+  function abaDaEtapa(atual) {
+    if (atual.mataMata) return "mata-mata";
+    if (atual.jogos.length) return "rodadas";
+    const camp = atual.campeonato;
+    if (camp.sorteio || Regras.diagnosticarCampeonato(camp.jogadores, camp.config).pronto) return "calendario";
+    return "jogadores";
+  }
+
+  function abaAtiva(atual) {
+    return abaDaUrl() || abaDaEtapa(atual);
+  }
+
+  function irParaAba(id) {
+    if (location.hash !== `#${id}`) location.hash = id; // o "hashchange" redesenha
+  }
+
+  // Fixa no endereço a aba da etapa (ao abrir, resetar ou importar). Depois disso a aba só muda
+  // quando o organizador escolhe: cadastrar o 8º jogador não tira ninguém da aba Jogadores.
+  function fixarAbaDaEtapa() {
+    if (location.hash === "#telao") return;
+    history.replaceState(null, "", `#${abaDaEtapa(estado.atual())}`);
+  }
+
+  function renderizarAbas(atual, tabela, ativa) {
+    const camp = atual.campeonato;
+    const travado = Regras.cadastroTravado(camp, atual.jogos);
+    const lancados = atual.jogos.filter((j) => j.resultado).length;
+    const empatePendente = tabela.some((l) => l.empateTecnico && !l.empateTecnico.ordemManual);
+    const campeoes = atual.mataMata && Regras.resolverMataMata(atual.mataMata, tabela, camp.config).podio.campeoes;
+    const indicadores = {
+      jogadores: camp.jogadores.length ? [String(camp.jogadores.length), `${camp.jogadores.length} jogadores`] : null,
+      calendario: travado ? ["✔", "Calendário confirmado"] : camp.sorteio && camp.sorteio.rascunho ? ["rascunho", "Sorteio ainda não confirmado"] : null,
+      rodadas: atual.jogos.length ? [`${lancados}/${atual.jogos.length}`, "Jogos lançados"] : null,
+      classificacao: empatePendente ? ["⚖️", "Empate técnico no top 8 sem ordem definida"] : null,
+      "mata-mata": campeoes ? ["🏆", "Campeões definidos"] : null,
+    };
+    for (const { id } of ABAS) {
+      const selecionada = id === ativa;
+      const botao = document.getElementById(`aba-btn-${id}`);
+      botao.setAttribute("aria-selected", String(selecionada));
+      botao.tabIndex = selecionada ? 0 : -1;
+      document.getElementById(`aba-${id}`).hidden = !selecionada;
+      const indicador = document.getElementById(`indicador-${id}`);
+      const [texto, titulo] = indicadores[id] || ["", ""];
+      indicador.textContent = texto;
+      indicador.title = titulo;
+    }
   }
 
   // ---------- cabeçalho e lembrete de backup ----------
@@ -180,8 +249,10 @@
     const base = Util.slug(atual.campeonato.nome);
     let canvas, prefixo;
     if (tipo === "classificacao") {
-      // Exporta o que está na tela: ao vivo ou "após a semana N".
-      const semana = telas.classificacao.semanaVista();
+      // Exporta o que está na tela: na aba Classificação, a semana escolhida; nas outras, ao vivo.
+      const ultimaSemana = Regras.ultimaSemanaComResultado(atual.jogos, cfg);
+      const vista = abaAtiva(atual) === "classificacao" ? telas.classificacao.semanaVista() : null;
+      const semana = vista !== null && ultimaSemana !== null && vista <= ultimaSemana ? vista : null;
       const jogos = semana === null ? atual.jogos : atual.jogos.filter((j) => Regras.semanaDoJogo(j) <= semana);
       const tabela = semana === null ? tabelaAtual()
         : Regras.classificacaoPorSemana(classificacaoBase, atual.jogos, atual.desempatesManuais, cfg, semana);
@@ -243,6 +314,7 @@
         estado.importarJSON(String(leitor.result));
         limparRascunhos();
         reiniciarVisoes();
+        fixarAbaDaEtapa();
         renderizar();
         avisar(`Backup importado: ${arquivo.name}`);
       } catch (erro) {
@@ -262,6 +334,7 @@
     limparRascunhos();
     reiniciarVisoes();
     estado.resetar();
+    fixarAbaDaEtapa();
     renderizar();
     avisar("Campeonato reiniciado: tudo vazio.");
   }
@@ -313,14 +386,11 @@
     const focoId = document.activeElement && document.activeElement.id;
     const atual = estado.atual();
     const tabela = calcularTabela(atual);
+    const aba = abaAtiva(atual);
     renderizarCabecalho(atual, tabela);
     renderizarLembreteBackup(atual);
-    telas.jogadores.renderizar(atual);
-    telas.calendario.renderizar(atual);
-    telas.rodadas.renderizar(atual, tabela);
-    telas.classificacao.renderizar(atual, tabela);
-    telas.emJogo.renderizar(atual, tabela);
-    telas.mataMata.renderizar(atual, tabela);
+    renderizarAbas(atual, tabela, aba);
+    for (const nome of ABA_POR_ID.get(aba).telas) telas[nome].renderizar(atual, tabela);
     renderizarBarra();
     if (focoPendente) {
       const alvo = document.getElementById(focoPendente);
@@ -355,19 +425,60 @@
   document.getElementById("btn-png-classificacao").addEventListener("click", () => exportarPNG("classificacao"));
   document.getElementById("btn-png-mata-mata").addEventListener("click", () => exportarPNG("mata-mata"));
   document.getElementById("btn-telao").addEventListener("click", () => telao.abrir());
+
+  // Menus do cabeçalho (<details>): fecham ao escolher um item, ao clicar fora e com Esc.
+  const menus = [...document.querySelectorAll("details.menu")];
+  function fecharMenus(exceto = null) {
+    for (const menu of menus) if (menu !== exceto) menu.open = false;
+  }
+  for (const menu of menus) {
+    menu.addEventListener("toggle", () => { if (menu.open) fecharMenus(menu); });
+    menu.querySelector(".menu-itens").addEventListener("click", (ev) => {
+      if (ev.target.closest("button")) menu.open = false;
+    });
+  }
+  document.addEventListener("click", (ev) => {
+    for (const menu of menus) if (menu.open && !menu.contains(ev.target)) menu.open = false;
+  });
+
+  // Abas: clique, setas ←→ dentro da lista e teclas 1–5 fora de campos de texto.
+  const botoesAba = ABAS.map(({ id }) => document.getElementById(`aba-btn-${id}`));
+  for (const botao of botoesAba) botao.addEventListener("click", () => irParaAba(botao.dataset.aba));
+  document.querySelector(".abas-lista").addEventListener("keydown", (ev) => {
+    if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+    ev.preventDefault();
+    const i = botoesAba.indexOf(document.activeElement);
+    const proximo = botoesAba[(i + (ev.key === "ArrowRight" ? 1 : botoesAba.length - 1)) % botoesAba.length];
+    proximo.focus();
+    irParaAba(proximo.dataset.aba);
+  });
+  window.addEventListener("hashchange", () => {
+    if (abaDaUrl()) renderizar();
+  });
+
   document.addEventListener("keydown", (ev) => {
     if (telao.ativo()) return;
+    if (ev.key === "Escape" && menus.some((m) => m.open)) {
+      const aberto = menus.find((m) => m.open);
+      fecharMenus();
+      aberto.querySelector("summary").focus();
+      return;
+    }
     const digitando = ev.target instanceof HTMLInputElement || ev.target instanceof HTMLSelectElement
       || ev.target instanceof HTMLTextAreaElement;
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z" && !digitando) {
       ev.preventDefault();
       desfazer();
+    } else if (/^[1-5]$/.test(ev.key) && !digitando && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+      ev.preventDefault();
+      irParaAba(ABAS[Number(ev.key) - 1].id);
     }
   });
 
   const st = estado.status();
   if (st.aviso) avisar(st.aviso, "erro");
   if (st.erro) avisar(st.erro, "erro");
+  if (!abaDaUrl()) fixarAbaDaEtapa();
   renderizarAgora();
   // index.html#telao: janela separada para a TV. Tela cheia exige um clique (botão ⛶).
   if (location.hash === "#telao") telao.abrir({ telaCheia: false });

@@ -33,8 +33,12 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
   esperar com `waitForFunction`.
 - Avisos que o app mostra ao carregar (ex.: 1.4) saem antes do `DOMContentLoaded`: ler `#avisos`
   direto, não por um observador instalado depois.
-- Depois de confirmar o calendário, a seção "Campeonato e jogadores" fica recolhida: abrir com
-  `document.getElementById("tela-jogadores").open = true` antes de usar o nome do campeonato.
+- Cada tela fica numa aba: abrir a aba certa antes de usar a tela (`#aba-btn-rodadas` etc. ou
+  navegar para `index.html#rodadas`). Só a aba visível é redesenhada.
+- Exportar/importar ficam no menu "💾 Backup" e os PNGs e o Resetar no menu "⋯": abrir o menu
+  (`#menu-backup > summary`, `#menu-mais > summary`) antes de clicar no item.
+- O servidor do Python manda o CSS com cache: depois de mudar o `style.css`, recarregar ignorando o
+  cache (CDP `Page.reload` com `ignoreCache: true`).
 - Usar só nomes fictícios ("Jogador 01" a "Jogador 32"). O repositório é público.
 - Os downloads e logs ficam em `.playwright-mcp/`, fora do git.
 
@@ -56,6 +60,21 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 1.3 | Cadastrar jogadores, lançar um placar e recarregar a página (F5). | Tudo continua igual; o status de salvamento indica que salvou. |
 | 1.4 | Gravar texto inválido na chave `copa-fifa-duplas-campeonato` e recarregar. | Aviso "Os dados salvos estavam inválidos (...) e foram guardados à parte. O app recomeçou da base." Existe uma chave `copa-fifa-duplas-campeonato-corrompido-<data>` com o conteúdo antigo. |
 | 1.5 | Rodar sem internet (modo avião). | Tudo funciona: o app não usa CDN nem servidor. |
+
+## 1b. Abas e cabeçalho
+
+| # | Passos | Esperado |
+|---|---|---|
+| 1b.1 | Abrir sem `#` no endereço, em cada etapa. | Abre na aba da etapa e o endereço passa a ter o `#` dela: sem cadastro pronto → Jogadores; cadastro pronto ou sorteio em rascunho → Calendário; calendário confirmado → Rodadas; chaveamento gerado → Mata-mata. |
+| 1b.2 | Na aba Jogadores, cadastrar o 8º jogador (a etapa muda). | Continua na aba Jogadores: a aba só muda por escolha. |
+| 1b.3 | Confirmar o calendário. | Vai sozinho para a aba Rodadas. |
+| 1b.4 | Clicar nas abas; usar ← → com o foco numa aba; teclas 1 a 5 fora de campos de texto. | Troca a aba e o endereço (`#jogadores`, `#calendario`, `#rodadas`, `#classificacao`, `#mata-mata`). Digitando num campo, 1–5 não trocam de aba. Com o telão aberto também não. |
+| 1b.5 | Voltar e avançar do navegador; F5. | Volta/avança entre as abas visitadas; F5 mantém a aba. |
+| 1b.6 | Indicadores das abas. | Jogadores: nº de jogadores. Calendário: "rascunho" ou ✔. Rodadas: "lançados/total". Classificação: ⚖️ com empate técnico sem ordem no top 8. Mata-mata: 🏆 com campeões. |
+| 1b.7 | Rodadas em tela larga (≥ 1100 px). | Jogos da semana em duas colunas e, ao lado, "Top 8 ao vivo" (até o 10º, com a linha de corte no 8º) atualizando a cada placar. "Ver classificação completa" abre a aba Classificação. |
+| 1b.8 | Menus "💾 Backup" e "⋯". | Abrem por cima do conteúdo; abrir um fecha o outro; fecham ao escolher um item, ao clicar fora e com Esc (o foco volta para o botão do menu). Em ~400 px a lista ocupa a largura do cabeçalho, sem sair da tela. |
+| 1b.9 | Resetar ou importar um backup. | Vai para a aba da etapa do campeonato resultante. |
+| 1b.10 | "PNG da classificação" com "após a semana N" escolhido. | Na aba Classificação, exporta a semana N (`...-classificacao-semana-N-...png`); em outra aba, exporta ao vivo. |
 
 ## 2. Campeonato e jogadores
 

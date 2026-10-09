@@ -108,13 +108,15 @@ A classificação **nunca** é salva: é sempre calculada a partir dos jogadores
 
 ## 4. Telas
 
-1. **Campeonato e jogadores**: nome, jogos por jogador, semanas, diagnóstico da combinação e cadastro (um nome por linha; renomear e remover).
+Uma aba por etapa (teclas 1 a 5; a aba ativa fica no endereço, ex.: `index.html#rodadas`). Sem `#`, abre na aba da etapa do campeonato; depois a aba só muda por escolha do organizador (e ao confirmar o calendário, que leva a Rodadas).
+
+1. **Jogadores**: nome, jogos por jogador, semanas, diagnóstico da combinação e cadastro (um nome por linha; renomear e remover).
 2. **Calendário**: sortear, conferir as restrições, trocar jogadores à mão e confirmar.
-3. **Rodadas**: navegação por semana, cartões dos jogos com placar, "W.O.", "Anular" e "Limpar"; quem descansa na semana.
-4. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual.
-5. **O que está em jogo**: Garantidos / Em disputa / Eliminados.
-6. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
-7. **Barra de ações**: Desfazer, Exportar/Importar JSON, PNG da classificação e do mata-mata, Modo telão e Resetar. Lembrete de backup quando for a hora.
+3. **Rodadas**: navegação por semana, cartões dos jogos com placar, "W.O.", "Anular" e "Limpar"; quem descansa na semana; agenda do jogador; top 8 ao vivo ao lado.
+4. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual. Ao lado, **o que está em jogo**: Garantidos / Em disputa / Eliminados.
+5. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
+
+**Cabeçalho**: Desfazer, menu Backup (exportar/importar JSON), Modo telão e menu ⋯ (PNG da classificação e do mata-mata, Resetar). Lembrete de backup quando for a hora.
 
 ## 5. Como o projeto foi construído
 
@@ -127,6 +129,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 7 | Jogo anulado e núcleo configurável (pontos, jogos por jogador, semanas) |
 | 8 | Cadastro de jogadores, sorteio do calendário, rodadas por semana, classificação por semana e lembrete de backup |
 | 9 | Código da interface dividido em um arquivo por tela (`js/telas/`), sem mudança para o usuário |
+| 10 | Navegação por abas, top 8 ao vivo nas rodadas e cabeçalho com menus |
 
 Novas fases seguem o mesmo jeito: uma mudança pequena por vez, com caso de teste novo ou ajustado.
 

@@ -1,4 +1,4 @@
-// Tela "Rodadas": jogos por semana, lançamento de placar, W.O., anular e agenda do jogador.
+// Tela "Rodadas": jogos por semana, lançamento de placar, W.O., anular, agenda do jogador e top 8 ao vivo.
 
 (function () {
   "use strict";
@@ -185,11 +185,38 @@
         corpo);
     }
 
+    // Painel ao lado dos jogos: top 8 ao vivo e quem vem logo atrás, para acompanhar sem trocar de aba.
+    const PERSEGUIDORES = 2;
+    function painelTop(painel, tabela) {
+      const vagas = Regras.VAGAS_FASE_FINAL;
+      painel.replaceChildren(
+        el("h3", {}, "Top 8 ao vivo"),
+        el("table", { class: "tabela-top" },
+          el("thead", {}, el("tr", {},
+            el("th", { class: "col-pos" }, "Pos"), el("th", { class: "col-jogador" }, "Jogador"),
+            el("th", { title: "Pontos" }, "Pts"), el("th", { title: "Vitórias" }, "V"), el("th", { title: "Saldo de gols" }, "SG"))),
+          el("tbody", {}, tabela.slice(0, vagas + PERSEGUIDORES).map((l) => {
+            let classe = l.posicao <= vagas ? "classificado" : "perseguidor";
+            if (l.posicao === vagas) classe += " linha-corte";
+            return el("tr", { class: classe },
+              el("td", { class: "col-pos" }, `${l.posicao}º`),
+              el("td", { class: "col-jogador" }, l.nome, l.empateTecnico && el("span", { class: "empate", title: "Empate técnico" }, "⚖️")),
+              el("td", { class: "col-pts" }, String(l.pontos)),
+              el("td", {}, String(l.v)),
+              el("td", {}, formatarSaldo(l.sg)));
+          }))),
+        el("button", { type: "button", id: "btn-ver-classificacao", class: "discreto mini", onclick: () => app.irParaAba("classificacao") },
+          "Ver classificação completa →"));
+    }
+
     function renderizarJogos(atual, tabela) {
       const lista = document.getElementById("lista-jogos");
       const navegacao = document.getElementById("navegacao-semanas");
       const agenda = document.getElementById("agenda-jogador");
+      const painel = document.getElementById("painel-top");
+      painel.hidden = !atual.jogos.length;
       if (!atual.jogos.length) {
+        painel.replaceChildren();
         navegacao.replaceChildren();
         agenda.replaceChildren();
         lista.replaceChildren(el("p", { class: "legenda" }, "Nenhum jogo ainda: cadastre os jogadores e sorteie o calendário."));
@@ -203,6 +230,7 @@
         .filter((j) => Regras.semanaDoJogo(j) === semana)
         .map((jogo) => cartaoJogo(jogo, numeros.get(jogo.id))));
       agenda.replaceChildren(agendaDoJogador(atual, tabela));
+      painelTop(painel, tabela);
       const lancados = atual.jogos.filter((j) => j.resultado).length;
       document.getElementById("contador-jogos").textContent = `${lancados}/${atual.jogos.length} lançados`;
     }
