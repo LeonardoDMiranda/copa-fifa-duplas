@@ -156,7 +156,10 @@
         el("p", { class: "diagnostico", id: "diagnostico" },
           `${diag.jogadores} jogadores × ${camp.config.jogosPorJogador} jogos ÷ 4 = ${diag.totalJogos} jogos · ${porSemana} por semana em ${camp.config.semanas} semanas`),
         diag.pronto
-          ? el("p", { class: "tudo-certo" }, "✔ Combinação válida para sortear o calendário.")
+          ? el("p", { class: "tudo-certo" }, "✔ Combinação válida para sortear o calendário.",
+              !travado && el("button", {
+                type: "button", class: "primario mini", dataset: { ir: "calendario" }, onclick: () => app.irParaAba("calendario"),
+              }, "Próximo: sortear o calendário →"))
           : el("ul", { class: "avisos-chave" }, diag.problemas.map((p) => el("li", {}, `⚠️ ${p}`))),
         travado
           ? el("div", { class: "alerta" },
@@ -173,7 +176,7 @@
                 el("button", { type: "button", id: "btn-adicionar-nomes", class: "primario", onclick: adicionarNomes }, "Adicionar"))),
         camp.jogadores.length
           ? el("ol", { class: "lista-jogadores", id: "lista-jogadores" }, camp.jogadores.map((j) => itemJogador(j, travado)))
-          : el("p", { class: "legenda" }, "Nenhum jogador cadastrado ainda."));
+          : app.proximoPasso("Nenhum jogador cadastrado ainda. Cole os nomes no campo acima, um por linha, e clique em \"Adicionar\"."));
     }
 
     return {

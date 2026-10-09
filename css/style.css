@@ -1,14 +1,89 @@
+/* Cores do app (o telão tem as suas, mais abaixo). O tema escuro segue a configuração do sistema. */
 :root {
+  color-scheme: light dark;
   --fundo: #eef1f5;
   --superficie: #ffffff;
+  --superficie-2: #f1f3f6;      /* campos desabilitados, editor, cartões neutros */
+  --superficie-hover: #e9eef5;
   --texto: #1b2430;
   --texto-suave: #5b6675;
   --borda: #dde2e9;
-  --primaria: #0d3b66;
+  --borda-forte: #b8c2cf;
+  --topo: #0d3b66;              /* fundo do cabeçalho */
+  --primaria: #0d3b66;          /* fundo dos botões principais (texto branco) */
+  --primaria-hover: #155a99;
+  --destaque: #0d3b66;          /* aba ativa, contornos de foco */
   --classificado: #e3f5e8;
   --classificado-borda: #2e9e4a;
   --sobe: #1f8a3d;
   --desce: #c62828;
+  --ambar: #c9a227;
+  --ambar-texto: #7d6200;
+  --alerta-fundo: #fff4d6;
+  --alerta-texto: #6b5100;
+  --tag-fundo: #ffe8a3;
+  --erro-fundo: #fdecec;
+  --info-fundo: #dfeafb;
+  --info-texto: #1d4f91;
+  --manual-fundo: #e8defc;
+  --manual-texto: #4b2a8f;
+  --lancado-fundo: #fafdfb;
+  --garantido-fundo: #eef9f1;
+  --disputa-fundo: #fffaeb;
+  --disputa-borda: #f0e2b0;
+  --eliminado-fundo: #f6f7f9;
+  --ouro-fundo: #fff6d1;
+  --ouro-borda: #e6c34a;
+  --bronze-fundo: #f8eadf;
+  --bronze-borda: #d4a57c;
+  --completa-texto: #145a26;
+  --aviso-fundo: #1b2430;
+  --sombra: rgba(0, 0, 0, .08);
+  --veu: rgba(15, 23, 32, .45); /* fundo atrás da janela de confirmação */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #0f141b;
+    --superficie: #18202b;
+    --superficie-2: #212b37;
+    --superficie-hover: #263242;
+    --texto: #e6ebf1;
+    --texto-suave: #9eabba;
+    --borda: #2d3948;
+    --borda-forte: #485870;
+    --topo: #0b1f33;
+    --primaria: #2b68ab;
+    --primaria-hover: #3579c2;
+    --destaque: #82b8f2;
+    --classificado: #17331f;
+    --classificado-borda: #3fbf68;
+    --sobe: #5fd38a;
+    --desce: #ff7b7b;
+    --ambar: #c9a227;
+    --ambar-texto: #e3bd45;
+    --alerta-fundo: #352d12;
+    --alerta-texto: #f3d98a;
+    --tag-fundo: #4a3d10;
+    --erro-fundo: #4a1f22;
+    --info-fundo: #1c3150;
+    --info-texto: #a3c8f7;
+    --manual-fundo: #30264f;
+    --manual-texto: #cfbcff;
+    --lancado-fundo: #16261c;
+    --garantido-fundo: #15281c;
+    --disputa-fundo: #2a2513;
+    --disputa-borda: #5a4c1c;
+    --eliminado-fundo: #1b222c;
+    --ouro-fundo: #3a3112;
+    --ouro-borda: #c9a227;
+    --bronze-fundo: #3a2a1c;
+    --bronze-borda: #b0805a;
+    --completa-texto: #8fe0aa;
+    --aviso-fundo: #2d3948;
+    --sombra: rgba(0, 0, 0, .4);
+    --veu: rgba(0, 0, 0, .6);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -21,7 +96,7 @@ body {
 }
 
 .topo {
-  background: var(--primaria);
+  background: var(--topo);
   color: #fff;
   padding: 14px 24px;
   display: flex;
@@ -48,7 +123,7 @@ main.painel {
   z-index: 5;
   background: var(--superficie);
   border-bottom: 1px solid var(--borda);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
+  box-shadow: 0 1px 3px var(--sombra);
 }
 .abas-lista { max-width: 1500px; margin: 0 auto; padding: 0 16px; display: flex; gap: 2px; overflow-x: auto; }
 button.aba-btn {
@@ -61,9 +136,9 @@ button.aba-btn {
   font-size: .95rem;
   white-space: nowrap;
 }
-button.aba-btn:hover:not(:disabled) { background: #f0f4f9; border-color: transparent; color: var(--texto); }
-button.aba-btn[aria-selected="true"] { color: var(--primaria); border-bottom-color: var(--primaria); font-weight: 600; }
-button.aba-btn:focus-visible { outline: 2px solid var(--primaria); outline-offset: -2px; }
+button.aba-btn:hover:not(:disabled) { background: var(--superficie-hover); border-color: transparent; color: var(--texto); }
+button.aba-btn[aria-selected="true"] { color: var(--destaque); border-bottom-color: var(--destaque); font-weight: 600; }
+button.aba-btn:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; }
 .indicador {
   margin-left: 6px;
   padding: 0 6px;
@@ -103,7 +178,7 @@ button.aba-btn:focus-visible { outline: 2px solid var(--primaria); outline-offse
 .tela {
   background: var(--superficie);
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+  box-shadow: 0 1px 3px var(--sombra);
   padding: 16px 20px 20px;
 }
 .tela-cabecalho h2 { margin: 0 0 4px; }
@@ -158,11 +233,11 @@ button {
   padding: 5px 12px;
   border: 1px solid var(--borda);
   border-radius: 5px;
-  background: #fff;
+  background: var(--superficie);
   color: var(--texto);
   cursor: pointer;
 }
-button:hover:not(:disabled) { background: #f0f4f9; border-color: #b8c2cf; }
+button:hover:not(:disabled) { background: var(--superficie-hover); border-color: var(--borda-forte); }
 button:disabled { opacity: .45; cursor: default; }
 button.discreto { background: transparent; }
 button.perigo { color: var(--desce); }
@@ -200,7 +275,7 @@ button.perigo { color: var(--desce); }
   box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
 }
 .menu-itens button { border: none; background: transparent; text-align: left; padding: 7px 10px; }
-.menu-itens button:hover:not(:disabled) { background: #f0f4f9; }
+.menu-itens button:hover:not(:disabled) { background: var(--superficie-hover); }
 .menu-itens hr { width: 100%; margin: 4px 0; border: none; border-top: 1px solid var(--borda); }
 /* Tela estreita: os botões quebram linha e o menu pode ficar à esquerda; a lista ocupa a largura do cabeçalho. */
 @media (max-width: 600px) {
@@ -225,7 +300,7 @@ button.perigo { color: var(--desce); }
 .aviso {
   padding: 10px 14px;
   border-radius: 6px;
-  background: #1b2430;
+  background: var(--aviso-fundo);
   color: #fff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
   font-size: .9rem;
@@ -241,15 +316,15 @@ button.perigo { color: var(--desce); }
 
 .jogo {
   border: 1px solid var(--borda);
-  border-left: 5px solid #c9a227;
+  border-left: 5px solid var(--ambar);
   border-radius: 6px;
   padding: 8px 12px 10px;
 }
-.jogo.lancado { border-left-color: var(--classificado-borda); background: #fafdfb; }
+.jogo.lancado { border-left-color: var(--classificado-borda); background: var(--lancado-fundo); }
 
 .jogo-topo { display: flex; gap: 10px; align-items: baseline; font-size: .8rem; color: var(--texto-suave); }
 .jogo-numero { font-weight: 700; color: var(--texto); }
-.jogo-topo .status { margin-left: auto; font-weight: 600; color: #9a7a10; }
+.jogo-topo .status { margin-left: auto; font-weight: 600; color: var(--ambar-texto); }
 .jogo.lancado .jogo-topo .status { color: var(--sobe); }
 
 .jogo-placar {
@@ -264,7 +339,7 @@ button.perigo { color: var(--desce); }
 .dupla.d2 { align-items: flex-start; }
 .dupla.vencedora { background: var(--classificado); font-weight: 700; }
 .dupla.perdedora { color: var(--texto-suave); }
-.dupla.empate { background: #f1f3f6; }
+.dupla.empate { background: var(--superficie-2); }
 .dupla.anulada { color: var(--texto-suave); font-style: italic; }
 
 .placar { display: flex; align-items: center; gap: 6px; }
@@ -276,19 +351,19 @@ input.gols {
   font-size: 1.3rem;
   font-weight: 700;
   text-align: center;
-  border: 1px solid #b8c2cf;
+  border: 1px solid var(--borda-forte);
   border-radius: 5px;
 }
-input.gols:focus { outline: 2px solid var(--primaria); outline-offset: 1px; }
-input.gols:disabled { background: #f1f3f6; color: var(--texto-suave); }
-input.gols.invalido { border-color: var(--desce); background: #fdecec; }
+input.gols:focus { outline: 2px solid var(--destaque); outline-offset: 1px; }
+input.gols:disabled { background: var(--superficie-2); color: var(--texto-suave); }
+input.gols.invalido { border-color: var(--desce); background: var(--erro-fundo); }
 
 .tag-repete {
   display: inline-block;
   padding: 0 5px;
   border-radius: 8px;
-  background: #ffe8a3;
-  color: #6b5100;
+  background: var(--tag-fundo);
+  color: var(--alerta-texto);
   font-size: .7rem;
   font-weight: 700;
   vertical-align: 1px;
@@ -317,16 +392,16 @@ input.gols.invalido { border-color: var(--desce); background: #fdecec; }
   .colunas-em-jogo { grid-template-columns: minmax(0, 1fr); }
 }
 .coluna-em-jogo { border-radius: 6px; padding: 10px 12px; border-top: 4px solid; }
-.coluna-em-jogo.garantido { background: #eef9f1; border-color: var(--classificado-borda); }
-.coluna-em-jogo.disputa { background: #fffaeb; border-color: #c9a227; }
-.coluna-em-jogo.eliminado { background: #f6f7f9; border-color: #b8c2cf; }
+.coluna-em-jogo.garantido { background: var(--garantido-fundo); border-color: var(--classificado-borda); }
+.coluna-em-jogo.disputa { background: var(--disputa-fundo); border-color: var(--ambar); }
+.coluna-em-jogo.eliminado { background: var(--eliminado-fundo); border-color: var(--borda-forte); }
 .coluna-em-jogo h3 { margin: 0 0 8px; font-size: 1rem; }
 .coluna-em-jogo .contagem { color: var(--texto-suave); font-weight: 400; }
 .coluna-em-jogo ul { list-style: none; margin: 0; padding: 0; }
 .coluna-em-jogo.disputa ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
 
 .item-em-jogo { padding: 4px 0; }
-.coluna-em-jogo.disputa .item-em-jogo { background: #fff; border: 1px solid #f0e2b0; border-radius: 5px; padding: 6px 8px; }
+.coluna-em-jogo.disputa .item-em-jogo { background: var(--superficie); border: 1px solid var(--disputa-borda); border-radius: 5px; padding: 6px 8px; }
 .linha-item { display: flex; align-items: baseline; gap: 6px; }
 .pos-item { font-size: .75rem; color: var(--texto-suave); min-width: 26px; }
 .nome-item { font-weight: 600; }
@@ -339,8 +414,8 @@ input.gols.invalido { border-color: var(--desce); background: #fdecec; }
 .tag-saldo {
   padding: 0 6px;
   border-radius: 8px;
-  background: #dfeafb;
-  color: #1d4f91;
+  background: var(--info-fundo);
+  color: var(--info-texto);
   font-size: .7rem;
   font-weight: 700;
   cursor: help;
@@ -349,21 +424,66 @@ input.gols.invalido { border-color: var(--desce); background: #fdecec; }
 /* ---------- mata-mata ---------- */
 
 button.primario { background: var(--primaria); color: #fff; border-color: var(--primaria); font-weight: 600; }
-button.primario:hover:not(:disabled) { background: #155a99; border-color: #155a99; }
+button.primario:hover:not(:disabled) { background: var(--primaria-hover); border-color: var(--primaria-hover); }
+button.perigo-forte { background: var(--desce); color: #fff; border-color: var(--desce); font-weight: 600; }
+button.perigo-forte:hover:not(:disabled) { background: var(--desce); border-color: var(--desce); filter: brightness(1.1); }
+
+/* ---------- foco, campos e telas vazias ---------- */
+
+button:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 2px;
+}
+input, select, textarea { background: var(--superficie); color: var(--texto); }
+select { border: 1px solid var(--borda); border-radius: 5px; }
+
+.vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px;
+  border: 1px dashed var(--borda-forte);
+  border-radius: 6px;
+  color: var(--texto-suave);
+  text-align: center;
+}
+.vazio p { margin: 0; }
+.lista-jogos > .vazio { grid-column: 1 / -1; }
+.celula-vazia { padding: 12px 0 !important; white-space: normal !important; }
+.tudo-certo button { margin-left: 10px; }
+
+/* ---------- janela de confirmação ---------- */
+
+dialog.dialogo {
+  width: min(480px, calc(100vw - 32px));
+  padding: 20px 22px 16px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--superficie);
+  color: var(--texto);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .3);
+}
+dialog.dialogo::backdrop { background: var(--veu); }
+.dialogo h2 { margin: 0 0 10px; font-size: 1.2rem; }
+.dialogo-texto p { margin: 0 0 10px; line-height: 1.45; }
+.dialogo-texto ul { margin: 0 0 10px; padding: 8px 12px 8px 28px; border-radius: 5px; background: var(--alerta-fundo); color: var(--alerta-texto); }
+.dialogo-acoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.dialogo-acoes button { padding: 7px 16px; }
 button.mini { padding: 2px 8px; font-size: .8rem; }
 
 .alerta {
   padding: 8px 12px;
   border-radius: 5px;
-  background: #fff4d6;
-  color: #6b5100;
+  background: var(--alerta-fundo);
+  color: var(--alerta-texto);
   font-size: .9rem;
 }
 .alerta button { margin-left: 6px; }
 
 .gerar-chave .previa { margin: 4px 0 12px; }
 .gerar-chave .previa li { margin: 2px 0; }
-.avisos-chave { margin: 0 0 12px; padding: 8px 12px 8px 28px; background: #fff4d6; border-radius: 5px; color: #6b5100; }
+.avisos-chave { margin: 0 0 12px; padding: 8px 12px 8px 28px; background: var(--alerta-fundo); border-radius: 5px; color: var(--alerta-texto); }
 .tudo-certo { color: var(--sobe); font-weight: 600; }
 
 .barra-mata-mata { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
@@ -381,7 +501,7 @@ button.mini { padding: 2px 8px; font-size: .8rem; }
 
 .confronto {
   border: 1px solid var(--borda);
-  border-left: 5px solid #c9a227;
+  border-left: 5px solid var(--ambar);
   border-radius: 6px;
   padding: 8px 12px 10px;
   display: flex;
@@ -409,14 +529,14 @@ button.mini { padding: 2px 8px; font-size: .8rem; }
 .tag-manual {
   padding: 0 6px;
   border-radius: 8px;
-  background: #e8defc;
-  color: #4b2a8f;
+  background: var(--manual-fundo);
+  color: var(--manual-texto);
   font-size: .7rem;
   font-weight: 700;
   cursor: help;
 }
 .tag-vence { color: var(--sobe); font-size: .8rem; font-weight: 700; }
-.editor-dupla { background: #f1f3f6; }
+.editor-dupla { background: var(--superficie-2); }
 .editor-dupla select { font: inherit; font-size: .85rem; padding: 2px 4px; max-width: 170px; }
 
 .placar-serie { font-weight: 700; padding: 0 8px; }
@@ -427,10 +547,10 @@ button.mini { padding: 2px 8px; font-size: .8rem; }
 .linha-placar { display: flex; align-items: center; gap: 6px; margin: 3px 0; padding-left: 8px; }
 .rotulo-etapa { font-size: .8rem; color: var(--texto-suave); width: 96px; }
 .linha-placar.etapa-prorrogacao .rotulo-etapa,
-.linha-placar.etapa-penaltis .rotulo-etapa { color: #9a7a10; font-weight: 600; }
+.linha-placar.etapa-penaltis .rotulo-etapa { color: var(--ambar-texto); font-weight: 600; }
 input.gols.mini { width: 2.4em; font-size: 1.05rem; padding: 2px; }
 .resultado-partida { font-size: .85rem; font-weight: 600; color: var(--sobe); padding-left: 8px; }
-.resultado-partida.pendente { color: #9a7a10; }
+.resultado-partida.pendente { color: var(--ambar-texto); }
 .resultado-partida.erro { color: var(--desce); }
 
 .podio { display: flex; flex-direction: column; gap: 10px; }
@@ -445,10 +565,10 @@ input.gols.mini { width: 2.4em; font-size: 1.05rem; padding: 2px; }
 .degrau .medalha { font-size: 2rem; line-height: 1; }
 .degrau .titulo-degrau { font-size: .75rem; text-transform: uppercase; color: var(--texto-suave); font-weight: 700; }
 .degrau .nome-podio { font-weight: 700; font-size: 1.05rem; }
-.degrau.ouro:not(.vazio) { background: #fff6d1; border-color: #e6c34a; }
+.degrau.ouro:not(.vazio) { background: var(--ouro-fundo); border-color: var(--ouro-borda); }
 .degrau.ouro:not(.vazio) .nome-podio { font-size: 1.3rem; }
-.degrau.prata:not(.vazio) { background: #f1f3f6; border-color: #b8c2cf; }
-.degrau.bronze:not(.vazio) { background: #f8eadf; border-color: #d4a57c; }
+.degrau.prata:not(.vazio) { background: var(--superficie-2); border-color: var(--borda-forte); }
+.degrau.bronze:not(.vazio) { background: var(--bronze-fundo); border-color: var(--bronze-borda); }
 
 /* ---------- modo telão ----------
    Tema escuro e medidas em vh: numa TV 1080p, 1vh = 10,8 px. */
@@ -677,7 +797,7 @@ body.telao-ativo { overflow: hidden; }
 }
 .campo-config.nome input { width: 22em; max-width: 100%; }
 .campo-config.numero input { width: 4em; text-align: center; }
-.campo-config input:disabled { background: #f1f3f6; color: var(--texto-suave); }
+.campo-config input:disabled { background: var(--superficie-2); color: var(--texto-suave); }
 .diagnostico { margin: 8px 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .adicionar-jogadores { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; max-width: 520px; }
@@ -686,7 +806,7 @@ body.telao-ativo { overflow: hidden; }
   font: inherit; padding: 6px 8px; min-height: 4.5em; resize: vertical;
   border: 1px solid var(--borda); border-radius: 5px;
 }
-.adicionar-jogadores textarea:focus, .campo-config input:focus { outline: 2px solid var(--primaria); outline-offset: 1px; }
+.adicionar-jogadores textarea:focus, .campo-config input:focus { outline: 2px solid var(--destaque); outline-offset: 1px; }
 
 ol.lista-jogadores { columns: 3 220px; column-gap: 24px; margin: 12px 0 0; padding-left: 2em; }
 .lista-jogadores li { break-inside: avoid; padding: 3px 0; }
@@ -703,7 +823,7 @@ ol.lista-jogadores { columns: 3 220px; column-gap: 24px; margin: 12px 0 0; paddi
 .qualidade { margin-bottom: 12px; }
 .qualidade .avisos-chave { margin-bottom: 6px; }
 .semanas-calendario { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
-.semana-calendario { border: 1px solid var(--borda); border-radius: 6px; padding: 8px 12px 10px; background: #fafbfc; }
+.semana-calendario { border: 1px solid var(--borda); border-radius: 6px; padding: 8px 12px 10px; background: var(--superficie-2); }
 .semana-calendario h3 { margin: 0 0 6px; font-size: 1rem; }
 .semana-calendario h3 .contagem { font-weight: 400; font-size: .85rem; color: var(--texto-suave); }
 .semana-calendario ol { margin: 0; padding-left: 1.6em; }
@@ -714,7 +834,7 @@ button.nome-slot {
   font: inherit; font-size: inherit; padding: 0 3px; border: 1px solid transparent; background: transparent;
   border-radius: 4px; color: inherit; cursor: pointer;
 }
-button.nome-slot:hover { background: #e8eef6; border-color: #b8c2cf; }
+button.nome-slot:hover { background: var(--superficie-hover); border-color: var(--borda-forte); }
 .troca-slot select { font: inherit; font-size: .85rem; max-width: 100%; }
 
 /* ---------- rodadas ---------- */
@@ -724,9 +844,9 @@ button.nome-slot:hover { background: #e8eef6; border-color: #b8c2cf; }
 .seletor-semana select { font: inherit; padding: 4px 8px; border: 1px solid var(--borda); border-radius: 5px; }
 .chips-semanas { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 4px; }
 button.chip-semana { padding: 2px 9px; font-size: .8rem; border-radius: 12px; color: var(--texto-suave); }
-button.chip-semana.parcial { background: #fff4d6; border-color: #e6c34a; color: #6b5100; }
-button.chip-semana.completa { background: var(--classificado); border-color: var(--classificado-borda); color: #145a26; }
-button.chip-semana.selecionada { outline: 2px solid var(--primaria); outline-offset: 1px; font-weight: 700; }
+button.chip-semana.parcial { background: var(--alerta-fundo); border-color: var(--ouro-borda); color: var(--alerta-texto); }
+button.chip-semana.completa { background: var(--classificado); border-color: var(--classificado-borda); color: var(--completa-texto); }
+button.chip-semana.selecionada { outline: 2px solid var(--destaque); outline-offset: 1px; font-weight: 700; }
 .navegacao-semanas .descansam { margin: 6px 0 0; font-size: .8rem; color: var(--texto-suave); }
 
 .agenda { margin-top: 18px; border-top: 1px solid var(--borda); padding-top: 10px; }
@@ -735,7 +855,7 @@ button.chip-semana.selecionada { outline: 2px solid var(--primaria); outline-off
 .agenda-lista { margin: 6px 0 0; padding-left: 1.6em; font-size: .92rem; }
 .agenda-lista li { padding: 2px 0; }
 .resultado-agenda { font-weight: 600; }
-.resultado-agenda.pendente { color: #9a7a10; font-weight: 400; }
+.resultado-agenda.pendente { color: var(--ambar-texto); font-weight: 400; }
 .resultado-agenda.vencedora { color: var(--sobe); }
 .resultado-agenda.perdedora { color: var(--desce); }
 .resultado-agenda.empate, .resultado-agenda.anulada { color: var(--texto-suave); }

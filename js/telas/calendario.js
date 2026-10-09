@@ -3,18 +3,23 @@
 (function () {
   "use strict";
 
-  const { el } = Util;
+  const { el, confirmar } = Util;
 
   function criar(app) {
     const { estado, nomePorId, avisar, renderizar, cadastroTravado } = app;
 
     let editandoSlot = null; // { indice, lado, pos } do jogador do rascunho em troca
 
-    function sortear() {
+    async function sortear() {
       if (cadastroTravado()) return;
-      const atual = estado.atual();
-      const { jogadores, config: cfg, sorteio } = atual.campeonato;
-      if (sorteio && sorteio.rascunho && !confirm("Já existe um sorteio. Sortear de novo descarta esse calendário, inclusive as trocas manuais.\n\nSortear de novo?")) return;
+      const anterior = estado.atual().campeonato.sorteio;
+      if (anterior && anterior.rascunho) {
+        const ok = await confirmar("O calendário atual será descartado, inclusive as trocas feitas à mão.",
+          { titulo: "Sortear de novo?", acao: "Sortear de novo" });
+        // Outra janela pode ter mudado o campeonato enquanto a pergunta estava aberta.
+        if (!ok || cadastroTravado() || estado.atual().campeonato.sorteio !== anterior) return;
+      }
+      const { jogadores, config: cfg } = estado.atual().campeonato;
       const semente = Math.floor(Math.random() * 2147483646) + 1;
       const r = Regras.gerarCalendario(jogadores, { jogosPorJogador: cfg.jogosPorJogador, semanas: cfg.semanas, semente });
       if (r.erro) {
@@ -33,13 +38,15 @@
       estado.modificar("descartar sorteio", (s) => { s.campeonato.sorteio = null; });
     }
 
-    function confirmarCalendario() {
+    async function confirmarCalendario() {
       const atual = estado.atual();
       const { jogadores, config: cfg, sorteio } = atual.campeonato;
       if (cadastroTravado() || !sorteio || !sorteio.rascunho) return;
       const aval = Regras.avaliarCalendario(jogadores, sorteio.rascunho, cfg);
       const aviso = aval.pronto ? "" : `Atenção, o calendário não respeita o regulamento:\n\n- ${aval.violacoes.join("\n- ")}\n\n`;
-      if (!confirm(`${aviso}Confirmar o calendário? Depois disso só dá para renomear jogadores (Desfazer ainda volta, mas lançamentos feitos depois se perdem).`)) return;
+      const ok = await confirmar(`${aviso}Depois disso só dá para renomear jogadores. "Desfazer" ainda volta, mas os placares lançados depois se perdem.`,
+        { titulo: "Confirmar o calendário?", acao: "Confirmar calendário", perigo: !aval.pronto });
+      if (!ok || estado.atual().campeonato.sorteio !== sorteio) return;
       editandoSlot = null;
       estado.modificar("confirmar calendário", (s) => {
         s.jogos = Regras.calendarioParaJogos(sorteio.rascunho);
@@ -145,13 +152,17 @@
       const alvo = document.getElementById("conteudo-calendario");
 
       if (!calendario) {
-        alvo.replaceChildren(
-          el("p", { class: "legenda" },
-            "Sorteia as duplas e os jogos de todas as semanas de uma vez: todos com o mesmo número de jogos, no máximo um por semana e sem repetir parceiro. Depois você pode trocar jogadores à mão e confirmar."),
-          diag.pronto
-            ? null
-            : el("ul", { class: "avisos-chave" }, [el("li", {}, "⚠️ Antes de sortear, ajuste o cadastro:"), ...diag.problemas.map((p) => el("li", {}, p))]),
-          el("button", { type: "button", id: "btn-sortear", class: "primario", disabled: !diag.pronto, onclick: sortear }, "🎲 Sortear calendário"));
+        const explicacao = el("p", { class: "legenda" },
+          "Sorteia as duplas e os jogos de todas as semanas de uma vez: todos com o mesmo número de jogos, no máximo um por semana e sem repetir parceiro. Depois você pode trocar jogadores à mão e confirmar.");
+        const botaoSortear = el("button", { type: "button", id: "btn-sortear", class: "primario", disabled: !diag.pronto, onclick: sortear }, "🎲 Sortear calendário");
+        if (diag.pronto) {
+          alvo.replaceChildren(explicacao, botaoSortear);
+        } else {
+          alvo.replaceChildren(explicacao,
+            el("ul", { class: "avisos-chave" }, el("li", {}, "⚠️ Antes de sortear, ajuste o cadastro:"), diag.problemas.map((p) => el("li", {}, p))),
+            el("div", { class: "acoes-calendario" }, botaoSortear,
+              el("button", { type: "button", dataset: { ir: "jogadores" }, onclick: () => app.irParaAba("jogadores") }, "Ir para Jogadores")));
+        }
         return;
       }
 

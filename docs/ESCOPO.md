@@ -130,6 +130,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 8 | Cadastro de jogadores, sorteio do calendário, rodadas por semana, classificação por semana e lembrete de backup |
 | 9 | Código da interface dividido em um arquivo por tela (`js/telas/`), sem mudança para o usuário |
 | 10 | Navegação por abas, top 8 ao vivo nas rodadas e cabeçalho com menus |
+| 11 | Janelas de confirmação próprias, tema escuro (segue o sistema), telas vazias com o próximo passo e foco visível |
 
 Novas fases seguem o mesmo jeito: uma mudança pequena por vez, com caso de teste novo ou ajustado.
 

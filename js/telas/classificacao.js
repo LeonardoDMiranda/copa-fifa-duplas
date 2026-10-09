@@ -80,6 +80,11 @@
     }
 
     function renderizarTabela(tabela, editavel) {
+      if (!tabela.length) {
+        document.getElementById("corpo-classificacao").replaceChildren(el("tr", {}, el("td", { colspan: "11", class: "celula-vazia" },
+          app.proximoPasso("Nenhum jogador cadastrado ainda.", "jogadores", "Ir para Jogadores"))));
+        return;
+      }
       document.getElementById("corpo-classificacao").replaceChildren(
         ...tabela.map((linha) => {
           let classe = linha.posicao <= VAGAS_FASE_FINAL ? "classificado" : "";

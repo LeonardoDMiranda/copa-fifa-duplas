@@ -20,6 +20,40 @@
     return e;
   }
 
+  // Texto de uma mensagem em blocos: parágrafos separados por linha em branco; um bloco em que
+  // todas as linhas começam com "- " vira lista.
+  function blocosDeTexto(texto) {
+    return String(texto).split(/\n\s*\n/).map((bloco) => {
+      const linhas = bloco.split("\n").filter((l) => l.trim());
+      if (linhas.length && linhas.every((l) => l.startsWith("- "))) {
+        return el("ul", {}, linhas.map((l) => el("li", {}, l.slice(2))));
+      }
+      return el("p", {}, linhas.join(" "));
+    });
+  }
+
+  // Janela de confirmação no lugar do confirm() do navegador. Devolve uma Promise<boolean>.
+  // Esc ou "Cancelar" = false. Em ações perigosas o botão de ação fica vermelho e o foco
+  // começa em "Cancelar", para Enter não confirmar sem querer.
+  function confirmar(mensagem, { titulo = "Confirmar?", acao = "Confirmar", perigo = false } = {}) {
+    return new Promise((resolver) => {
+      const dialogo = el("dialog", { class: "dialogo", "aria-labelledby": "dialogo-titulo" },
+        el("form", { method: "dialog" },
+          el("h2", { id: "dialogo-titulo" }, titulo),
+          el("div", { class: "dialogo-texto" }, blocosDeTexto(mensagem)),
+          el("div", { class: "dialogo-acoes" },
+            el("button", { type: "submit", id: "dialogo-cancelar", value: "cancelar" }, "Cancelar"),
+            el("button", { type: "submit", id: "dialogo-ok", value: "ok", class: perigo ? "perigo-forte" : "primario" }, acao))));
+      dialogo.addEventListener("close", () => {
+        dialogo.remove();
+        resolver(dialogo.returnValue === "ok");
+      });
+      document.body.appendChild(dialogo);
+      dialogo.showModal();
+      dialogo.querySelector(perigo ? "#dialogo-cancelar" : "#dialogo-ok").focus();
+    });
+  }
+
   const MAX_GOLS = 99;
 
   // Texto digitado num campo de placar: { vazio } | { invalido } | { valor }.
@@ -60,5 +94,5 @@
     return " empate";
   }
 
-  globalThis.Util = { el, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado };
+  globalThis.Util = { el, confirmar, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado };
 })();

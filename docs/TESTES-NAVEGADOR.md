@@ -20,8 +20,9 @@ python -m http.server 8765 --bind 127.0.0.1
 e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 
 - Começar cada bloco com `localStorage.clear()` e recarregar, para partir do app vazio.
-- Os `confirm()` do app travam a automação: antes dos cliques, trocar por
-  `window.confirm = (m) => { window.__confirms.push(m); return true; }` e conferir as mensagens depois.
+- As confirmações são uma janela do próprio app (`<dialog>`), não o `confirm()` do navegador: ler o
+  título em `dialog[open] h2` e clicar em `#dialogo-ok` ou `#dialogo-cancelar` (Esc também cancela).
+  Um `confirm()` nativo aparecendo é falha.
 - Para chegar rápido a um estado (ex.: 7 semanas lançadas), dá para escrever o estado direto na chave
   `copa-fifa-duplas-campeonato` do `localStorage` e recarregar. O que está sendo testado deve ser feito
   pela tela.
@@ -102,11 +103,11 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 |---|---|---|
 | 3.1 | Com 32 jogadores, clicar em "🎲 Sortear calendário". | Rascunho com 8 semanas e 6 jogos por semana; botões "Sortear de novo", "Confirmar calendário" e "Descartar". |
 | 3.2 | Conferir o rascunho. | Cada jogador em 6 jogos, no máximo 1 por semana, nenhum parceiro repetido. 8 jogadores descansando por semana. |
-| 3.3 | "Sortear de novo". | Pede confirmação ("Já existe um sorteio. ..."); aceitando, gera outro calendário; cancelando, nada muda. |
+| 3.3 | "Sortear de novo". | Janela "Sortear de novo?"; aceitando, gera outro calendário; cancelando, nada muda. |
 | 3.4 | Trocar um jogador num jogo do rascunho pelo seletor. | As opções dizem "(atual)", "— joga no jogo N (trocam de lugar)" ou "— descansa nesta semana". Escolhendo, o rascunho muda na hora. |
-| 3.5 | Trocar um jogador por alguém que descansa na semana. | O painel mostra "⚠️ ... tem 5 jogo(s) (o esperado é 6).", "⚠️ ... tem 7 jogo(s) ..." e, se for o caso, "... são parceiros 2 vezes.". "Confirmar" pede confirmação começando com "Atenção, o calendário não respeita o regulamento: ...". |
+| 3.5 | Trocar um jogador por alguém que descansa na semana. | O painel mostra "⚠️ ... tem 5 jogo(s) (o esperado é 6).", "⚠️ ... tem 7 jogo(s) ..." e, se for o caso, "... são parceiros 2 vezes.". "Confirmar" abre "Confirmar o calendário?" começando com "Atenção, o calendário não respeita o regulamento: ..." e o botão de ação em vermelho. |
 | 3.6 | "Descartar". | Volta para antes do sorteio. |
-| 3.7 | "Confirmar calendário". | Pede confirmação; aceitando, cria os 48 jogos (`s1-j1` ...), o cadastro trava (só renomear) e aparece "Reiniciar campeonato". |
+| 3.7 | "Confirmar calendário". | Janela "Confirmar o calendário?"; aceitando, cria os 48 jogos (`s1-j1` ...), o cadastro trava (só renomear), aparece "Reiniciar campeonato" e o app vai para a aba Rodadas. |
 | 3.8 | Depois de confirmado, tentar adicionar ou remover jogador. | Campo de nomes e botões de remover não aparecem; só "Renomear". |
 | 3.9 | Exportar o backup, resetar, importar e comparar o calendário. | Mesmo calendário (a semente vai no backup). |
 
@@ -159,7 +160,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 
 | # | Passos | Esperado |
 |---|---|---|
-| 7.1 | Antes de lançar todos os jogos. | "Prévia pela classificação atual" e avisos do que falta. "Gerar chaveamento" pede confirmação ("Atenção: ..."). |
+| 7.1 | Antes de lançar todos os jogos. | "Prévia pela classificação atual" e avisos do que falta. "Gerar chaveamento" abre "Gerar o chaveamento mesmo assim?" com a lista dos avisos. |
 | 7.2 | Com tudo lançado, gerar. | Semi 1 = 1º+8º × 2º+7º; Semi 2 = 3º+6º × 4º+5º. "✔ Todos os jogos lançados e nenhum empate técnico pendente no top 8." antes de gerar. |
 | 7.3 | Lançar placar com vencedor numa semi. | "✔ Dupla N vence", status "Decidido". |
 | 7.4 | Lançar empate numa semi. | Aparece a prorrogação; empatando nela, aparecem os pênaltis. |
@@ -168,12 +169,12 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 7.7 | Pódio. | 🥇 campeões e 🥈 vice saem da final; 🥉 do 3º lugar. |
 | 7.8 | Trocar uma dupla à mão ("✎"), salvar e depois voltar à automática. | A dupla manual aparece; voltar restaura a dupla da classificação/semi. |
 | 7.9 | Trocar uma dupla com jogador repetido ou o mesmo jogador nas duas duplas. | Erros "Os dois jogadores da dupla precisam ser diferentes." / "Um jogador não pode estar nas duas duplas do mesmo jogo." |
-| 7.10 | Mudar um placar da fase de classificação depois de gerar, alterando o top 8. | Alerta "A classificação mudou depois de gerar o chaveamento ..." com "Usar duplas da classificação atual". As semis continuam com as duplas antigas até clicar. Se as semis já têm placar, pede confirmação; ao trocar, se final/3º lugar já têm placar, aparece em seguida o alerta do 7.12. |
+| 7.10 | Mudar um placar da fase de classificação depois de gerar, alterando o top 8. | Alerta "A classificação mudou depois de gerar o chaveamento ..." com "Usar duplas da classificação atual". As semis continuam com as duplas antigas até clicar. Se as semis já têm placar, abre "Trocar as duplas mesmo assim?"; ao trocar, se final/3º lugar já têm placar, aparece em seguida o alerta do 7.12. |
 | 7.11 **(R)** | Final sem placar: trocar o resultado de uma semi. | A final passa a mostrar o novo vencedor sozinha, sem alerta. |
 | 7.12 **(R)** | Final e 3º lugar com placar: corrigir o resultado de uma semi. | As duplas que jogaram e os placares continuam. Aparece o alerta "O resultado de uma semifinal mudou depois de lançar placares da final ou do 3º lugar ...". |
-| 7.13 **(R)** | No caso 7.12, clicar em "Usar duplas que saem das semis". | Pede confirmação ("... já tem placar lançado. Os placares continuam e passam a valer para as novas duplas."). Aceitando, troca as duplas e mantém os placares; o alerta some. "Desfazer" volta ao estado anterior. |
+| 7.13 **(R)** | No caso 7.12, clicar em "Usar duplas que saem das semis". | Janela "Trocar as duplas mesmo assim?" ("... já tem placar lançado. Os placares continuam e passam a valer para as novas duplas."). Aceitando, troca as duplas e mantém os placares; o alerta some. "Desfazer" volta ao estado anterior. |
 | 7.14 | Resultados do mata-mata. | A classificação não muda. |
-| 7.15 | "Apagar chaveamento". | Pede confirmação; apaga tudo do mata-mata; "Desfazer" traz de volta. |
+| 7.15 | "Apagar chaveamento". | Janela "Apagar o chaveamento?"; aceitando, apaga tudo do mata-mata; "Desfazer" traz de volta. |
 
 ## 8. Desfazer
 
@@ -194,7 +195,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 9.3 | Concluir mais uma semana depois do backup. | Lembrete "... semanas já foram concluídas, mais do que no último backup." |
 | 9.4 | Backup com 7 dias ou mais (ajustar a data de `ultimoBackup` no `localStorage`). | Lembrete "Faz N dias desde o último backup." |
 | 9.5 | "Dispensar". | O lembrete some até a mensagem mudar ou a página ser recarregada. |
-| 9.6 **(R)** | Resetar (botão "Resetar"). | Pede confirmação; aceitando, volta ao cadastro vazio, avisa "Campeonato reiniciado: tudo vazio." e `ultimoBackup` fica `null`. |
+| 9.6 **(R)** | Resetar (menu ⋯ → "Resetar campeonato"). | Janela "Resetar o campeonato?"; aceitando, volta ao cadastro vazio, avisa "Campeonato reiniciado: tudo vazio." e `ultimoBackup` fica `null`. |
 | 9.7 **(R)** | Exportar, resetar e desfazer. | O campeonato e o registro do backup voltam: o lembrete não reaparece. |
 | 9.8 **(R)** | Importar um backup exportado. | "Backup importado: <arquivo>"; campeonato igual ao exportado; `ultimoBackup` igual ao do arquivo; sem lembrete. |
 | 9.9 **(R)** | Importar um backup sem `ultimoBackup`. | O registro fica `null` e o lembrete aparece. |
@@ -241,6 +242,9 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 13.2 | Navegar só com o teclado (Tab, Enter, Espaço). | Todos os botões e campos alcançáveis, com foco visível. |
 | 13.3 | Campos de placar. | Têm `aria-label` dizendo o jogo e a dupla. |
 | 13.4 | Avisos de erro. | Aparecem com `role="alert"` e somem sozinhos (erros em 8 s, os outros em 3,5 s). |
+| 13.5 | Janelas de confirmação (sortear de novo, confirmar calendário, gerar/apagar chaveamento, trocar duplas com placar, resetar). | Título com a pergunta e botão com o nome da ação. Ações perigosas: botão vermelho e foco em "Cancelar" (Enter cancela). Esc cancela. Com a janela aberta, Ctrl+Z e as teclas 1–5 não fazem nada. |
+| 13.6 | Tema escuro do sistema (Windows: Configurações → Personalização → Cores → escuro). | O app inteiro fica escuro, legível, sem fundo branco sobrando (campos, menus, janelas). O telão não muda. |
+| 13.7 | Telas vazias (app zerado), em cada aba. | Cada uma diz o que falta e tem um botão para a aba onde se resolve ("Ir para Jogadores", "Ir para o Calendário"). Nenhum "null" ou "undefined" na tela. Com o cadastro pronto, Jogadores mostra "Próximo: sortear o calendário →". |
 
 ---
 

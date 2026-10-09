@@ -3,7 +3,7 @@
 (function () {
   "use strict";
 
-  const { el, MAX_GOLS, lerGols } = Util;
+  const { el, confirmar, MAX_GOLS, lerGols } = Util;
 
   const ROTULOS = { semi1: "Semifinal 1", semi2: "Semifinal 2", terceiro: "3º lugar", final: "Final" };
   const ORIGEM_DUPLA = {
@@ -34,7 +34,7 @@
 
     function painelGerar(atual, tabela) {
       if (tabela.length < Regras.VAGAS_FASE_FINAL) {
-        return el("p", { class: "legenda" }, `O chaveamento precisa de pelo menos ${Regras.VAGAS_FASE_FINAL} jogadores cadastrados.`);
+        return app.proximoPasso(`O chaveamento precisa de pelo menos ${Regras.VAGAS_FASE_FINAL} jogadores cadastrados.`, "jogadores", "Ir para Jogadores");
       }
       const avisos = Regras.avisosParaGerarChaveamento(atual.jogos, tabela, atual.campeonato.config);
       const semis = Regras.duplasDasSemis(tabela);
@@ -51,25 +51,30 @@
     }
 
     // Recalcula na hora do clique: um placar digitado logo antes pode ter mudado a classificação.
-    function gerarChaveamento() {
+    async function gerarChaveamento() {
+      const avisos = Regras.avisosParaGerarChaveamento(estado.atual().jogos, tabelaAtual(), app.config());
+      if (avisos.length && !(await confirmar(`- ${avisos.join("\n- ")}`,
+        { titulo: "Gerar o chaveamento mesmo assim?", acao: "Gerar mesmo assim", perigo: true }))) return;
+      if (estado.atual().mataMata) return; // outra janela já gerou
       const tabela = tabelaAtual();
-      const avisos = Regras.avisosParaGerarChaveamento(estado.atual().jogos, tabela, app.config());
-      if (avisos.length && !confirm(`Atenção:\n\n- ${avisos.join("\n- ")}\n\nGerar o chaveamento mesmo assim?`)) return;
       estado.modificar("gerar chaveamento", (s) => { s.mataMata = Regras.gerarMataMata(tabela); });
     }
 
-    function apagarChaveamento() {
-      if (!confirm("Apagar o chaveamento, as duplas trocadas e todos os resultados do mata-mata?\n\nDá para voltar com \"Desfazer\".")) return;
+    async function apagarChaveamento() {
+      const ok = await confirmar("Apaga as duplas trocadas e todos os resultados do mata-mata. Dá para voltar com \"Desfazer\".",
+        { titulo: "Apagar o chaveamento?", acao: "Apagar chaveamento", perigo: true });
+      if (!ok) return;
       app.limparRascunhos();
       estado.modificar("apagar chaveamento", (s) => { s.mataMata = null; });
     }
 
     // Trocar duplas de um confronto que já tem placar: os placares ficam e passam a valer para as novas.
-    function confirmarTrocaComPlacar(confrontos) {
+    async function confirmarTrocaComPlacar(confrontos) {
       const comPlacar = confrontos.filter((c) => c.partidas.length && (c.lado1.desatualizada || c.lado2.desatualizada));
       if (!comPlacar.length) return true;
-      return confirm(`${comPlacar.map((c) => ROTULOS[c.chave]).join(" e ")} já ${comPlacar.length > 1 ? "têm" : "tem"} placar lançado. `
-        + "Os placares continuam e passam a valer para as novas duplas.\n\nTrocar as duplas mesmo assim?");
+      return confirmar(`${comPlacar.map((c) => ROTULOS[c.chave]).join(" e ")} já ${comPlacar.length > 1 ? "têm" : "tem"} placar lançado. `
+        + "Os placares continuam e passam a valer para as novas duplas.",
+      { titulo: "Trocar as duplas mesmo assim?", acao: "Trocar as duplas", perigo: true });
     }
 
     function barraMataMata(mm) {
@@ -82,8 +87,8 @@
           "⚠️ A classificação mudou depois de gerar o chaveamento: as duplas automáticas das semis não batem mais com ela. ",
           el("button", {
             type: "button", id: "btn-atualizar-semis",
-            onclick: () => {
-              if (!confirmarTrocaComPlacar(semis)) return;
+            onclick: async () => {
+              if (!(await confirmarTrocaComPlacar(semis))) return;
               modificarMataMata("atualizar duplas das semis", (m) => Regras.atualizarDuplasDasSemis(m, tabelaAtual()));
             },
           }, "Usar duplas da classificação atual")),
@@ -92,8 +97,8 @@
           + "as duplas que jogaram não são mais as que saem das semis. ",
           el("button", {
             type: "button", id: "btn-atualizar-finais",
-            onclick: () => {
-              if (!confirmarTrocaComPlacar(finais)) return;
+            onclick: async () => {
+              if (!(await confirmarTrocaComPlacar(finais))) return;
               modificarMataMata("atualizar duplas da final e do 3º lugar", (m) => Regras.atualizarDuplasDasFinais(m, tabelaAtual(), app.config()));
             },
           }, "Usar duplas que saem das semis")),

@@ -78,6 +78,12 @@
     renderizar,
     focarDepois(id) { focoPendente = id; },
     irParaAba,
+    // Tela vazia ou etapa pendente: diz o que falta e leva até a aba onde se resolve.
+    proximoPasso(texto, aba, rotulo) {
+      return el("div", { class: "vazio" },
+        el("p", {}, texto),
+        aba && el("button", { type: "button", class: "primario", dataset: { ir: aba }, onclick: () => irParaAba(aba) }, rotulo));
+    },
     cadastroTravado,
     nomesDupla,
     numerosNaSemana,
@@ -325,10 +331,11 @@
     leitor.readAsText(arquivo);
   }
 
-  function resetar() {
-    const ok = confirm(
-      "Resetar apaga o campeonato inteiro (jogadores, calendário, placares, W.O., desempates manuais e mata-mata) e volta ao cadastro vazio.\n\n"
-      + "Dá para voltar com \"Desfazer\", mas é recomendável exportar um backup antes.\n\nResetar agora?"
+  async function resetar() {
+    const ok = await Util.confirmar(
+      "Apaga o campeonato inteiro (jogadores, calendário, placares, W.O., desempates manuais e mata-mata) e volta ao cadastro vazio.\n\n"
+      + "Dá para voltar com \"Desfazer\", mas é recomendável exportar um backup antes.",
+      { titulo: "Resetar o campeonato?", acao: "Resetar", perigo: true }
     );
     if (!ok) return;
     limparRascunhos();
@@ -457,7 +464,7 @@
   });
 
   document.addEventListener("keydown", (ev) => {
-    if (telao.ativo()) return;
+    if (telao.ativo() || document.querySelector("dialog[open]")) return;
     if (ev.key === "Escape" && menus.some((m) => m.open)) {
       const aberto = menus.find((m) => m.open);
       fecharMenus();
