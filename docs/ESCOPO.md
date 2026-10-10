@@ -165,7 +165,9 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 10 | Navegação por abas, top 8 ao vivo nas rodadas e cabeçalho com menus |
 | 11 | Janelas de confirmação próprias, tema escuro (segue o sistema), telas vazias com o próximo passo e foco visível |
 | 12 | Várias edições: seletor no cabeçalho, tela de Campeonatos (novo, duplicar, arquivar, excluir), importar como novo e migração automática |
-| 13 | Aparência por edição (cor e logo no cabeçalho, telão e PNGs) e modelo de campeonato (exportar e criar edição a partir dele) |
+| 15 (parte 1) | Aparência por edição (cor e logo no cabeçalho, telão e PNGs) e modelo de campeonato (exportar e criar edição a partir dele) |
+
+A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
 Novas fases seguem o mesmo jeito: uma mudança pequena por vez, com caso de teste novo ou ajustado.
 

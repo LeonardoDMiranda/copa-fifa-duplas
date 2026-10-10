@@ -840,7 +840,7 @@ body.telao-ativo { overflow: hidden; }
 /* ---------- campeonato e jogadores ---------- */
 
 .config-campeonato { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 20px; margin: 14px 0 8px; }
-.campo-config { display: flex; flex-direction: column; gap: 3px; font-size: .8rem; color: var(--texto-suave); }
+.campo-config { display: flex; flex-direction: column; gap: 3px; max-width: 100%; font-size: .8rem; color: var(--texto-suave); }
 .campo-config input {
   font: inherit; font-size: 1rem; padding: 5px 8px; color: var(--texto);
   border: 1px solid var(--borda); border-radius: 5px;

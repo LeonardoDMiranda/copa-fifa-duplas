@@ -271,9 +271,39 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 14.13 | Gravar texto inválido em `copa-fifa-duplas-indice` e recarregar. | Aviso "A lista de campeonatos estava inválida (...)"; as edições continuam todas no seletor; existe `copa-fifa-duplas-indice-corrompido-<data>`. |
 | 14.14 | Seletor e tela de Campeonatos em ~400 px e no tema escuro. | Sem rolagem horizontal; a lista do seletor ocupa a largura do cabeçalho; legível no escuro. |
 
+## 15. Aparência (cor e logo) e modelo de campeonato
+
+| # | Passos | Esperado |
+|---|---|---|
+| 15.1 | Aba Jogadores → "Aparência" → escolher uma cor escura (ex.: `#8b0000`). | O cabeçalho muda na hora, aviso "Cor do campeonato atualizada.", aparece o botão "Padrão". O Desfazer continua como estava (a cor não entra no desfazer). |
+| 15.2 | Escolher uma cor clara (ex.: `#ffff00`). | Erro "Cor clara demais... (contraste 1,1:1; o mínimo é 4,5:1)". O cabeçalho não muda e o seletor volta para a cor anterior. |
+| 15.3 | "Escolher imagem" com um PNG grande (ex.: 600×300); depois um arquivo que não é imagem. | O logo aparece ao lado do título e na prévia, reduzido para caber em 256×128. Arquivo que não é imagem: erro "use uma imagem PNG, JPG ou WebP." e nada muda. |
+| 15.4 | "Remover" o logo e "Padrão" na cor. | Volta ao cabeçalho azul sem logo, com aviso a cada ação. |
+| 15.5 | Com cor e logo numa edição, trocar para outra sem aparência pelo seletor, e voltar. | Cada edição mostra a sua: a outra fica com o azul padrão e sem logo. |
+| 15.6 | PNG da classificação e do mata-mata, com cor e logo. | Faixa do topo na cor do campeonato, logo no canto superior direito, título sem passar por cima do logo. |
+| 15.7 | Modo telão com cor e logo; depois tirar a aparência com o telão aberto. | Fundo do telão escurecido a partir da cor e logo à esquerda do nome. Sem aparência: fundo e topo padrão, sem recarregar. |
+| 15.8 | Exportar backup, Resetar e Desfazer. | O JSON tem `aparencia`. Resetar volta ao padrão; Desfazer devolve a cor e o logo. |
+| 15.9 | Tela de Campeonatos → "⬇ Modelo" numa edição com jogos. | Baixa `<nome>-modelo-<data>.json` com `tipo: "modelo-copa-fifa-duplas"`, `versao`, `campeonato` (nome, config, jogadores) e `aparencia`; sem jogos, calendário nem desfazer. |
+| 15.10 | "+ Novo a partir de modelo" e escolher o modelo. Repetir pelo "💾 Backup → Importar". | Abre o seletor de arquivo. Sem a janela de escolha: edição nova aberta na aba Jogadores, com os jogadores, a configuração, a cor e o logo do modelo, cadastro livre e aviso "Campeonato criado a partir do modelo: ...". O importar reconhece o modelo do mesmo jeito. |
+| 15.11 | Modelo com `versao: 99` (ou um JSON qualquer com `tipo` de modelo e sem `campeonato`). | Erro "Não foi possível usar o modelo: ..."; nenhuma edição criada, a aberta não muda. |
+| 15.12 | Duplicar uma edição com cor e logo. | A cópia tem a mesma cor e o mesmo logo. |
+| 15.13 | Aba Jogadores e cabeçalho com logo em ~400 px e no tema escuro. | O bloco "Aparência" quebra a linha sem rolagem horizontal; o logo não empurra os botões do cabeçalho para fora; legível no escuro. |
+
 ---
 
 ## Última execução
+
+**Fase 15 (parte 1: cor/logo e modelo), 2026-10-10**, Playwright (Chromium) via servidor local, depois do commit
+`f1e504e`. Partindo do app vazio, com 32 jogadores fictícios, calendário sorteado e confirmado pela tela.
+
+- `testes.html`: 90 passaram, 0 falharam (inclui os casos A1 a A5).
+- **Passaram:** 15.1 a 15.13 (15.13 em 400 px e no tema escuro). Logo de 600×300 reduzido para 256×128;
+  PNGs com a faixa na cor e o logo no canto; telão volta ao fundo padrão sem recarregar. Nenhum erro de
+  JavaScript no console (só o aviso de tela cheia, porque o telão foi aberto por script, sem gesto do usuário).
+- **Falhou e foi corrigido na hora:** em 400 px, o campo "Nome do campeonato" passava ~19 px da borda do
+  cartão (problema antigo, de antes desta fase: o rótulo ficava com a largura de 22em do campo). Agora o
+  rótulo respeita a largura disponível.
+- **Não executados nesta rodada:** o restante do roteiro, que não mudou.
 
 **Fase 12, 2026-10-09**, Playwright (Chromium) via servidor local, antes do commit da fase.
 
