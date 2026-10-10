@@ -4,7 +4,8 @@
 (function () {
   "use strict";
 
-  // Chave nova: os dados do formato antigo (versão 1, campeonato 2026) ficam intactos no navegador.
+  // Chave de uma edição só (até a Fase 12). Hoje cada edição tem a sua (ver campeonatos.js), que
+  // migra desta; os dados do formato antigo (versão 1, campeonato 2026) seguem intactos no navegador.
   const CHAVE = "copa-fifa-duplas-campeonato";
   const VERSAO = 2;
   const MAX_HISTORICO = 30;
@@ -215,15 +216,16 @@
   }
 
   // Cria o gerenciador de estado sobre um armazenamento com a interface do localStorage
-  // (getItem/setItem). Os testes passam um armazenamento em memória.
-  function criar(armazenamento) {
+  // (getItem/setItem). Os testes passam um armazenamento em memória. `chave` é a da edição
+  // (ver campeonatos.js); sem ela, vale a chave de antes das várias edições.
+  function criar(armazenamento, chave = CHAVE) {
     let estado;
     const ouvintes = [];
     const status = { salvoEm: null, erro: null, aviso: null };
 
     function salvar() {
       try {
-        armazenamento.setItem(CHAVE, JSON.stringify(estado));
+        armazenamento.setItem(chave, JSON.stringify(estado));
         status.salvoEm = new Date();
         status.erro = null;
       } catch (erro) {
@@ -238,7 +240,7 @@
     function carregar() {
       let bruto = null;
       try {
-        bruto = armazenamento.getItem(CHAVE);
+        bruto = armazenamento.getItem(chave);
       } catch (erro) {
         status.erro = `Não foi possível ler o armazenamento do navegador (${erro.message}).`;
       }
@@ -250,7 +252,7 @@
         estado = validarEstado(JSON.parse(bruto));
       } catch (erro) {
         // Guarda o conteúdo corrompido antes de recomeçar, para não perder nada.
-        try { armazenamento.setItem(`${CHAVE}-corrompido-${Date.now()}`, bruto); } catch (_) { /* sem espaço */ }
+        try { armazenamento.setItem(`${chave}-corrompido-${Date.now()}`, bruto); } catch (_) { /* sem espaço */ }
         status.aviso = `Os dados salvos estavam inválidos (${erro.message}) e foram guardados à parte. O app recomeçou da base.`;
         estado = estadoInicial();
         salvar();
@@ -354,9 +356,20 @@
       notificar();
     }
 
+    // Passa a trabalhar com outra edição (outra chave). Ouvintes continuam os mesmos.
+    function trocarChave(nova) {
+      chave = nova;
+      status.salvoEm = null;
+      status.erro = null;
+      status.aviso = null;
+      recarregar();
+    }
+
     return {
       atual: () => estado,
+      chave: () => chave,
       recarregar,
+      trocarChave,
       modificar,
       desfazer,
       ultimaAcao: () => (estado.historico.length ? estado.historico[estado.historico.length - 1].descricao : null),
@@ -370,5 +383,5 @@
     };
   }
 
-  globalThis.Estado = { criar, CHAVE, MAX_HISTORICO };
+  globalThis.Estado = { criar, CHAVE, MAX_HISTORICO, VERSAO, estadoInicial, validarEstado };
 })();

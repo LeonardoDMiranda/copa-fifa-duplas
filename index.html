@@ -9,7 +9,12 @@
 <body>
   <header class="topo">
     <div class="topo-titulo">
-      <h1 id="titulo-campeonato">Copa FIFA em Duplas</h1>
+      <details class="menu menu-campeonatos" id="menu-campeonatos">
+        <summary title="Trocar de campeonato, criar um novo ou gerenciar os guardados">
+          <h1 id="titulo-campeonato">Copa FIFA em Duplas</h1><span class="seta" aria-hidden="true">▾</span>
+        </summary>
+        <div class="menu-itens" id="itens-campeonatos"></div>
+      </details>
       <p class="subtitulo" id="subtitulo-campeonato"></p>
     </div>
     <nav class="barra-acoes" aria-label="Ações">
@@ -134,6 +139,19 @@
       </section>
     </section>
 
+    <section id="aba-campeonatos" class="aba" aria-labelledby="titulo-tela-campeonatos" hidden>
+      <section id="tela-campeonatos" class="tela">
+        <div class="tela-cabecalho">
+          <h2 id="titulo-tela-campeonatos">Campeonatos <span id="resumo-campeonatos" class="contador"></span></h2>
+          <p class="legenda">
+            Cada edição guarda os seus jogadores, calendário, placares, mata-mata e desfazer. O campeonato aberto vale
+            para todas as janelas do app neste navegador (inclusive o telão). Para passar a outra pessoa, exporte o backup.
+          </p>
+        </div>
+        <div id="conteudo-campeonatos"></div>
+      </section>
+    </section>
+
     <section id="aba-mata-mata" class="aba" role="tabpanel" aria-labelledby="aba-btn-mata-mata" hidden>
       <section id="tela-mata-mata" class="tela">
         <div class="tela-cabecalho">
@@ -153,6 +171,7 @@
   <!-- Scripts clássicos (sem módulos) para funcionar em file://. A ordem importa. -->
   <script src="js/regras.js"></script>
   <script src="js/estado.js"></script>
+  <script src="js/campeonatos.js"></script>
   <script src="js/util.js"></script>
   <script src="js/exportar.js"></script>
   <script src="js/telao.js"></script>
@@ -162,6 +181,7 @@
   <script src="js/telas/classificacao.js"></script>
   <script src="js/telas/em-jogo.js"></script>
   <script src="js/telas/mata-mata.js"></script>
+  <script src="js/telas/campeonatos.js"></script>
   <script src="js/ui.js"></script>
 </body>
 </html>

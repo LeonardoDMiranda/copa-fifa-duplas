@@ -11,6 +11,8 @@ Aplicação local (HTML + CSS + JavaScript puro) para o organizador conduzir um 
 5. Gerar e conduzir o mata-mata: semifinais, 3º lugar e final MD3.
 6. Exportar imagens (PNG) para mandar no grupo e exibir tudo num **modo telão**.
 
+Várias edições (campeonatos) ficam guardadas no app; só uma está aberta por vez.
+
 **Fora do escopo:** login, servidor, multiusuário e sincronização online. Os dados ficam no navegador de quem usa, com backup em JSON.
 
 ## 2. Regras de negócio
@@ -79,13 +81,29 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
 
 ### 2.6 Backup
 
-- Exportar/importar JSON guarda e restaura o campeonato inteiro.
+- Exportar/importar JSON guarda e restaura o campeonato inteiro (uma edição por arquivo).
+- Importar sempre pergunta: **"Importar como novo campeonato"** (principal; entra ao lado dos outros, sem o desfazer do arquivo) ou **"Substituir o ativo"** (dá para desfazer). Arquivo inválido é recusado antes da pergunta.
 - O app lembra de exportar quando já há jogos e: nunca houve backup, uma semana nova foi concluída desde o último, ou faz 7 dias ou mais.
 - O registro do último backup é do campeonato: resetar apaga o registro, e importar traz o que veio no arquivo. Desfazer o resetar ou o importar devolve o registro anterior; desfazer qualquer outra ação não mexe nele.
+
+### 2.7 Várias edições
+
+- Cada edição é um campeonato completo (estado v2), com o seu desfazer e o seu registro de backup.
+- **Novo campeonato**: edição vazia; abre na aba Jogadores com o nome selecionado.
+- **Duplicar**: copia o nome com "(2)" (ou "(3)"... se já existir), a configuração e os jogadores; sem calendário, jogos, mata-mata, desempates, desfazer nem registro de backup. Abre a cópia.
+- **Abrir**: troca a edição ativa. Ela vale para todas as janelas do app no mesmo navegador: o telão acompanha (evento `storage` na chave índice).
+- **Arquivar / desarquivar**: arquivada sai do seletor, vai para "Arquivados" e perde o histórico do desfazer (para poupar espaço). Não abre sem desarquivar.
+- **Excluir**: janela vermelha com "Exportar backup antes" ao lado. Sem desfazer e sem lixeira.
+- Arquivar ou excluir a edição ativa abre a última não arquivada; se não sobrar nenhuma, cria uma vazia.
+- A tela de Campeonatos mostra o espaço usado pelo app no navegador (referência de ~5 MB).
 
 ## 3. Modelo de dados (estado salvo no `localStorage`)
 
 ```js
+// copa-fifa-duplas-indice: quais edições existem e qual está aberta
+{ ativo: "<id>", campeonatos: [ { id, criadoEm, arquivado } ] }   // na ordem de criação
+
+// copa-fifa-duplas-campeonato-<id>: uma chave por edição
 {
   versao: 2,
   campeonato: {
@@ -106,6 +124,10 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
 
 A classificação **nunca** é salva: é sempre calculada a partir dos jogadores (base zerada) + jogos com resultado.
 
+Nome e situação de cada edição ("cadastro", "semana 5 de 8", "fase final", "🏆 campeões") são lidos da própria edição (`Regras.situacaoDoCampeonato`), não do índice.
+
+**Migração:** na primeira abertura sem índice, o campeonato da chave de antes (`copa-fifa-duplas-campeonato`) vira a primeira edição; a chave antiga fica intacta. Índice corrompido é guardado à parte (`copa-fifa-duplas-indice-corrompido-<data>`) e refeito a partir das chaves das edições.
+
 ## 4. Telas
 
 Uma aba por etapa (teclas 1 a 5; a aba ativa fica no endereço, ex.: `index.html#rodadas`). Sem `#`, abre na aba da etapa do campeonato; depois a aba só muda por escolha do organizador (e ao confirmar o calendário, que leva a Rodadas).
@@ -116,7 +138,9 @@ Uma aba por etapa (teclas 1 a 5; a aba ativa fica no endereço, ex.: `index.html
 4. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual. Ao lado, **o que está em jogo**: Garantidos / Em disputa / Eliminados.
 5. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
 
-**Cabeçalho**: Desfazer, menu Backup (exportar/importar JSON), Modo telão e menu ⋯ (PNG da classificação e do mata-mata, Resetar). Lembrete de backup quando for a hora.
+**Campeonatos** (`index.html#campeonatos`, fora das abas de etapa): edições em uso e arquivadas, com Abrir, Duplicar, Exportar, Arquivar/Desarquivar e Excluir; "Novo campeonato"; espaço usado.
+
+**Cabeçalho**: o título é o seletor de campeonatos (edições não arquivadas, "+ Novo campeonato" e "Gerenciar campeonatos"). Desfazer, menu Backup (exportar/importar JSON), Modo telão e menu ⋯ (PNG da classificação e do mata-mata, Resetar). Lembrete de backup quando for a hora.
 
 ## 5. Como o projeto foi construído
 
@@ -131,6 +155,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 9 | Código da interface dividido em um arquivo por tela (`js/telas/`), sem mudança para o usuário |
 | 10 | Navegação por abas, top 8 ao vivo nas rodadas e cabeçalho com menus |
 | 11 | Janelas de confirmação próprias, tema escuro (segue o sistema), telas vazias com o próximo passo e foco visível |
+| 12 | Várias edições: seletor no cabeçalho, tela de Campeonatos (novo, duplicar, arquivar, excluir), importar como novo e migração automática |
 
 Novas fases seguem o mesmo jeito: uma mudança pequena por vez, com caso de teste novo ou ajustado.
 
@@ -148,6 +173,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | R | Rodadas e classificação por semana |
 | T | PNG e telão com qualquer número de jogadores |
 | B | Lembrete e registro de backup |
+| E | Várias edições: migração, índice corrompido, criar/duplicar/arquivar/excluir, trocar a ativa, importar como novo ou substituindo |
 
 ## 7. Pendências
 

@@ -1,6 +1,6 @@
 // Orquestração da tela: cria o estado e as telas (js/telas/*.js), agenda o redesenho, cuida das
-// abas, do cabeçalho, do lembrete de backup e da barra de ações. Regras de negócio ficam em regras.js;
-// estado em estado.js.
+// abas, do cabeçalho (com o seletor de edições), do lembrete de backup e da barra de ações. Regras
+// de negócio ficam em regras.js; estado de uma edição em estado.js; a lista de edições em campeonatos.js.
 
 (function () {
   "use strict";
@@ -27,12 +27,20 @@
   } catch (_) {
     armazenamento = null;
   }
-  const estado = Estado.criar(armazenamento || {
-    getItem: () => null,
-    setItem: () => { throw new Error("localStorage indisponível"); },
-  });
+  if (!armazenamento) {
+    armazenamento = {
+      length: 0,
+      key: () => null,
+      getItem: () => null,
+      setItem: () => { throw new Error("localStorage indisponível"); },
+      removeItem: () => {},
+    };
+  }
+  // Edição ativa: vale para todas as janelas do app neste navegador (ver o evento "storage").
+  const campeonatos = Campeonatos.criar(armazenamento);
+  const estado = Estado.criar(armazenamento, campeonatos.chaveAtiva());
 
-  let focoPendente = null; // id a focar depois do próximo redesenho
+  let focoPendente = null; // { id, selecionar } a focar depois do próximo redesenho
 
   // ---------- utilitários compartilhados com as telas ----------
 
@@ -71,12 +79,13 @@
 
   const app = {
     estado,
+    campeonatos,
     nomePorId,
     base: () => classificacaoBase,
     config,
     avisar,
     renderizar,
-    focarDepois(id) { focoPendente = id; },
+    focarDepois(id, { selecionar = false } = {}) { focoPendente = { id, selecionar }; },
     irParaAba,
     // Tela vazia ou etapa pendente: diz o que falta e leva até a aba onde se resolve.
     proximoPasso(texto, aba, rotulo) {
@@ -90,6 +99,9 @@
     tabelaAtual,
     limparRascunhos,
     resetar,
+    sincronizarEdicao,
+    novoCampeonato,
+    exportarEdicao: exportar,
   };
   const telas = {
     jogadores: Telas.jogadores.criar(app),
@@ -98,6 +110,7 @@
     classificacao: Telas.classificacao.criar(app),
     emJogo: Telas.emJogo.criar(app),
     mataMata: Telas.mataMata.criar(app),
+    campeonatos: Telas.campeonatos.criar(app),
   };
 
   // Descarta o que foi digitado e não lançado em todas as telas (ex.: depois de desfazer).
@@ -112,15 +125,18 @@
 
   // ---------- abas ----------
 
-  // Cada aba mostra uma ou mais telas; só as telas da aba visível são redesenhadas.
+  // Cada aba mostra uma ou mais telas; só as telas da aba visível são redesenhadas. As de etapa
+  // têm botão na barra (teclas 1–5); a de campeonatos se abre pelo seletor do cabeçalho.
   const ABAS = [
     { id: "jogadores", telas: ["jogadores"] },
     { id: "calendario", telas: ["calendario"] },
     { id: "rodadas", telas: ["rodadas"] },
     { id: "classificacao", telas: ["classificacao", "emJogo"] },
     { id: "mata-mata", telas: ["mataMata"] },
+    { id: "campeonatos", telas: ["campeonatos"], semBotao: true },
   ];
   const ABA_POR_ID = new Map(ABAS.map((a) => [a.id, a]));
+  const ABAS_DE_ETAPA = ABAS.filter((a) => !a.semBotao);
 
   // A aba ativa fica no endereço (#rodadas...): voltar/avançar do navegador funciona.
   function abaDaUrl() {
@@ -165,12 +181,13 @@
       classificacao: empatePendente ? ["⚖️", "Empate técnico no top 8 sem ordem definida"] : null,
       "mata-mata": campeoes ? ["🏆", "Campeões definidos"] : null,
     };
-    for (const { id } of ABAS) {
+    for (const { id, semBotao } of ABAS) {
       const selecionada = id === ativa;
+      document.getElementById(`aba-${id}`).hidden = !selecionada;
+      if (semBotao) continue;
       const botao = document.getElementById(`aba-btn-${id}`);
       botao.setAttribute("aria-selected", String(selecionada));
       botao.tabIndex = selecionada ? 0 : -1;
-      document.getElementById(`aba-${id}`).hidden = !selecionada;
       const indicador = document.getElementById(`indicador-${id}`);
       const [texto, titulo] = indicadores[id] || ["", ""];
       indicador.textContent = texto;
@@ -187,6 +204,7 @@
     const n = camp.jogadores.length;
     document.getElementById("titulo-campeonato").textContent = camp.nome;
     document.title = camp.nome;
+    renderizarSeletor();
 
     let subtitulo;
     if (!n) {
@@ -203,6 +221,24 @@
     document.getElementById("subtitulo-campeonato").textContent = subtitulo;
   }
 
+  // Seletor de edições (título do cabeçalho): as não arquivadas, "Novo" e "Gerenciar".
+  function renderizarSeletor() {
+    const edicoes = campeonatos.listar().filter((c) => !c.arquivado);
+    document.getElementById("itens-campeonatos").replaceChildren(
+      el("p", { class: "menu-rotulo" }, "Campeonatos"),
+      ...edicoes.map((c) => el("button", {
+        type: "button", id: `seletor-${c.id}`, class: `item-edicao${c.ativo ? " edicao-ativa" : ""}`, "aria-current": c.ativo ? "true" : null,
+        title: c.ativo ? "Campeonato aberto" : `Abrir "${c.nome}"`,
+        onclick: () => { if (!c.ativo) abrirEdicao(c.id); },
+      },
+      el("span", { class: "marca-ativa", "aria-hidden": "true" }, c.ativo ? "✔" : ""),
+      el("span", { class: "edicao-nome" }, c.nome),
+      el("small", {}, c.situacao.texto))),
+      el("hr"),
+      el("button", { type: "button", id: "btn-novo-campeonato", onclick: novoCampeonato }, "+ Novo campeonato"),
+      el("button", { type: "button", id: "btn-gerenciar-campeonatos", onclick: () => irParaAba("campeonatos") }, "⚙ Gerenciar campeonatos"));
+  }
+
   function renderizarLembreteBackup(atual) {
     const alvo = document.getElementById("lembrete-backup");
     const lembrete = Regras.precisaDeBackup(atual.campeonato, atual.jogos, estado.ultimoBackup(), new Date());
@@ -214,7 +250,7 @@
     alvo.hidden = false;
     alvo.replaceChildren(el("div", { class: "alerta" },
       `💾 ${lembrete.mensagem}`,
-      el("button", { type: "button", id: "btn-lembrete-exportar", class: "primario mini", onclick: exportar }, "Exportar backup agora"),
+      el("button", { type: "button", id: "btn-lembrete-exportar", class: "primario mini", onclick: () => exportar() }, "Exportar backup agora"),
       el("button", { type: "button", id: "btn-lembrete-dispensar", class: "discreto mini", onclick: () => { lembreteDispensado = lembrete.mensagem; renderizar(); } }, "Dispensar")));
   }
 
@@ -293,14 +329,16 @@
     }
   }
 
-  function exportar() {
+  // Backup em JSON de uma edição (padrão: a ativa). Outra edição é lida e registrada direto na chave dela.
+  function exportar(id = campeonatos.ativo()) {
     const agora = new Date();
-    const atual = estado.atual();
+    const est = id === campeonatos.ativo() ? estado : Estado.criar(armazenamento, Campeonatos.chaveDe(id));
+    const atual = est.atual();
     const cfg = atual.campeonato.config;
     // O registro vai antes do JSON, para o arquivo já conter a data deste backup.
-    estado.registrarBackup({ em: agora.toISOString(), semanasCompletas: Regras.contarSemanasCompletas(atual.jogos, cfg.semanas, cfg) });
+    est.registrarBackup({ em: agora.toISOString(), semanasCompletas: Regras.contarSemanasCompletas(atual.jogos, cfg.semanas, cfg) });
     const nome = `${Util.slug(atual.campeonato.nome)}-backup-${Util.carimbo(agora)}.json`;
-    const blob = new Blob([estado.exportarJSON()], { type: "application/json" });
+    const blob = new Blob([est.exportarJSON()], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = el("a", { href: url, download: nome });
     document.body.appendChild(link);
@@ -308,6 +346,7 @@
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     avisar(`Backup exportado: ${nome}`);
+    if (est !== estado) renderizar(); // o espaço usado mudou
   }
 
   function importar(ev) {
@@ -315,14 +354,43 @@
     ev.target.value = "";
     if (!arquivo) return;
     const leitor = new FileReader();
-    leitor.onload = () => {
+    // Arquivo inválido é recusado antes de perguntar; válido, sempre pergunta como importar.
+    leitor.onload = async () => {
+      const texto = String(leitor.result);
+      let importado;
       try {
-        estado.importarJSON(String(leitor.result));
-        limparRascunhos();
-        reiniciarVisoes();
-        fixarAbaDaEtapa();
-        renderizar();
-        avisar(`Backup importado: ${arquivo.name}`);
+        let obj;
+        try { obj = JSON.parse(texto); } catch (_) { throw new Error("o arquivo não é um JSON válido."); }
+        importado = Estado.validarEstado(obj);
+      } catch (erro) {
+        avisar(`Não foi possível importar: ${erro.message}`, "erro");
+        return;
+      }
+      const escolha = await Util.escolher(
+        `O arquivo "${arquivo.name}" traz "${importado.campeonato.nome}" (${importado.campeonato.jogadores.length} jogadores).\n\n`
+        + `Ele pode entrar como um campeonato novo, ao lado dos outros, ou substituir o campeonato aberto ("${estado.atual().campeonato.nome}"). `
+        + "Substituir dá para voltar com \"Desfazer\".",
+        {
+          titulo: "Importar backup",
+          opcoes: [
+            { valor: "substituir", id: "importar-substituir", rotulo: "Substituir o ativo" },
+            { valor: "novo", id: "importar-novo", rotulo: "Importar como novo campeonato", classe: "primario" },
+          ],
+        }
+      );
+      try {
+        if (escolha === "novo") {
+          campeonatos.importarComoNovo(texto);
+          sincronizarEdicao("etapa");
+          avisar(`Backup importado como novo campeonato: ${arquivo.name}`);
+        } else if (escolha === "substituir") {
+          estado.importarJSON(texto);
+          limparRascunhos();
+          reiniciarVisoes();
+          fixarAbaDaEtapa();
+          renderizar();
+          avisar(`Backup importado: ${arquivo.name}`);
+        }
       } catch (erro) {
         avisar(`Não foi possível importar: ${erro.message}`, "erro");
       }
@@ -344,6 +412,43 @@
     fixarAbaDaEtapa();
     renderizar();
     avisar("Campeonato reiniciado: tudo vazio.");
+  }
+
+  // ---------- edições ----------
+
+  // Depois de mudar a lista de edições (aqui ou em outra janela): se a ativa mudou, carrega a nova.
+  // `aba`: para onde ir quando troca ("etapa" = a aba da etapa da edição; null = fica onde está).
+  function sincronizarEdicao(aba = "etapa") {
+    if (estado.chave() !== campeonatos.chaveAtiva()) {
+      lembreteDispensado = null;
+      limparRascunhos();
+      reiniciarVisoes();
+      estado.trocarChave(campeonatos.chaveAtiva());
+      const st = estado.status();
+      if (st.aviso) avisar(st.aviso, "erro");
+      if (aba === "etapa") fixarAbaDaEtapa();
+      else if (aba && location.hash !== "#telao") irParaAba(aba);
+    }
+    renderizar();
+  }
+
+  function abrirEdicao(id) {
+    try {
+      campeonatos.abrir(id);
+    } catch (erro) {
+      avisar(`Não foi possível abrir: ${erro.message}`, "erro");
+      return;
+    }
+    sincronizarEdicao("etapa");
+    avisar(`Campeonato aberto: ${estado.atual().campeonato.nome}`);
+  }
+
+  // Edição vazia: abre na aba Jogadores com o nome selecionado, pronto para digitar.
+  function novoCampeonato() {
+    campeonatos.novo();
+    sincronizarEdicao("jogadores");
+    app.focarDepois("nome-campeonato", { selecionar: true });
+    avisar("Campeonato novo criado. Dê um nome e cadastre os jogadores.");
   }
 
   // ---------- render geral ----------
@@ -391,6 +496,7 @@
   function renderizarAgora() {
     // Guarda o foco para não perdê-lo ao recriar os elementos (ex.: Tab entre placares).
     const focoId = document.activeElement && document.activeElement.id;
+    const selecao = selecaoDe(document.activeElement);
     const atual = estado.atual();
     const tabela = calcularTabela(atual);
     const aba = abaAtiva(atual);
@@ -400,14 +506,31 @@
     for (const nome of ABA_POR_ID.get(aba).telas) telas[nome].renderizar(atual, tabela);
     renderizarBarra();
     if (focoPendente) {
-      const alvo = document.getElementById(focoPendente);
+      const { id, selecionar } = focoPendente;
+      const alvo = document.getElementById(id);
       focoPendente = null;
-      if (alvo) alvo.focus();
+      if (alvo) {
+        alvo.focus();
+        if (selecionar && alvo.select) alvo.select();
+      }
     } else if (telas.mataMata.focarCampoSeguinte()) {
       // o foco foi para o campo seguinte do mata-mata (Enter num placar)
     } else if (focoId) {
       const alvo = document.getElementById(focoId);
-      if (alvo && !alvo.disabled && alvo !== document.activeElement) alvo.focus();
+      if (alvo && !alvo.disabled && alvo !== document.activeElement) {
+        alvo.focus();
+        if (selecao) alvo.setSelectionRange(...selecao);
+      }
+    }
+  }
+
+  // Seleção de um campo de texto (para o campo recriado continuar com o mesmo trecho selecionado).
+  function selecaoDe(campo) {
+    if (!(campo instanceof HTMLInputElement || campo instanceof HTMLTextAreaElement)) return null;
+    try {
+      return campo.selectionStart === null ? null : [campo.selectionStart, campo.selectionEnd];
+    } catch (_) {
+      return null;
     }
   }
 
@@ -416,16 +539,22 @@
   estado.aoMudar(renderizar);
   const telao = Telao.criar(estado);
 
-  // Outra janela do app (ex.: o telão na TV) salvou algo: relê para ficar em dia.
+  // Outra janela do app (ex.: o telão na TV) salvou algo: relê para ficar em dia. Se ela trocou
+  // a edição ativa, esta janela troca junto.
   window.addEventListener("storage", (ev) => {
-    if (ev.key === Estado.CHAVE) {
+    if (ev.key === Campeonatos.CHAVE_INDICE) {
+      campeonatos.recarregar();
+      sincronizarEdicao("etapa");
+    } else if (ev.key === estado.chave()) {
       limparRascunhos();
       estado.recarregar();
+    } else if (ev.key && ev.key.startsWith(Campeonatos.PREFIXO)) {
+      renderizar(); // nome ou situação de outra edição (seletor e tela de campeonatos)
     }
   });
 
   document.getElementById("btn-desfazer").addEventListener("click", desfazer);
-  document.getElementById("btn-exportar").addEventListener("click", exportar);
+  document.getElementById("btn-exportar").addEventListener("click", () => exportar());
   document.getElementById("btn-importar").addEventListener("click", () => document.getElementById("arquivo-importar").click());
   document.getElementById("arquivo-importar").addEventListener("change", importar);
   document.getElementById("btn-resetar").addEventListener("click", resetar);
@@ -449,7 +578,7 @@
   });
 
   // Abas: clique, setas ←→ dentro da lista e teclas 1–5 fora de campos de texto.
-  const botoesAba = ABAS.map(({ id }) => document.getElementById(`aba-btn-${id}`));
+  const botoesAba = ABAS_DE_ETAPA.map(({ id }) => document.getElementById(`aba-btn-${id}`));
   for (const botao of botoesAba) botao.addEventListener("click", () => irParaAba(botao.dataset.aba));
   document.querySelector(".abas-lista").addEventListener("keydown", (ev) => {
     if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
@@ -478,11 +607,13 @@
       desfazer();
     } else if (/^[1-5]$/.test(ev.key) && !digitando && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
       ev.preventDefault();
-      irParaAba(ABAS[Number(ev.key) - 1].id);
+      irParaAba(ABAS_DE_ETAPA[Number(ev.key) - 1].id);
     }
   });
 
   const st = estado.status();
+  const stCampeonatos = campeonatos.status();
+  if (stCampeonatos.aviso) avisar(stCampeonatos.aviso, "erro");
   if (st.aviso) avisar(st.aviso, "erro");
   if (st.erro) avisar(st.erro, "erro");
   if (!abaDaUrl()) fixarAbaDaEtapa();

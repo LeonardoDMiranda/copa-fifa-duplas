@@ -24,8 +24,10 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
   título em `dialog[open] h2` e clicar em `#dialogo-ok` ou `#dialogo-cancelar` (Esc também cancela).
   Um `confirm()` nativo aparecendo é falha.
 - Para chegar rápido a um estado (ex.: 7 semanas lançadas), dá para escrever o estado direto na chave
-  `copa-fifa-duplas-campeonato` do `localStorage` e recarregar. O que está sendo testado deve ser feito
-  pela tela.
+  da edição ativa (`copa-fifa-duplas-campeonato-<id>`, com o `<id>` em `ativo` da chave
+  `copa-fifa-duplas-indice`) e recarregar. Com o `localStorage` vazio, gravar na chave antiga
+  `copa-fifa-duplas-campeonato` também serve: na abertura ela vira a primeira edição. O que está sendo
+  testado deve ser feito pela tela.
 - O app redesenha a tela de forma assíncrona (`setTimeout`): esperar ~150 ms depois de cada ação
   antes de ler a tela.
 - Downloads reais derrubam o navegador do Playwright MCP. Interceptar no `addInitScript`:
@@ -37,7 +39,11 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 - Cada tela fica numa aba: abrir a aba certa antes de usar a tela (`#aba-btn-rodadas` etc. ou
   navegar para `index.html#rodadas`). Só a aba visível é redesenhada.
 - Exportar/importar ficam no menu "💾 Backup" e os PNGs e o Resetar no menu "⋯": abrir o menu
-  (`#menu-backup > summary`, `#menu-mais > summary`) antes de clicar no item.
+  (`#menu-backup > summary`, `#menu-mais > summary`) antes de clicar no item. Para importar, dá para
+  mandar o arquivo direto em `#arquivo-importar` (`setInputFiles`); depois escolher na janela
+  `#importar-novo` ou `#importar-substituir`.
+- O seletor de campeonatos é o título do cabeçalho (`#menu-campeonatos > summary`); a tela de
+  Campeonatos fica em `index.html#campeonatos`.
 - O servidor do Python manda o CSS com cache: depois de mudar o `style.css`, recarregar ignorando o
   cache (CDP `Page.reload` com `ignoreCache: true`).
 - Usar só nomes fictícios ("Jogador 01" a "Jogador 32"). O repositório é público.
@@ -59,7 +65,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 1.1 | Abrir `index.html` com duplo clique (`file://`) no Chrome e no Edge. | App carrega, sem erro no console (F12). Nenhum pedido de rede além dos arquivos locais. |
 | 1.2 | Abrir com o `localStorage` vazio. | Cadastro vazio, nome "Copa FIFA em Duplas", sem calendário, sem jogos, sem lembrete de backup. |
 | 1.3 | Cadastrar jogadores, lançar um placar e recarregar a página (F5). | Tudo continua igual; o status de salvamento indica que salvou. |
-| 1.4 | Gravar texto inválido na chave `copa-fifa-duplas-campeonato` e recarregar. | Aviso "Os dados salvos estavam inválidos (...) e foram guardados à parte. O app recomeçou da base." Existe uma chave `copa-fifa-duplas-campeonato-corrompido-<data>` com o conteúdo antigo. |
+| 1.4 | Gravar texto inválido na chave da edição ativa (`copa-fifa-duplas-campeonato-<id>`) e recarregar. | Aviso "Os dados salvos estavam inválidos (...) e foram guardados à parte. O app recomeçou da base." Existe uma chave `copa-fifa-duplas-campeonato-<id>-corrompido-<data>` com o conteúdo antigo. |
 | 1.5 | Rodar sem internet (modo avião). | Tudo funciona: o app não usa CDN nem servidor. |
 
 ## 1b. Abas e cabeçalho
@@ -197,12 +203,12 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 9.5 | "Dispensar". | O lembrete some até a mensagem mudar ou a página ser recarregada. |
 | 9.6 **(R)** | Resetar (menu ⋯ → "Resetar campeonato"). | Janela "Resetar o campeonato?"; aceitando, volta ao cadastro vazio, avisa "Campeonato reiniciado: tudo vazio." e `ultimoBackup` fica `null`. |
 | 9.7 **(R)** | Exportar, resetar e desfazer. | O campeonato e o registro do backup voltam: o lembrete não reaparece. |
-| 9.8 **(R)** | Importar um backup exportado. | "Backup importado: <arquivo>"; campeonato igual ao exportado; `ultimoBackup` igual ao do arquivo; sem lembrete. |
+| 9.8 **(R)** | Importar um backup exportado, escolhendo "Substituir o ativo". | "Backup importado: <arquivo>"; campeonato igual ao exportado; `ultimoBackup` igual ao do arquivo; sem lembrete. |
 | 9.9 **(R)** | Importar um backup sem `ultimoBackup`. | O registro fica `null` e o lembrete aparece. |
 | 9.10 **(R)** | Importar um backup com um jogo na semana 9 (campeonato de 8 semanas). | "Não foi possível importar: semana inválida no jogo ... (o campeonato tem 8 semanas)." O estado atual não muda. |
 | 9.11 | Importar um arquivo que não é JSON. | "Não foi possível importar: o arquivo não é um JSON válido." |
 | 9.12 | Importar um backup da versão 1. | "Não foi possível importar: este backup é do formato antigo (versão 1, ...)". |
-| 9.13 **(R)** | Importar e depois desfazer. | Volta o campeonato de antes da importação, com o registro de backup dele. |
+| 9.13 **(R)** | Importar ("Substituir o ativo") e depois desfazer. | Volta o campeonato de antes da importação, com o registro de backup dele. |
 | 9.14 | "Reiniciar campeonato" (no cadastro travado). | Mesmo comportamento do "Resetar". |
 
 ## 10. Imagens (PNG)
@@ -246,9 +252,43 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 13.6 | Tema escuro do sistema (Windows: Configurações → Personalização → Cores → escuro). | O app inteiro fica escuro, legível, sem fundo branco sobrando (campos, menus, janelas). O telão não muda. |
 | 13.7 | Telas vazias (app zerado), em cada aba. | Cada uma diz o que falta e tem um botão para a aba onde se resolve ("Ir para Jogadores", "Ir para o Calendário"). Nenhum "null" ou "undefined" na tela. Com o cadastro pronto, Jogadores mostra "Próximo: sortear o calendário →". |
 
+## 14. Várias edições
+
+| # | Passos | Esperado |
+|---|---|---|
+| 14.1 | `localStorage` só com a chave antiga `copa-fifa-duplas-campeonato` (um campeonato com jogos) e abrir o app. | Abre esse campeonato, na aba da etapa. Existem `copa-fifa-duplas-indice` e `copa-fifa-duplas-campeonato-<id>`; a chave antiga continua igual. Recarregar não cria outra edição. |
+| 14.2 | Clicar no título do cabeçalho. | Abre a lista "Campeonatos" com as edições não arquivadas (a aberta com ✔ e a situação embaixo de cada nome), "+ Novo campeonato" e "⚙ Gerenciar campeonatos". Fecha ao escolher, ao clicar fora e com Esc. Nome longo não empurra os botões do cabeçalho. |
+| 14.3 | "+ Novo campeonato". | Vai para a aba Jogadores com o nome "Copa FIFA em Duplas" selecionado: digitar substitui. Desfazer fica desabilitado (edição nova). |
+| 14.4 | Escolher outra edição no seletor. | Carrega a edição, vai para a aba da etapa dela, aviso "Campeonato aberto: ...". O desfazer é o daquela edição. O lembrete de backup é o dela. |
+| 14.5 | Telão em outra janela (`index.html#telao`) e trocar de edição na primeira. | O telão passa a mostrar a nova edição sozinho (nome no topo e rodízio de telas). |
+| 14.6 | "Gerenciar campeonatos". | `#campeonatos`, nenhuma aba de etapa selecionada. Edições em uso (a aberta com a etiqueta "aberto" e sem botão Abrir) e "Arquivados"; cada uma com situação, nº de jogadores e data de criação; espaço usado no rodapé. |
+| 14.7 | Duplicar uma edição com jogos. | Nova edição "Nome (2)" aberta na aba Jogadores, com os mesmos jogadores e configuração, sem calendário nem jogos, cadastro livre. Duplicar de novo: "(3)". |
+| 14.8 | Arquivar uma edição (e depois a aberta). | Sai do seletor e vai para "Arquivados", sem botão Abrir. Arquivar a aberta abre a última não arquivada. Desarquivar devolve ao seletor. |
+| 14.9 | Excluir uma edição. | Janela "Excluir o campeonato?" com botão vermelho e foco em "Cancelar". "⬇ Exportar backup antes" baixa o JSON dela e a janela continua aberta. "Excluir" apaga a chave dela; sem desfazer. Excluir a última cria uma edição vazia. |
+| 14.10 | Exportar uma edição que não está aberta (tela de Campeonatos). | Baixa o JSON daquela edição; o registro de backup é gravado nela; a aberta não muda. |
+| 14.11 | Importar um backup válido. | Janela "Importar backup" com o nome do campeonato do arquivo, "Cancelar", "Substituir o ativo" e "Importar como novo campeonato" (com o foco). "Novo": edição nova aberta na aba da etapa, sem desfazer; a anterior continua na lista. Esc ou "Cancelar": nada muda. |
+| 14.12 | Importar um arquivo inválido. | Erro na hora, sem a janela de escolha; nenhuma edição criada. |
+| 14.13 | Gravar texto inválido em `copa-fifa-duplas-indice` e recarregar. | Aviso "A lista de campeonatos estava inválida (...)"; as edições continuam todas no seletor; existe `copa-fifa-duplas-indice-corrompido-<data>`. |
+| 14.14 | Seletor e tela de Campeonatos em ~400 px e no tema escuro. | Sem rolagem horizontal; a lista do seletor ocupa a largura do cabeçalho; legível no escuro. |
+
 ---
 
 ## Última execução
+
+**Fase 12, 2026-10-09**, Playwright (Chromium) via servidor local, antes do commit da fase.
+
+- `testes.html`: 85 passaram, 0 falharam (inclui os casos E1 a E10).
+- **Passaram:** 14.1 a 14.14 (14.14 em 390 px e no tema escuro), 9.6 (resetar continua igual, foco em
+  "Cancelar"). Nenhum erro de JavaScript no console (só o 404 do `favicon.ico`, que o servidor do Python pede).
+- **Falharam e foram corrigidos na hora:**
+  - Seletor mostrava "[object HTMLButtonElement]" no lugar das edições (`replaceChildren` não achata
+    listas) e o título cortava com "…" sem precisar (margem negativa no `summary`).
+  - "Novo campeonato" focava o nome, mas o segundo redesenho (troca de aba) recriava o campo sem a
+    seleção. Agora o redesenho devolve a seleção do campo que estava com o foco.
+- **Não executados nesta rodada:** em 14.4, o lembrete de backup de cada edição (todas as edições do teste
+  já tinham backup; o registro por edição é coberto pelos casos E4 e E8), e o restante do roteiro, que não mudou.
+
+**2026-10-09**, Playwright (Chromium) via servidor local, commit `90eefdc`.
 
 **2026-10-09**, Playwright (Chromium) via servidor local, commit `90eefdc`.
 

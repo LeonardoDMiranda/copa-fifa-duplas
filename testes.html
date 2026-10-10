@@ -28,6 +28,7 @@
   <script src="testes/dados-exemplo.js"></script>
   <script src="js/regras.js"></script>
   <script src="js/estado.js"></script>
+  <script src="js/campeonatos.js"></script>
   <script src="js/util.js"></script>
   <script src="js/exportar.js"></script>
   <script src="js/telao.js"></script>
@@ -205,8 +206,11 @@
       const dados = { ...inicial };
       return {
         dados,
+        get length() { return Object.keys(dados).length; },
+        key: (i) => Object.keys(dados)[i] ?? null,
         getItem: (k) => (k in dados ? dados[k] : null),
         setItem: (k, v) => { dados[k] = String(v); },
+        removeItem: (k) => { delete dados[k]; },
       };
     }
     // Estado v2 de teste: os 32 jogadores de 2026 (zerados) e os 7 jogos de sexta, todos na semana 1.
@@ -1289,6 +1293,225 @@
       reaberto.registrarBackup(r3);
       reaberto.desfazer();
       t.igual(reaberto.ultimoBackup(), r3, "desfazer uma ação comum não \"desexporta\"");
+    });
+
+    // ---------- Várias edições (Fase 12) ----------
+
+    const { CHAVE_INDICE } = Campeonatos;
+    function indiceDe(arm) { return JSON.parse(arm.dados[CHAVE_INDICE]); }
+    function edicaoGuardada(arm, id) { return JSON.parse(arm.dados[Campeonatos.chaveDe(id)]); }
+
+    caso("E1 Migração: o campeonato de antes vira a primeira edição e a chave antiga fica intacta", (t) => {
+      const arm = memoria2026();
+      const antigo = arm.dados[Estado.CHAVE];
+      const camps = Campeonatos.criar(arm);
+      const indice = indiceDe(arm);
+      t.igual(indice.campeonatos.length, 1, "uma edição");
+      t.igual(indice.ativo, indice.campeonatos[0].id, "ela é a ativa");
+      t.verdadeiro(!indice.campeonatos[0].arquivado && indice.campeonatos[0].criadoEm, "não arquivada, com data de criação");
+      t.igual(arm.dados[camps.chaveAtiva()], antigo, "a edição tem o mesmo conteúdo da chave antiga");
+      const est = Estado.criar(arm, camps.chaveAtiva());
+      t.igual(est.atual().campeonato.nome, "Copa de teste", "o estado abre a edição migrada");
+      lancar(est, "j1", placar(2, 1));
+      t.igual(arm.dados[Estado.CHAVE], antigo, "a chave antiga continua intacta depois de alterar a edição");
+      const reaberto = Campeonatos.criar(arm);
+      t.igual(reaberto.listar().length, 1, "reabrir não migra de novo");
+      t.igual(reaberto.ativo(), indice.ativo, "a ativa continua a mesma");
+    });
+
+    caso("E2 Primeira abertura sem dados: uma edição vazia", (t) => {
+      const arm = memoria();
+      const camps = Campeonatos.criar(arm);
+      const lista = camps.listar();
+      t.igual(lista.length, 1, "uma edição");
+      t.igual([lista[0].ativo, lista[0].situacao.etapa, lista[0].jogadores], [true, "cadastro", 0], "ativa, em cadastro, sem jogadores");
+      t.igual(Estado.criar(arm, camps.chaveAtiva()).atual().campeonato.jogadores, [], "o estado abre vazio");
+      t.verdadeiro(!(Estado.CHAVE in arm.dados), "não cria a chave antiga");
+    });
+
+    caso("E3 Índice corrompido ou desencontrado é refeito a partir das edições guardadas", (t) => {
+      const arm = memoria();
+      const camps = Campeonatos.criar(arm);
+      const a = camps.ativo();
+      const b = camps.novo();
+      arm.dados[CHAVE_INDICE] = "{ lixo";
+      const refeito = Campeonatos.criar(arm);
+      t.verdadeiro(refeito.status().aviso, "avisa o organizador");
+      t.verdadeiro(Object.keys(arm.dados).some((k) => k.startsWith(`${CHAVE_INDICE}-corrompido-`)), "índice corrompido guardado à parte");
+      t.igual(refeito.listar().map((c) => c.id).sort(), [a, b].sort(), "as duas edições continuam na lista");
+      t.verdadeiro([a, b].includes(refeito.ativo()), "uma delas é a ativa");
+
+      arm.dados[CHAVE_INDICE] = JSON.stringify({
+        ativo: "sumiu",
+        campeonatos: [{ id: a, criadoEm: "ontem", arquivado: false }, { id: "sumiu" }, { id: a }, { id: "../mal" }, null],
+      });
+      const corrigido = Campeonatos.criar(arm);
+      t.igual(corrigido.listar().map((c) => [c.id, c.criadoEm]), [[a, null]],
+        "entradas sem dados, repetidas ou com id inválido saem; data inválida vira null");
+      t.igual(corrigido.ativo(), a, "ativa inexistente: vale a que sobrou");
+      t.igual(indiceDe(arm).ativo, a, "o índice corrigido é salvo");
+    });
+
+    caso("E4 Novo campeonato e duplicar como nova edição", (t) => {
+      const arm = memoria2026();
+      const camps = Campeonatos.criar(arm);
+      const original = camps.ativo();
+      const est = Estado.criar(arm, camps.chaveAtiva());
+      lancar(est, "j1", placar(2, 1));
+      est.registrarBackup({ em: "2026-10-05T10:00:00.000Z", semanasCompletas: 0 });
+
+      const novo = camps.novo();
+      t.igual(camps.ativo(), novo, "o novo vira o ativo");
+      t.igual(edicaoGuardada(arm, novo).campeonato.jogadores, [], "e começa vazio");
+
+      const copia = camps.duplicar(original);
+      const dup = edicaoGuardada(arm, copia);
+      t.igual(camps.ativo(), copia, "a cópia vira a ativa");
+      t.igual(dup.campeonato.nome, "Copa de teste (2)", "nome com (2)");
+      t.igual(dup.campeonato.config, est.atual().campeonato.config, "mesma configuração");
+      t.igual(dup.campeonato.jogadores, est.atual().campeonato.jogadores, "mesmos jogadores");
+      t.igual([dup.campeonato.sorteio, dup.jogos, dup.mataMata, dup.desempatesManuais, dup.historico, dup.ultimoBackup],
+        [null, [], null, [], [], null], "sem calendário, jogos, mata-mata, desempates, desfazer nem registro de backup");
+      t.verdadeiro(!Regras.cadastroTravado(dup.campeonato, dup.jogos), "cadastro livre");
+      t.igual(edicaoGuardada(arm, camps.duplicar(original)).campeonato.nome, "Copa de teste (3)", "duplicar de novo: (3)");
+      t.igual(edicaoGuardada(arm, camps.duplicar(copia)).campeonato.nome, "Copa de teste (4)", "duplicar a cópia não vira \"(2) (2)\"");
+      t.igual(edicaoGuardada(arm, original).jogos[0].resultado, placar(2, 1), "a original não muda");
+      t.igual(camps.listar().length, 5, "cinco edições");
+    });
+
+    caso("E5 Arquivar tira do seletor e apaga o desfazer; arquivar a ativa troca de edição", (t) => {
+      const arm = memoria2026();
+      const camps = Campeonatos.criar(arm);
+      const a = camps.ativo();
+      lancar(Estado.criar(arm, camps.chaveAtiva()), "j1", placar(2, 1));
+      const b = camps.novo();
+      camps.arquivar(a);
+      t.verdadeiro(camps.listar().find((c) => c.id === a).arquivado, "fica marcada como arquivada");
+      t.igual(edicaoGuardada(arm, a).historico, [], "histórico do desfazer apagado");
+      t.igual(edicaoGuardada(arm, a).jogos[0].resultado, placar(2, 1), "os dados continuam");
+      t.igual(camps.ativo(), b, "a ativa não muda");
+      let erro = null;
+      try { camps.abrir(a); } catch (e) { erro = e; }
+      t.verdadeiro(erro && camps.ativo() === b, "arquivada não abre sem desarquivar");
+      camps.desarquivar(a);
+      camps.abrir(a);
+      t.igual(camps.ativo(), a, "desarquivada, abre");
+      camps.arquivar(a);
+      t.igual(camps.ativo(), b, "arquivar a ativa passa para a última não arquivada");
+      camps.arquivar(b);
+      const nova = camps.ativo();
+      t.verdadeiro(nova !== a && nova !== b, "arquivar todas cria uma edição vazia");
+      t.igual(camps.listar().filter((c) => !c.arquivado).map((c) => c.id), [nova], "só ela fica no seletor");
+    });
+
+    caso("E6 Excluir apaga a edição de vez", (t) => {
+      const arm = memoria2026();
+      const camps = Campeonatos.criar(arm);
+      const a = camps.ativo();
+      const b = camps.novo();
+      camps.abrir(a);
+      camps.excluir(a);
+      t.verdadeiro(!(Campeonatos.chaveDe(a) in arm.dados), "dados apagados");
+      t.igual(indiceDe(arm).campeonatos.map((c) => c.id), [b], "sai do índice");
+      t.igual(camps.ativo(), b, "excluir a ativa passa para a que sobrou");
+      t.verdadeiro(Estado.CHAVE in arm.dados, "a chave antiga não é apagada");
+      camps.excluir(b);
+      t.verdadeiro(![a, b].includes(camps.ativo()) && camps.listar().length === 1, "excluir a última cria uma edição vazia");
+      t.igual(Campeonatos.criar(arm).listar().length, 1, "reabrir não migra de novo a chave antiga");
+      let erro = null;
+      try { camps.excluir("naoexiste"); } catch (e) { erro = e; }
+      t.verdadeiro(erro, "edição desconhecida: erro");
+    });
+
+    caso("E7 Trocar a edição ativa: o estado acompanha e o desfazer é de cada edição", (t) => {
+      const arm = memoria2026();
+      const camps = Campeonatos.criar(arm);
+      const a = camps.ativo();
+      const est = Estado.criar(arm, camps.chaveAtiva());
+      let avisos = 0;
+      est.aoMudar(() => avisos++);
+      lancar(est, "j1", placar(2, 1));
+      const b = camps.duplicar(a);
+      est.trocarChave(camps.chaveAtiva());
+      t.igual(est.chave(), Campeonatos.chaveDe(b), "estado na chave da nova edição");
+      t.igual(est.atual().campeonato.nome, "Copa de teste (2)", "mostra a nova edição");
+      t.igual(est.ultimaAcao(), null, "a nova não tem o que desfazer");
+      t.igual(avisos, 2, "a troca avisa as telas");
+      est.modificar("nome", (s) => { s.campeonato.nome = "Copa B"; });
+      camps.abrir(a);
+      est.trocarChave(camps.chaveAtiva());
+      t.igual(est.ultimaAcao(), "teste j1", "de volta à primeira, o desfazer é o dela");
+      est.desfazer();
+      t.igual(est.atual().jogos[0].resultado, null, "desfazer age só nela");
+      t.igual(edicaoGuardada(arm, b).campeonato.nome, "Copa B", "a outra edição não muda");
+      t.igual(Campeonatos.criar(arm).ativo(), a, "outra janela lê a mesma ativa do índice");
+    });
+
+    caso("E8 Importar backup como novo campeonato ou substituindo o ativo", (t) => {
+      const arm = memoria2026();
+      const camps = Campeonatos.criar(arm);
+      const a = camps.ativo();
+      const est = Estado.criar(arm, camps.chaveAtiva());
+      lancar(est, "j1", placar(2, 1));
+      est.registrarBackup({ em: "2026-10-05T10:00:00.000Z", semanasCompletas: 0 });
+      const arquivo = JSON.parse(est.exportarJSON());
+      arquivo.campeonato.nome = "Copa importada";
+      const texto = JSON.stringify(arquivo);
+
+      const novo = camps.importarComoNovo(texto);
+      t.igual(camps.ativo(), novo, "importado como novo vira o ativo");
+      const importado = edicaoGuardada(arm, novo);
+      t.igual(importado.campeonato.nome, "Copa importada", "com os dados do arquivo");
+      t.igual(importado.jogos[0].resultado, placar(2, 1), "inclusive os placares");
+      t.igual(importado.historico, [], "sem o desfazer do arquivo");
+      t.igual(importado.ultimoBackup, arquivo.ultimoBackup, "com o registro de backup do arquivo");
+      t.igual(edicaoGuardada(arm, a).campeonato.nome, "Copa de teste", "o campeonato que estava aberto continua igual");
+
+      const antes = camps.listar().length;
+      for (const ruim of ["{ quebrado", JSON.stringify({ versao: 1, jogos: [] }), JSON.stringify(dadosV2((d) => { d.jogos[0].semana = 0; }))]) {
+        let erro = null;
+        try { camps.importarComoNovo(ruim); } catch (e) { erro = e; }
+        t.verdadeiro(erro, `arquivo inválido recusado (${erro && erro.message})`);
+      }
+      t.igual(camps.listar().length, antes, "nenhuma edição criada pelos inválidos");
+      t.igual(camps.ativo(), novo, "e a ativa não muda");
+
+      camps.abrir(a);
+      t.igual(est.chave(), camps.chaveAtiva(), "de volta à primeira edição");
+      est.importarJSON(texto);
+      t.igual(est.atual().campeonato.nome, "Copa importada", "substituir troca os dados do ativo");
+      t.igual(camps.listar().length, antes, "sem criar edição");
+      est.desfazer();
+      t.igual(est.atual().campeonato.nome, "Copa de teste", "e dá para desfazer");
+    });
+
+    caso("E9 Situação de cada edição (lida da própria edição)", (t) => {
+      const sit = (ajustar) => Regras.situacaoDoCampeonato(Estado.validarEstado(dadosV2(ajustar))).texto;
+      t.igual(sit((d) => { d.jogos = []; }), "cadastro", "sem jogos: cadastro");
+      t.igual(sit(), "semana 1 de 8", "com jogos pendentes: a semana em andamento");
+      t.igual(sit((d) => { d.jogos.forEach((j, i) => { j.semana = i < 3 ? 1 : 5; j.resultado = i < 3 ? placar(1, 0) : null; }); }),
+        "semana 5 de 8", "semana 1 resolvida: a próxima com jogo pendente");
+      const semis = [["semi1", 0, "gols1", 2], ["semi1", 0, "gols2", 0], ["semi2", 0, "gols1", 0], ["semi2", 0, "gols2", 1]];
+      t.igual(sit((d) => { d.mataMata = mataMataCom(semis); }), "fase final", "mata-mata em andamento: fase final");
+      const final = [["final", 0, "gols1", 1], ["final", 0, "gols2", 0], ["final", 1, "gols1", 3], ["final", 1, "gols2", 0]];
+      t.igual(sit((d) => { d.mataMata = mataMataCom([...semis, ...final]); }), "🏆 campeões", "final decidida: campeões");
+
+      const arm = memoria();
+      const camps = Campeonatos.criar(arm);
+      arm.dados[camps.chaveAtiva()] = "{ lixo";
+      t.igual(camps.listar()[0].situacao.etapa, "invalido", "edição com dados inválidos aparece como tal na lista");
+    });
+
+    caso("E10 Espaço usado conta só as chaves do app", (t) => {
+      const arm = memoria({ "outro-app": "x".repeat(1000) });
+      const camps = Campeonatos.criar(arm);
+      const doApp = () => Object.entries(arm.dados).filter(([k]) => k.startsWith("copa-fifa-duplas"))
+        .reduce((soma, [k, v]) => soma + (k.length + v.length) * 2, 0);
+      t.igual(camps.espacoUsado().bytes, doApp(), "2 bytes por caractere de chave e valor, só do app");
+      const antes = camps.espacoUsado().bytes;
+      camps.novo();
+      t.verdadeiro(camps.espacoUsado().bytes > antes, "uma edição nova aumenta o espaço usado");
+      t.igual(camps.espacoUsado().limite, 5 * 1024 * 1024, "referência de ~5 MB");
     });
 
     // Execução e relatório

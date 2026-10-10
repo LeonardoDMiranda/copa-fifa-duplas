@@ -931,6 +931,20 @@
     return calcularClassificacao(base, considerados, desempatesManuais, { config, posicoesAnteriores: anteriores });
   }
 
+  // Etapa de uma edição, para a lista de campeonatos: "cadastro", "semanas" (com a semana em
+  // andamento), "fase-final" ou "campeoes". Recebe o estado salvo da edição (campeonato, jogos...).
+  function situacaoDoCampeonato(estado) {
+    const config = estado.campeonato.config;
+    if (estado.mataMata) {
+      const base = baseDosJogadores(estado.campeonato.jogadores);
+      const tabela = classificacaoPorSemana(base, estado.jogos, estado.desempatesManuais, config);
+      const campeoes = resolverMataMata(estado.mataMata, tabela, config).podio.campeoes;
+      return campeoes ? { etapa: "campeoes", texto: "🏆 campeões" } : { etapa: "fase-final", texto: "fase final" };
+    }
+    if (!estado.jogos.length) return { etapa: "cadastro", texto: "cadastro" };
+    return { etapa: "semanas", texto: `semana ${semanaAtual(estado.jogos, config)} de ${config.semanas}` };
+  }
+
   // ---------- O que está em jogo ----------
 
   // Desfechos possíveis de um jogo pendente, só pelo que importa aqui (pontos e vitórias):
@@ -1147,6 +1161,7 @@
     semanaAtual,
     ultimaSemanaComResultado,
     classificacaoPorSemana,
+    situacaoDoCampeonato,
     jogosPorSemana,
     gerarCalendario,
     avaliarCalendario,

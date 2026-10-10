@@ -284,6 +284,28 @@ button.perigo { color: var(--desce); }
   .menu-itens { left: 16px; right: 16px; top: auto; margin-top: 4px; }
 }
 
+/* Seletor de campeonatos: o título do cabeçalho abre a lista de edições. */
+.menu-campeonatos { display: inline-block; max-width: 100%; }
+.menu-campeonatos > summary {
+  display: flex; align-items: center; gap: 8px; max-width: 100%;
+  padding: 2px 8px; font-size: inherit; border-color: transparent; background: transparent;
+}
+.menu-campeonatos h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-campeonatos .seta { font-size: 1rem; opacity: .8; }
+.menu-campeonatos .menu-itens {
+  left: 0; right: auto; min-width: 300px; max-width: min(460px, calc(100vw - 32px));
+  max-height: 70vh; overflow-y: auto; color: var(--texto);
+}
+.menu-rotulo { margin: 4px 10px 2px; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--texto-suave); }
+.menu-itens button.item-edicao { display: grid; grid-template-columns: 1.2em 1fr; column-gap: 6px; }
+.item-edicao .edicao-nome { overflow-wrap: anywhere; }
+.item-edicao small { grid-column: 2; color: var(--texto-suave); }
+.item-edicao.edicao-ativa { font-weight: 600; }
+.marca-ativa { color: var(--sobe); }
+@media (max-width: 600px) {
+  .menu-campeonatos .menu-itens { left: 16px; right: 16px; min-width: 0; max-width: none; }
+}
+
 .status-salvamento { flex-basis: 100%; margin: 0; font-size: .8rem; opacity: .75; text-align: right; }
 .status-salvamento.erro { opacity: 1; color: #ffd166; font-weight: 600; }
 
@@ -468,8 +490,33 @@ dialog.dialogo::backdrop { background: var(--veu); }
 .dialogo h2 { margin: 0 0 10px; font-size: 1.2rem; }
 .dialogo-texto p { margin: 0 0 10px; line-height: 1.45; }
 .dialogo-texto ul { margin: 0 0 10px; padding: 8px 12px 8px 28px; border-radius: 5px; background: var(--alerta-fundo); color: var(--alerta-texto); }
-.dialogo-acoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.dialogo-acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .dialogo-acoes button { padding: 7px 16px; }
+.dialogo-acoes .dialogo-extra { margin-right: auto; } /* ex.: "Exportar backup antes", à esquerda */
+
+/* ---------- campeonatos (edições) ---------- */
+
+.acoes-campeonatos { margin: 4px 0 12px; }
+.lista-campeonatos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.item-campeonato {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  padding: 10px 14px; border: 1px solid var(--borda); border-radius: 6px; background: var(--superficie);
+}
+.item-campeonato.ativo { border-color: var(--destaque); box-shadow: inset 3px 0 0 var(--destaque); }
+.item-campeonato-texto { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.titulo-edicao { font-weight: 600; overflow-wrap: anywhere; }
+.item-campeonato .situacao { font-size: .85rem; color: var(--texto-suave); }
+.item-campeonato .situacao.etapa-campeoes { color: var(--ambar-texto); }
+.item-campeonato .situacao.etapa-invalido { color: var(--desce); }
+.item-campeonato-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-ativo {
+  margin-left: 8px; padding: 1px 7px; border-radius: 10px;
+  font-size: .75rem; font-weight: 600; background: var(--info-fundo); color: var(--info-texto);
+}
+.lista-campeonatos.arquivados .item-campeonato { background: var(--superficie-2); }
+.titulo-arquivados { margin: 20px 0 8px; font-size: 1rem; color: var(--texto-suave); }
+.espaco-usado { margin: 20px 0 0; font-size: .85rem; color: var(--texto-suave); }
+.espaco-usado.cheio { padding: 6px 10px; border-radius: 5px; background: var(--alerta-fundo); color: var(--alerta-texto); }
 button.mini { padding: 2px 8px; font-size: .8rem; }
 
 .alerta {

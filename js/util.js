@@ -32,26 +32,42 @@
     });
   }
 
-  // Janela de confirmação no lugar do confirm() do navegador. Devolve uma Promise<boolean>.
-  // Esc ou "Cancelar" = false. Em ações perigosas o botão de ação fica vermelho e o foco
-  // começa em "Cancelar", para Enter não confirmar sem querer.
-  function confirmar(mensagem, { titulo = "Confirmar?", acao = "Confirmar", perigo = false } = {}) {
+  // Janela com várias opções. Devolve uma Promise com o `valor` da opção escolhida, ou null
+  // (Esc ou "Cancelar"). opcoes = [{ valor, rotulo, id?, classe? }], da esquerda para a direita;
+  // `foco` = valor da opção que começa com o foco (padrão: a última). extras = [{ rotulo, id?,
+  // aoClicar }]: botões à esquerda que fazem algo sem fechar a janela (ex.: exportar antes).
+  function escolher(mensagem, { titulo, opcoes, foco = null, extras = [] }) {
     return new Promise((resolver) => {
       const dialogo = el("dialog", { class: "dialogo", "aria-labelledby": "dialogo-titulo" },
         el("form", { method: "dialog" },
           el("h2", { id: "dialogo-titulo" }, titulo),
           el("div", { class: "dialogo-texto" }, blocosDeTexto(mensagem)),
           el("div", { class: "dialogo-acoes" },
-            el("button", { type: "submit", id: "dialogo-cancelar", value: "cancelar" }, "Cancelar"),
-            el("button", { type: "submit", id: "dialogo-ok", value: "ok", class: perigo ? "perigo-forte" : "primario" }, acao))));
+            extras.map((x) => el("button", { type: "button", id: x.id, class: "dialogo-extra", onclick: x.aoClicar }, x.rotulo)),
+            el("button", { type: "submit", id: "dialogo-cancelar", value: "" }, "Cancelar"),
+            opcoes.map((o) => el("button", { type: "submit", id: o.id, value: o.valor, class: o.classe || null }, o.rotulo)))));
       dialogo.addEventListener("close", () => {
         dialogo.remove();
-        resolver(dialogo.returnValue === "ok");
+        resolver(opcoes.some((o) => o.valor === dialogo.returnValue) ? dialogo.returnValue : null);
       });
       document.body.appendChild(dialogo);
       dialogo.showModal();
-      dialogo.querySelector(perigo ? "#dialogo-cancelar" : "#dialogo-ok").focus();
+      const inicial = foco === "" ? "" : foco ?? opcoes[opcoes.length - 1].valor;
+      dialogo.querySelector(`button[type="submit"][value="${inicial}"]`).focus();
     });
+  }
+
+  // Janela de confirmação no lugar do confirm() do navegador. Devolve uma Promise<boolean>.
+  // Esc ou "Cancelar" = false. Em ações perigosas o botão de ação fica vermelho e o foco
+  // começa em "Cancelar", para Enter não confirmar sem querer.
+  async function confirmar(mensagem, { titulo = "Confirmar?", acao = "Confirmar", perigo = false, extras = [] } = {}) {
+    const escolha = await escolher(mensagem, {
+      titulo,
+      opcoes: [{ valor: "ok", id: "dialogo-ok", rotulo: acao, classe: perigo ? "perigo-forte" : "primario" }],
+      foco: perigo ? "" : "ok",
+      extras,
+    });
+    return escolha === "ok";
   }
 
   const MAX_GOLS = 99;
@@ -94,5 +110,5 @@
     return " empate";
   }
 
-  globalThis.Util = { el, confirmar, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado };
+  globalThis.Util = { el, escolher, confirmar, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado };
 })();
