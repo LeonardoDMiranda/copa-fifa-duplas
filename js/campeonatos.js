@@ -191,16 +191,36 @@
       return alterar(() => criarEdicao(Estado.estadoInicial()));
     }
 
-    // Nova edição com o nome, a configuração e os jogadores da escolhida; sem calendário,
-    // jogos nem mata-mata (o cadastro fica livre).
+    // Nova edição com o nome, a configuração, os jogadores e a aparência da escolhida; sem
+    // calendário, jogos nem mata-mata (o cadastro fica livre).
     function duplicar(id) {
       return alterar(() => {
         buscar(id);
-        const origem = lerEdicao(id).campeonato;
+        const origem = lerEdicao(id);
+        const c = origem.campeonato;
         const estado = Estado.estadoInicial();
-        estado.campeonato = { nome: nomeDuplicado(origem.nome), config: { ...origem.config }, jogadores: origem.jogadores, sorteio: null };
+        estado.campeonato = { nome: nomeDuplicado(c.nome), config: { ...c.config }, jogadores: c.jogadores, sorteio: null };
+        estado.aparencia = origem.aparencia;
         return criarEdicao(estado);
       });
+    }
+
+    // Modelo (nome, configuração, jogadores e aparência) de uma edição, em JSON.
+    function exportarModelo(id) {
+      buscar(id);
+      return JSON.stringify({ ...Estado.modeloDoEstado(lerEdicao(id)), exportadoEm: agora().toISOString() }, null, 2);
+    }
+
+    // Edição nova (que passa a ser a ativa) a partir de um modelo. Arquivo inválido: lança Error e nada muda.
+    function criarDeModelo(texto) {
+      let obj;
+      try {
+        obj = JSON.parse(texto);
+      } catch (_) {
+        throw new Error("o arquivo não é um JSON válido.");
+      }
+      const modelo = Estado.validarModelo(obj);
+      return alterar(() => criarEdicao({ ...Estado.estadoInicial(), campeonato: modelo.campeonato, aparencia: modelo.aparencia }));
     }
 
     function abrir(id) {
@@ -276,6 +296,8 @@
       desarquivar,
       excluir,
       importarComoNovo,
+      exportarModelo,
+      criarDeModelo,
       espacoUsado,
       recarregar: carregar,
       status: () => ({ ...status }),

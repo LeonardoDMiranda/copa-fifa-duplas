@@ -1,5 +1,6 @@
 // Tela "Campeonatos" (index.html#campeonatos, fora das abas de etapa): as edições guardadas no
-// navegador, com abrir, duplicar, arquivar/desarquivar, exportar e excluir, e o espaço usado.
+// navegador, com abrir, duplicar, arquivar/desarquivar, exportar (backup ou modelo) e excluir,
+// criar a partir de um modelo, e o espaço usado.
 
 (function () {
   "use strict";
@@ -80,6 +81,8 @@
           botao(`campeonato-duplicar-${c.id}`, "Duplicar", "Nova edição com o mesmo nome (2), configuração e jogadores; sem calendário nem jogos",
             () => duplicar(c), { disabled: invalido }),
           botao(`campeonato-exportar-${c.id}`, "⬇ Exportar", "Baixar o backup em JSON desta edição", () => app.exportarEdicao(c.id), { disabled: invalido }),
+          botao(`campeonato-modelo-${c.id}`, "⬇ Modelo", "Baixar um modelo (nome, configuração, jogadores, cor e logo) para outro organizador ou outra edição",
+            () => app.exportarModelo(c.id), { disabled: invalido }),
           c.arquivado
             ? botao(`campeonato-desarquivar-${c.id}`, "Desarquivar", "Volta para a lista do seletor", () => desarquivar(c))
             : botao(`campeonato-arquivar-${c.id}`, "Arquivar", "Tira do seletor e apaga o histórico do desfazer desta edição", () => arquivar(c)),
@@ -97,7 +100,11 @@
       // replaceChildren não descarta os false (como el() faz): filtra antes.
       document.getElementById("conteudo-campeonatos").replaceChildren(...[
         el("div", { class: "acoes-campeonatos" },
-          el("button", { type: "button", id: "btn-campeonato-novo", class: "primario", onclick: app.novoCampeonato }, "+ Novo campeonato")),
+          el("button", { type: "button", id: "btn-campeonato-novo", class: "primario", onclick: app.novoCampeonato }, "+ Novo campeonato"),
+          el("button", {
+            type: "button", id: "btn-campeonato-de-modelo", title: "Escolher um arquivo de modelo (…-modelo.json)",
+            onclick: app.escolherArquivoParaImportar,
+          }, "+ Novo a partir de modelo")),
         el("ul", { class: "lista-campeonatos", id: "lista-campeonatos" }, ativos.map(itemCampeonato)),
         arquivados.length > 0 && el("h3", { class: "titulo-arquivados" }, "Arquivados"),
         arquivados.length > 0 && el("ul", { class: "lista-campeonatos arquivados", id: "lista-arquivados" }, arquivados.map(itemCampeonato)),

@@ -1,9 +1,11 @@
-// Tela "Campeonato e jogadores": nome, configuração e cadastro (adicionar, renomear, remover).
+// Tela "Campeonato e jogadores": nome, configuração, aparência (cor e logo) e cadastro
+// (adicionar, renomear, remover).
 
 (function () {
   "use strict";
 
   const { el } = Util;
+  const COR_PADRAO = "#0d3b66"; // azul do cabeçalho (--topo)
 
   function criar(app) {
     const { estado, nomePorId, avisar, renderizar, cadastroTravado } = app;
@@ -93,6 +95,57 @@
       }
     }
 
+    // Cor e logo valem na hora e ficam fora do desfazer (ver Estado.definirAparencia).
+    function definirAparencia(parcial, mensagem) {
+      if (estado.definirAparencia({ ...(estado.aparencia() || {}), ...parcial })) avisar(mensagem);
+    }
+
+    function mudarCor(ev) {
+      const cor = ev.target.value.toLowerCase();
+      if (!Util.corLegivelComBranco(cor)) {
+        const c = Util.contraste(cor, "#ffffff").toFixed(1).replace(".", ",");
+        avisar(`Cor clara demais: o texto branco do cabeçalho ficaria ilegível (contraste ${c}:1; o mínimo é 4,5:1). Escolha uma mais escura.`, "erro");
+        renderizar();
+        return;
+      }
+      definirAparencia({ cor }, "Cor do campeonato atualizada.");
+    }
+
+    async function escolherLogo(ev) {
+      const arquivo = ev.target.files[0];
+      ev.target.value = "";
+      if (!arquivo) return;
+      try {
+        definirAparencia({ logo: await Util.prepararLogo(arquivo) }, "Logo do campeonato atualizado.");
+      } catch (erro) {
+        avisar(`Não foi possível usar a imagem: ${erro.message}`, "erro");
+      }
+    }
+
+    function blocoAparencia() {
+      const ap = estado.aparencia() || {};
+      return el("div", { class: "aparencia", id: "aparencia" },
+        el("span", { class: "rotulo-aparencia" }, "Aparência"),
+        el("label", { class: "campo-aparencia" }, "Cor",
+          el("input", { id: "aparencia-cor", type: "color", value: ap.cor || COR_PADRAO, onchange: mudarCor })),
+        ap.cor && el("button", {
+          type: "button", id: "aparencia-cor-padrao", class: "discreto mini", title: "Voltar ao azul padrão",
+          onclick: () => definirAparencia({ cor: null }, "Cor padrão restaurada."),
+        }, "Padrão"),
+        el("span", { class: "campo-aparencia" }, "Logo",
+          ap.logo ? el("img", { class: "previa-logo", id: "previa-logo", src: ap.logo, alt: "Logo do campeonato" }) : el("span", { class: "sem-logo" }, "nenhum"),
+          el("button", {
+            type: "button", id: "aparencia-logo-escolher", class: "mini", title: "Imagem PNG, JPG ou WebP; é reduzida para caber em 256×128",
+            onclick: () => document.getElementById("aparencia-logo-arquivo").click(),
+          }, ap.logo ? "Trocar" : "Escolher imagem"),
+          ap.logo && el("button", {
+            type: "button", id: "aparencia-logo-remover", class: "discreto mini perigo",
+            onclick: () => definirAparencia({ logo: null }, "Logo removido."),
+          }, "Remover"),
+          el("input", { id: "aparencia-logo-arquivo", type: "file", accept: "image/png,image/jpeg,image/webp", hidden: true, onchange: escolherLogo })),
+        el("span", { class: "legenda" }, "No cabeçalho, no telão e nos PNGs. Não entra no \"Desfazer\"."));
+    }
+
     function campoConfig(classe, rotulo, entrada) {
       return el("label", { class: `campo-config ${classe}` }, rotulo, entrada);
     }
@@ -153,6 +206,7 @@
           })),
           campoConfig("numero", "Jogos por jogador", numero("config-jogos", "jogosPorJogador", "Jogos por jogador")),
           campoConfig("numero", "Semanas", numero("config-semanas", "semanas", "Semanas"))),
+        blocoAparencia(),
         el("p", { class: "diagnostico", id: "diagnostico" },
           `${diag.jogadores} jogadores × ${camp.config.jogosPorJogador} jogos ÷ 4 = ${diag.totalJogos} jogos · ${porSemana} por semana em ${camp.config.semanas} semanas`),
         diag.pronto

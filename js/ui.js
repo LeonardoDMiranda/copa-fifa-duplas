@@ -102,6 +102,8 @@
     sincronizarEdicao,
     novoCampeonato,
     exportarEdicao: exportar,
+    exportarModelo,
+    escolherArquivoParaImportar,
   };
   const telas = {
     jogadores: Telas.jogadores.criar(app),
@@ -204,6 +206,7 @@
     const n = camp.jogadores.length;
     document.getElementById("titulo-campeonato").textContent = camp.nome;
     document.title = camp.nome;
+    renderizarAparencia();
     renderizarSeletor();
 
     let subtitulo;
@@ -219,6 +222,20 @@
       subtitulo = `Semana ${Regras.semanaAtual(atual.jogos, camp.config)} de ${camp.config.semanas} · ${lancados}/${atual.jogos.length} jogos lançados`;
     }
     document.getElementById("subtitulo-campeonato").textContent = subtitulo;
+  }
+
+  // Cor do campeonato no fundo do cabeçalho (vale nos dois temas) e logo ao lado do título.
+  function renderizarAparencia() {
+    const ap = estado.aparencia() || {};
+    if (ap.cor) document.documentElement.style.setProperty("--topo", ap.cor);
+    else document.documentElement.style.removeProperty("--topo");
+    const logo = document.getElementById("logo-campeonato");
+    logo.hidden = !ap.logo;
+    if (ap.logo) {
+      if (logo.getAttribute("src") !== ap.logo) logo.src = ap.logo;
+    } else {
+      logo.removeAttribute("src");
+    }
   }
 
   // Seletor de edições (título do cabeçalho): as não arquivadas, "Novo" e "Gerenciar".
@@ -289,6 +306,10 @@
     const cfg = atual.campeonato.config;
     const agora = new Date();
     const base = Util.slug(atual.campeonato.nome);
+    const ap = estado.aparencia() || {};
+    // Logo que não carrega não impede a imagem: sai sem ele.
+    const logo = ap.logo ? await Util.carregarImagem(ap.logo).catch(() => null) : null;
+    const visual = { cor: ap.cor, logo };
     let canvas, prefixo;
     if (tipo === "classificacao") {
       // Exporta o que está na tela: na aba Classificação, a semana escolhida; nas outras, ao vivo.
@@ -304,12 +325,13 @@
         semana,
         lancados: jogos.filter((j) => j.resultado).length,
         totalJogos: jogos.length,
+        ...visual,
       });
       prefixo = `${base}-classificacao${semana === null ? "" : `-semana-${semana}`}`;
     } else {
       if (!atual.mataMata) { avisar("Gere o chaveamento antes de exportar o mata-mata.", "erro"); return; }
       canvas = Exportar.desenharMataMata(Regras.resolverMataMata(atual.mataMata, tabelaAtual(), cfg), nomePorId,
-        { geradoEm: agora, nome: atual.campeonato.nome });
+        { geradoEm: agora, nome: atual.campeonato.nome, ...visual });
       prefixo = `${base}-mata-mata`;
     }
     try {
@@ -338,15 +360,47 @@
     // O registro vai antes do JSON, para o arquivo já conter a data deste backup.
     est.registrarBackup({ em: agora.toISOString(), semanasCompletas: Regras.contarSemanasCompletas(atual.jogos, cfg.semanas, cfg) });
     const nome = `${Util.slug(atual.campeonato.nome)}-backup-${Util.carimbo(agora)}.json`;
-    const blob = new Blob([est.exportarJSON()], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+    baixarJSON(nome, est.exportarJSON());
+    avisar(`Backup exportado: ${nome}`);
+    if (est !== estado) renderizar(); // o espaço usado mudou
+  }
+
+  function baixarJSON(nome, texto) {
+    const url = URL.createObjectURL(new Blob([texto], { type: "application/json" }));
     const link = el("a", { href: url, download: nome });
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    avisar(`Backup exportado: ${nome}`);
-    if (est !== estado) renderizar(); // o espaço usado mudou
+  }
+
+  // Modelo (nome, configuração, jogadores, cor e logo) de uma edição, para começar outra igual.
+  function exportarModelo(id) {
+    try {
+      const texto = campeonatos.exportarModelo(id);
+      const nome = `${Util.slug(JSON.parse(texto).campeonato.nome)}-modelo-${Util.carimbo(new Date())}.json`;
+      baixarJSON(nome, texto);
+      avisar(`Modelo exportado: ${nome}`);
+    } catch (erro) {
+      avisar(`Não foi possível exportar o modelo: ${erro.message}`, "erro");
+    }
+  }
+
+  // O mesmo campo de arquivo serve para backup e modelo: importar() reconhece o tipo.
+  function escolherArquivoParaImportar() {
+    document.getElementById("arquivo-importar").click();
+  }
+
+  // Modelo não substitui nada: vira uma edição nova direto, sem perguntar.
+  function importarModelo(texto, arquivo) {
+    try {
+      campeonatos.criarDeModelo(texto);
+    } catch (erro) {
+      avisar(`Não foi possível usar o modelo: ${erro.message}`, "erro");
+      return;
+    }
+    sincronizarEdicao("jogadores");
+    avisar(`Campeonato criado a partir do modelo: ${arquivo.name}`);
   }
 
   function importar(ev) {
@@ -361,6 +415,10 @@
       try {
         let obj;
         try { obj = JSON.parse(texto); } catch (_) { throw new Error("o arquivo não é um JSON válido."); }
+        if (obj && obj.tipo === Estado.TIPO_MODELO) {
+          importarModelo(texto, arquivo);
+          return;
+        }
         importado = Estado.validarEstado(obj);
       } catch (erro) {
         avisar(`Não foi possível importar: ${erro.message}`, "erro");

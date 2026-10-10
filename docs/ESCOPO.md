@@ -90,12 +90,20 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
 
 - Cada edição é um campeonato completo (estado v2), com o seu desfazer e o seu registro de backup.
 - **Novo campeonato**: edição vazia; abre na aba Jogadores com o nome selecionado.
-- **Duplicar**: copia o nome com "(2)" (ou "(3)"... se já existir), a configuração e os jogadores; sem calendário, jogos, mata-mata, desempates, desfazer nem registro de backup. Abre a cópia.
+- **Duplicar**: copia o nome com "(2)" (ou "(3)"... se já existir), a configuração, os jogadores e a aparência; sem calendário, jogos, mata-mata, desempates, desfazer nem registro de backup. Abre a cópia.
 - **Abrir**: troca a edição ativa. Ela vale para todas as janelas do app no mesmo navegador: o telão acompanha (evento `storage` na chave índice).
 - **Arquivar / desarquivar**: arquivada sai do seletor, vai para "Arquivados" e perde o histórico do desfazer (para poupar espaço). Não abre sem desarquivar.
 - **Excluir**: janela vermelha com "Exportar backup antes" ao lado. Sem desfazer e sem lixeira.
 - Arquivar ou excluir a edição ativa abre a última não arquivada; se não sobrar nenhuma, cria uma vazia.
 - A tela de Campeonatos mostra o espaço usado pelo app no navegador (referência de ~5 MB).
+- **Modelo**: arquivo `…-modelo-<data>.json` com nome, configuração, jogadores e aparência de uma edição (sem calendário nem jogos), para começar outra edição igual ou passar a outro organizador. **"+ Novo a partir de modelo"** (ou o "Importar backup", que reconhece o tipo do arquivo) cria uma edição nova e a abre na aba Jogadores, com o cadastro livre. Modelo inválido é recusado sem mudar nada.
+
+### 2.8 Aparência
+
+- Cada edição pode ter uma **cor** e um **logo**, usados no cabeçalho, no telão (fundo escurecido a partir da cor) e nos PNGs. Sem eles, vale o azul padrão.
+- A cor precisa ter contraste de pelo menos 4,5:1 com o texto branco (WCAG AA); cor clara demais é recusada com aviso.
+- O logo (PNG, JPG ou WebP) é reduzido para caber em 256×128 e guardado na edição como data URL (até ~80 mil caracteres). SVG não é aceito.
+- Como o registro do backup, a aparência fica **fora do desfazer** (o logo repetido em cada passo do histórico ocuparia espaço demais), mas é do campeonato: vai no backup, resetar volta ao padrão, importar traz a do arquivo, e desfazer o resetar ou o importar devolve a anterior.
 
 ## 3. Modelo de dados (estado salvo no `localStorage`)
 
@@ -117,6 +125,7 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
   desempatesManuais: [ { jogadores: [id, ...] } ],
   mataMata: null | { semi1, semi2, terceiro, final },  // cada um: { dupla1, dupla2, duplaManual1?, duplaManual2?, partidas: [Partida] }
   ultimoBackup: null | { em, semanasCompletas },
+  aparencia: null | { cor: "#rrggbb" | null, logo: "data:image/...;base64,..." | null },
   historico: [ /* até 30 estados anteriores para o "desfazer" */ ]
 }
 // Partida = { gols1, gols2, prorrogacao1?, prorrogacao2?, penaltis1?, penaltis2? }
@@ -132,15 +141,15 @@ Nome e situação de cada edição ("cadastro", "semana 5 de 8", "fase final", "
 
 Uma aba por etapa (teclas 1 a 5; a aba ativa fica no endereço, ex.: `index.html#rodadas`). Sem `#`, abre na aba da etapa do campeonato; depois a aba só muda por escolha do organizador (e ao confirmar o calendário, que leva a Rodadas).
 
-1. **Jogadores**: nome, jogos por jogador, semanas, diagnóstico da combinação e cadastro (um nome por linha; renomear e remover).
+1. **Jogadores**: nome, jogos por jogador, semanas, aparência (cor e logo), diagnóstico da combinação e cadastro (um nome por linha; renomear e remover).
 2. **Calendário**: sortear, conferir as restrições, trocar jogadores à mão e confirmar.
 3. **Rodadas**: navegação por semana, cartões dos jogos com placar, "W.O.", "Anular" e "Limpar"; quem descansa na semana; agenda do jogador; top 8 ao vivo ao lado.
 4. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual. Ao lado, **o que está em jogo**: Garantidos / Em disputa / Eliminados.
 5. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
 
-**Campeonatos** (`index.html#campeonatos`, fora das abas de etapa): edições em uso e arquivadas, com Abrir, Duplicar, Exportar, Arquivar/Desarquivar e Excluir; "Novo campeonato"; espaço usado.
+**Campeonatos** (`index.html#campeonatos`, fora das abas de etapa): edições em uso e arquivadas, com Abrir, Duplicar, Exportar, Modelo, Arquivar/Desarquivar e Excluir; "Novo campeonato" e "Novo a partir de modelo"; espaço usado.
 
-**Cabeçalho**: o título é o seletor de campeonatos (edições não arquivadas, "+ Novo campeonato" e "Gerenciar campeonatos"). Desfazer, menu Backup (exportar/importar JSON), Modo telão e menu ⋯ (PNG da classificação e do mata-mata, Resetar). Lembrete de backup quando for a hora.
+**Cabeçalho**: na cor do campeonato, com o logo ao lado do título. O título é o seletor de campeonatos (edições não arquivadas, "+ Novo campeonato" e "Gerenciar campeonatos"). Desfazer, menu Backup (exportar/importar JSON), Modo telão e menu ⋯ (PNG da classificação e do mata-mata, Resetar). Lembrete de backup quando for a hora.
 
 ## 5. Como o projeto foi construído
 
@@ -156,6 +165,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 10 | Navegação por abas, top 8 ao vivo nas rodadas e cabeçalho com menus |
 | 11 | Janelas de confirmação próprias, tema escuro (segue o sistema), telas vazias com o próximo passo e foco visível |
 | 12 | Várias edições: seletor no cabeçalho, tela de Campeonatos (novo, duplicar, arquivar, excluir), importar como novo e migração automática |
+| 13 | Aparência por edição (cor e logo no cabeçalho, telão e PNGs) e modelo de campeonato (exportar e criar edição a partir dele) |
 
 Novas fases seguem o mesmo jeito: uma mudança pequena por vez, com caso de teste novo ou ajustado.
 
@@ -174,6 +184,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | T | PNG e telão com qualquer número de jogadores |
 | B | Lembrete e registro de backup |
 | E | Várias edições: migração, índice corrompido, criar/duplicar/arquivar/excluir, trocar a ativa, importar como novo ou substituindo |
+| A | Aparência (contraste, validação, fora do desfazer, backup/reset/importar), modelo de campeonato, duplicar com aparência, cor no PNG e no telão |
 
 ## 7. Pendências
 

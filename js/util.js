@@ -100,6 +100,62 @@
       + `-${dois(data.getHours())}${dois(data.getMinutes())}${dois(data.getSeconds())}`;
   }
 
+  // ---------- cor e logo do campeonato ----------
+
+  // Contraste entre duas cores "#rrggbb", pela fórmula do WCAG (1 a 21).
+  function contraste(cor1, cor2) {
+    const luminancia = (hex) => {
+      const [r, g, b] = [1, 3, 5].map((i) => {
+        const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const [clara, escura] = [luminancia(cor1), luminancia(cor2)].sort((a, b) => b - a);
+    return (clara + 0.05) / (escura + 0.05);
+  }
+
+  const CONTRASTE_MINIMO = 4.5; // texto normal (WCAG AA)
+
+  // O cabeçalho, o telão e os PNGs escrevem em branco sobre a cor do campeonato.
+  function corLegivelComBranco(cor) {
+    return /^#[0-9a-fA-F]{6}$/.test(cor) && contraste(cor, "#ffffff") >= CONTRASTE_MINIMO;
+  }
+
+  function carregarImagem(src) {
+    return new Promise((resolver, rejeitar) => {
+      const img = new Image();
+      img.onload = () => resolver(img);
+      img.onerror = () => rejeitar(new Error("não foi possível ler a imagem."));
+      img.src = src;
+    });
+  }
+
+  const LOGO_LARGURA = 256;
+  const LOGO_ALTURA = 128;
+
+  // Reduz a imagem escolhida para caber em 256×128 (sem aumentar) e devolve uma data URL (PNG ou,
+  // se ficar grande, WebP), que fica guardada nos dados do campeonato. Lança Error se não der.
+  async function prepararLogo(arquivo) {
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(arquivo.type)) throw new Error("use uma imagem PNG, JPG ou WebP.");
+    const url = URL.createObjectURL(arquivo);
+    try {
+      const img = await carregarImagem(url);
+      const escala = Math.min(1, LOGO_LARGURA / img.naturalWidth, LOGO_ALTURA / img.naturalHeight);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * escala));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * escala));
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      for (const [tipo, qualidade] of [["image/png"], ["image/webp", 0.9], ["image/webp", 0.7]]) {
+        const dados = canvas.toDataURL(tipo, qualidade);
+        if (dados.startsWith(`data:${tipo};`) && dados.length <= Estado.MAX_CARACTERES_LOGO) return dados;
+      }
+      throw new Error("a imagem ficou grande demais mesmo reduzida; tente uma mais simples.");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   // Classe CSS (com espaço na frente) do lado de um jogo de classificação, conforme o resultado.
   function classeDoLado(resultado, lado) {
     if (resultado && resultado.tipo === "anulado") return " anulada";
@@ -110,5 +166,8 @@
     return " empate";
   }
 
-  globalThis.Util = { el, escolher, confirmar, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado };
+  globalThis.Util = {
+    el, escolher, confirmar, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado,
+    contraste, CONTRASTE_MINIMO, corLegivelComBranco, carregarImagem, prepararLogo,
+  };
 })();

@@ -8,6 +8,7 @@
 </head>
 <body>
   <header class="topo">
+    <img id="logo-campeonato" class="logo-campeonato" alt="" hidden>
     <div class="topo-titulo">
       <details class="menu menu-campeonatos" id="menu-campeonatos">
         <summary title="Trocar de campeonato, criar um novo ou gerenciar os guardados">
@@ -23,7 +24,7 @@
         <summary title="Exportar ou importar o backup em JSON">💾 Backup</summary>
         <div class="menu-itens">
           <button type="button" id="btn-exportar" title="Baixar um backup em JSON">⬇ Exportar backup (JSON)</button>
-          <button type="button" id="btn-importar" title="Restaurar um backup em JSON">⬆ Importar backup (JSON)</button>
+          <button type="button" id="btn-importar" title="Restaurar um backup em JSON ou criar um campeonato a partir de um modelo">⬆ Importar backup (JSON)</button>
         </div>
       </details>
       <input type="file" id="arquivo-importar" accept=".json,application/json" hidden>

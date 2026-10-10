@@ -10,6 +10,12 @@
   const VERSAO = 2;
   const MAX_HISTORICO = 30;
   const NOME_PADRAO = "Copa FIFA em Duplas";
+  // Logo guardado como data URL: depois de reduzido (Util.prepararLogo) costuma ter poucos KB.
+  const MAX_CARACTERES_LOGO = 80000;
+  const LOGO_VALIDO = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+  const COR_VALIDA = /^#[0-9a-f]{6}$/;
+  const TIPO_MODELO = "modelo-copa-fifa-duplas";
+  const VERSAO_MODELO = 1;
 
   function clonar(valor) {
     return JSON.parse(JSON.stringify(valor));
@@ -29,6 +35,7 @@
       desempatesManuais: [],
       mataMata: null,
       ultimoBackup: null,
+      aparencia: null,
       historico: [],
     };
   }
@@ -196,6 +203,32 @@
     return { em: b.em, semanasCompletas: Number.isInteger(b.semanasCompletas) && b.semanasCompletas >= 0 ? b.semanasCompletas : 0 };
   }
 
+  // Cor e logo do campeonato: { cor: "#rrggbb" | null, logo: data URL | null }, ou null (padrão).
+  // Como o registro do backup, fica fora do desfazer (ver trocarDadosForaDoDesfazer). Parte
+  // inválida (ou cor clara demais para o texto branco do cabeçalho) vira null.
+  function validarAparencia(a) {
+    if (!a || typeof a !== "object") return null;
+    const cor = typeof a.cor === "string" && COR_VALIDA.test(a.cor.toLowerCase()) && Util.corLegivelComBranco(a.cor)
+      ? a.cor.toLowerCase() : null;
+    const logo = typeof a.logo === "string" && a.logo.length <= MAX_CARACTERES_LOGO && LOGO_VALIDO.test(a.logo) ? a.logo : null;
+    return cor || logo ? { cor, logo } : null;
+  }
+
+  // Modelo de campeonato: nome, configuração, jogadores e aparência, sem calendário nem jogos.
+  function modeloDoEstado(estado) {
+    const { nome, config, jogadores } = estado.campeonato;
+    return { tipo: TIPO_MODELO, versao: VERSAO_MODELO, campeonato: { nome, config, jogadores }, aparencia: estado.aparencia };
+  }
+
+  // Valida um modelo vindo de arquivo; devolve { campeonato, aparencia } ou lança Error.
+  function validarModelo(obj) {
+    if (!obj || typeof obj !== "object" || obj.tipo !== TIPO_MODELO) throw new Error("o arquivo não é um modelo de campeonato.");
+    if (obj.versao !== VERSAO_MODELO) throw new Error(`versão ${obj.versao} do modelo não suportada (esperado ${VERSAO_MODELO}).`);
+    const c = obj.campeonato;
+    if (!c || typeof c !== "object") throw new Error("dados do campeonato ausentes.");
+    return { campeonato: validarCampeonato({ nome: c.nome, config: c.config, jogadores: c.jogadores, sorteio: null }), aparencia: validarAparencia(obj.aparencia) };
+  }
+
   function validarEstado(obj) {
     if (!obj || typeof obj !== "object") throw new Error("arquivo não contém um objeto JSON.");
     if (obj.versao === 1) {
@@ -207,12 +240,19 @@
       try {
         const entrada = { descricao: String(snap.descricao || "alteração"), ...validarConteudo(snap) };
         if ("ultimoBackup" in snap) entrada.ultimoBackup = validarBackup(snap.ultimoBackup);
+        if ("aparencia" in snap) entrada.aparencia = validarAparencia(snap.aparencia);
         historico.push(entrada);
       } catch (_) {
         // snapshot antigo inválido: descarta só ele
       }
     }
-    return { versao: VERSAO, ...validarConteudo(obj), ultimoBackup: validarBackup(obj.ultimoBackup), historico: historico.slice(-MAX_HISTORICO) };
+    return {
+      versao: VERSAO,
+      ...validarConteudo(obj),
+      ultimoBackup: validarBackup(obj.ultimoBackup),
+      aparencia: validarAparencia(obj.aparencia),
+      historico: historico.slice(-MAX_HISTORICO),
+    };
   }
 
   // Cria o gerenciador de estado sobre um armazenamento com a interface do localStorage
@@ -272,7 +312,7 @@
       if (JSON.stringify(rascunho) === JSON.stringify(antes)) return false;
 
       const historico = [...estado.historico, { descricao, ...antes }].slice(-MAX_HISTORICO);
-      estado = { versao: VERSAO, ...rascunho, ultimoBackup: estado.ultimoBackup, historico };
+      estado = { versao: VERSAO, ...rascunho, ultimoBackup: estado.ultimoBackup, aparencia: estado.aparencia, historico };
       salvar();
       notificar();
       return true;
@@ -282,10 +322,11 @@
       if (!estado.historico.length) return null;
       const historico = estado.historico.slice();
       const entrada = historico.pop();
-      const { descricao, ultimoBackup: registroAnterior, ...anterior } = entrada;
-      // Só resetar e importar guardam o registro na entrada (ver trocarRegistroDeBackup).
+      const { descricao, ultimoBackup: registroAnterior, aparencia: aparenciaAnterior, ...anterior } = entrada;
+      // Só resetar e importar guardam esses dados na entrada (ver trocarDadosForaDoDesfazer).
       const ultimoBackup = "ultimoBackup" in entrada ? registroAnterior : estado.ultimoBackup;
-      estado = { versao: VERSAO, ...clonar(anterior), ultimoBackup, historico };
+      const aparencia = "aparencia" in entrada ? aparenciaAnterior : estado.aparencia;
+      estado = { versao: VERSAO, ...clonar(anterior), ultimoBackup, aparencia, historico };
       salvar();
       notificar();
       return descricao;
@@ -305,8 +346,8 @@
         s.desempatesManuais = importado.desempatesManuais;
         s.mataMata = importado.mataMata;
       });
-      // O registro do backup é do campeonato: passa a valer o que veio no arquivo.
-      trocarRegistroDeBackup(importado.ultimoBackup, mudou);
+      // Registro do backup e aparência são do campeonato: passa a valer o que veio no arquivo.
+      trocarDadosForaDoDesfazer({ ultimoBackup: importado.ultimoBackup, aparencia: importado.aparencia }, mudou);
     }
 
     function resetar() {
@@ -317,24 +358,39 @@
         s.desempatesManuais = inicial.desempatesManuais;
         s.mataMata = inicial.mataMata;
       });
-      // Campeonato novo: o backup do anterior não vale para ele.
-      trocarRegistroDeBackup(null, mudou);
+      // Campeonato novo: o backup e a aparência do anterior não valem para ele.
+      trocarDadosForaDoDesfazer({ ultimoBackup: null, aparencia: null }, mudou);
       return mudou;
     }
 
-    // Troca o registro junto com o campeonato (resetar, importar). Se a ação entrou no histórico,
-    // a entrada guarda o registro anterior: desfazer a ação devolve o campeonato e o registro dele.
-    function trocarRegistroDeBackup(registro, entrouNoHistorico) {
-      const anterior = estado.ultimoBackup;
-      if (JSON.stringify(anterior) === JSON.stringify(registro)) return;
+    // Registro do backup e aparência ficam fora do desfazer, mas são do campeonato: trocam junto
+    // com ele (resetar, importar). Se a ação entrou no histórico, a entrada guarda os valores
+    // anteriores que mudaram: desfazer a ação devolve o campeonato com eles.
+    function trocarDadosForaDoDesfazer(novos, entrouNoHistorico) {
+      const anteriores = {};
+      for (const [campo, valor] of Object.entries(novos)) {
+        if (JSON.stringify(estado[campo]) !== JSON.stringify(valor)) anteriores[campo] = estado[campo];
+      }
+      if (!Object.keys(anteriores).length) return;
       let historico = estado.historico;
       if (entrouNoHistorico) {
         historico = historico.slice();
-        historico[historico.length - 1] = { ...historico[historico.length - 1], ultimoBackup: anterior };
+        historico[historico.length - 1] = { ...historico[historico.length - 1], ...anteriores };
       }
-      estado = { ...estado, ultimoBackup: registro, historico };
+      estado = { ...estado, ...novos, historico };
       salvar();
       notificar();
+    }
+
+    // Cor e logo: valem na hora e não entram no desfazer (o logo repetido em cada passo do
+    // histórico ocuparia espaço demais). Devolve false se nada mudou.
+    function definirAparencia(aparencia) {
+      const nova = validarAparencia(aparencia);
+      if (JSON.stringify(nova) === JSON.stringify(estado.aparencia)) return false;
+      estado = { ...estado, aparencia: nova };
+      salvar();
+      notificar();
+      return true;
     }
 
     // O registro do backup não entra no desfazer (exportar e depois desfazer não "desexporta").
@@ -376,6 +432,8 @@
       exportarJSON,
       registrarBackup,
       ultimoBackup: () => estado.ultimoBackup,
+      aparencia: () => estado.aparencia,
+      definirAparencia,
       importarJSON,
       resetar,
       status: () => ({ ...status }),
@@ -383,5 +441,8 @@
     };
   }
 
-  globalThis.Estado = { criar, CHAVE, MAX_HISTORICO, VERSAO, estadoInicial, validarEstado };
+  globalThis.Estado = {
+    criar, CHAVE, MAX_HISTORICO, VERSAO, MAX_CARACTERES_LOGO, TIPO_MODELO,
+    estadoInicial, validarEstado, validarAparencia, modeloDoEstado, validarModelo,
+  };
 })();

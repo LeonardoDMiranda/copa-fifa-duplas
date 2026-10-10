@@ -78,10 +78,23 @@
 
   const TITULO_PADRAO = "Copa FIFA em Duplas";
 
-  function cabecalho(ctx, titulo, subtitulo, geradoEm) {
-    ctx.fillStyle = CORES.primaria;
+  const LOGO_ALTURA_MAX = 72;
+  const LOGO_LARGURA_MAX = 200;
+
+  // Faixa do topo na cor do campeonato (info.cor), com o logo (info.logo, imagem já carregada)
+  // no canto superior direito.
+  function cabecalho(ctx, titulo, subtitulo, geradoEm, { cor = null, logo = null } = {}) {
+    ctx.fillStyle = cor || CORES.primaria;
     ctx.fillRect(0, 0, LARGURA, 150);
-    escrever(ctx, titulo, MARGEM, 58, { tamanho: 52, peso: 700, cor: "#ffffff", larguraMax: LARGURA - 2 * MARGEM });
+    let larguraTitulo = LARGURA - 2 * MARGEM;
+    if (logo && logo.naturalWidth) {
+      const escala = Math.min(LOGO_ALTURA_MAX / logo.naturalHeight, LOGO_LARGURA_MAX / logo.naturalWidth);
+      const w = Math.round(logo.naturalWidth * escala);
+      const h = Math.round(logo.naturalHeight * escala);
+      ctx.drawImage(logo, LARGURA - MARGEM - w, 58 - h / 2, w, h);
+      larguraTitulo -= w + 24;
+    }
+    escrever(ctx, titulo, MARGEM, 58, { tamanho: 52, peso: 700, cor: "#ffffff", larguraMax: larguraTitulo });
     escrever(ctx, subtitulo, MARGEM, 112, { tamanho: 26, cor: "rgba(255,255,255,.85)", larguraMax: 640 });
     escrever(ctx, `Gerado em ${formatarDataHora(geradoEm)}`, LARGURA - MARGEM, 112,
       { tamanho: 22, cor: "rgba(255,255,255,.7)", alinhar: "right" });
@@ -105,7 +118,7 @@
   }
 
   // tabela = Regras.calcularClassificacao(...)
-  // info = { geradoEm, nome (do campeonato), semana (null = ao vivo), lancados, totalJogos }
+  // info = { geradoEm, nome (do campeonato), semana (null = ao vivo), lancados, totalJogos, cor?, logo? }
   function desenharClassificacao(tabela, info) {
     const alt = alturaDaLinha(tabela.length);
     const k = alt / ALTURA_LINHA; // fonte acompanha a altura da linha
@@ -122,7 +135,7 @@
     else if (!info.totalJogos) situacao = "sem jogos";
     else if (info.lancados === info.totalJogos) situacao = "todos os jogos lançados";
     else situacao = `${info.lancados}/${info.totalJogos} jogos lançados`;
-    cabecalho(ctx, info.nome || TITULO_PADRAO, `Classificação · ${situacao}`, info.geradoEm);
+    cabecalho(ctx, info.nome || TITULO_PADRAO, `Classificação · ${situacao}`, info.geradoEm, info);
     retangulo(ctx, MARGEM - 16, topoPainel, LARGURA - 2 * (MARGEM - 16), fimLinhas - topoPainel + 16,
       { cor: CORES.superficie, raio: 14 });
 
@@ -275,7 +288,7 @@
     return y;
   }
 
-  // mm = Regras.resolverMataMata(...); info = { geradoEm, nome (do campeonato) }
+  // mm = Regras.resolverMataMata(...); info = { geradoEm, nome (do campeonato), cor?, logo? }
   function desenharMataMata(mm, nomePorId, info) {
     const larguraMeia = (LARGURA - 2 * MARGEM - 20) / 2;
     const larguraCheia = LARGURA - 2 * MARGEM;
@@ -288,7 +301,7 @@
     let subtitulo = "Mata-mata";
     if (mm.podio.campeoes) subtitulo = "Mata-mata · resultado final";
     else if (mm.final.pronto) subtitulo = "Mata-mata · final";
-    cabecalho(ctx, info.nome || TITULO_PADRAO, subtitulo, info.geradoEm);
+    cabecalho(ctx, info.nome || TITULO_PADRAO, subtitulo, info.geradoEm, info);
 
     const secao = (titulo, y) => escrever(ctx, titulo, MARGEM, y + 30, { tamanho: 26, peso: 700, cor: CORES.primaria });
 

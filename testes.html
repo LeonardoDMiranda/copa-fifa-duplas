@@ -1514,6 +1514,139 @@
       t.igual(camps.espacoUsado().limite, 5 * 1024 * 1024, "referência de ~5 MB");
     });
 
+    // ---------- Aparência e modelo de campeonato (Fase 13) ----------
+
+    const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+    caso("A1 Cor e logo: contraste com o texto branco e validação", (t) => {
+      t.igual(Math.round(Util.contraste("#000000", "#ffffff")), 21, "preto × branco = 21:1");
+      t.igual(Util.contraste("#ffffff", "#ffffff"), 1, "branco × branco = 1:1");
+      t.verdadeiro(Util.corLegivelComBranco("#0d3b66"), "o azul padrão é legível com branco");
+      t.verdadeiro(!Util.corLegivelComBranco("#ffff00") && !Util.corLegivelComBranco("#7fb8ff"), "cores claras não são");
+      t.verdadeiro(!Util.corLegivelComBranco("azul") && !Util.corLegivelComBranco("#123"), "formato inválido não é");
+      t.igual(Estado.validarAparencia({ cor: "#8B0000", logo: LOGO }), { cor: "#8b0000", logo: LOGO }, "cor normalizada em minúsculas, logo aceito");
+      t.igual(Estado.validarAparencia({ cor: "#ffff00", logo: LOGO }), { cor: null, logo: LOGO }, "cor clara demais vira null");
+      t.igual(Estado.validarAparencia({ cor: "#8b0000", logo: "data:image/svg+xml;base64,PHN2Zz4=" }), { cor: "#8b0000", logo: null },
+        "logo SVG (pode ter script) é recusado");
+      t.igual(Estado.validarAparencia({ logo: `data:image/png;base64,${"A".repeat(Estado.MAX_CARACTERES_LOGO)}` }), null, "logo grande demais: nada sobra");
+      t.igual([Estado.validarAparencia(null), Estado.validarAparencia({}), Estado.validarAparencia("x")], [null, null, null], "sem aparência: null");
+      t.igual(Estado.estadoInicial().aparencia, null, "campeonato novo usa o padrão");
+    });
+
+    caso("A2 Aparência fica fora do desfazer, mas acompanha o campeonato (salvar, exportar, importar, resetar)", (t) => {
+      const arm = memoria2026();
+      const est = criarEstado(arm);
+      lancar(est, "j1", placar(2, 1));
+      t.verdadeiro(est.definirAparencia({ cor: "#8b0000", logo: LOGO }), "definir devolve true");
+      t.verdadeiro(!est.definirAparencia({ cor: "#8B0000", logo: LOGO }), "a mesma aparência de novo: nada muda");
+      t.igual(est.ultimaAcao(), "teste j1", "não entra no desfazer");
+      est.desfazer();
+      t.igual(est.aparencia(), { cor: "#8b0000", logo: LOGO }, "desfazer uma ação comum não tira a cor");
+      t.igual(criarEstado(arm).aparencia(), { cor: "#8b0000", logo: LOGO }, "reabrir recupera a aparência");
+      t.verdadeiro(est.definirAparencia({ cor: "#ffffff" }) && est.aparencia() === null, "cor ilegível sozinha volta ao padrão");
+      est.definirAparencia({ cor: "#8b0000", logo: LOGO });
+
+      const texto = est.exportarJSON();
+      t.igual(JSON.parse(texto).aparencia, { cor: "#8b0000", logo: LOGO }, "o backup leva a aparência");
+      est.resetar();
+      t.igual(est.aparencia(), null, "resetar volta ao padrão");
+      est.desfazer();
+      t.igual(est.aparencia(), { cor: "#8b0000", logo: LOGO }, "desfazer o reset devolve a aparência");
+
+      const outro = criarEstado(memoria2026());
+      outro.definirAparencia({ cor: "#004d40" });
+      lancar(outro, "j2", placar(1, 0)); // conteúdo diferente do arquivo: a importação entra no desfazer
+      outro.importarJSON(texto);
+      t.igual(outro.aparencia(), { cor: "#8b0000", logo: LOGO }, "importar traz a aparência do arquivo");
+      outro.desfazer();
+      t.igual(outro.aparencia(), { cor: "#004d40", logo: null }, "desfazer a importação devolve a de antes");
+
+      const semAparencia = JSON.parse(texto);
+      delete semAparencia.aparencia;
+      t.igual(Estado.validarEstado(semAparencia).aparencia, null, "backup antigo (sem aparência) usa o padrão");
+    });
+
+    caso("A3 Modelo de campeonato: exportar e criar edição a partir dele", (t) => {
+      const arm = memoria2026();
+      const camps = Campeonatos.criar(arm);
+      const a = camps.ativo();
+      const est = Estado.criar(arm, camps.chaveAtiva());
+      lancar(est, "j1", placar(2, 1));
+      est.definirAparencia({ cor: "#8b0000", logo: LOGO });
+
+      const texto = camps.exportarModelo(a);
+      const modelo = JSON.parse(texto);
+      t.igual([modelo.tipo, modelo.versao], [Estado.TIPO_MODELO, 1], "tipo e versão do modelo");
+      t.igual(modelo.campeonato.nome, "Copa de teste", "leva o nome");
+      t.igual(modelo.campeonato.jogadores.length, 32, "e os jogadores");
+      t.igual(modelo.aparencia, { cor: "#8b0000", logo: LOGO }, "e a aparência");
+      t.verdadeiro(!("jogos" in modelo) && !("sorteio" in modelo.campeonato) && !("historico" in modelo), "sem jogos, calendário nem desfazer");
+
+      const novo = camps.criarDeModelo(texto);
+      const criada = edicaoGuardada(arm, novo);
+      t.igual(camps.ativo(), novo, "a edição criada vira a ativa");
+      t.igual(criada.campeonato.config, est.atual().campeonato.config, "mesma configuração");
+      t.igual(criada.campeonato.jogadores, est.atual().campeonato.jogadores, "mesmos jogadores");
+      t.igual(criada.aparencia, { cor: "#8b0000", logo: LOGO }, "mesma aparência");
+      t.igual([criada.campeonato.sorteio, criada.jogos, criada.mataMata, criada.historico, criada.ultimoBackup],
+        [null, [], null, [], null], "sem calendário, jogos, mata-mata, desfazer nem registro de backup");
+
+      const antes = camps.listar().length;
+      const ruins = [
+        "{ quebrado",
+        est.exportarJSON(),
+        JSON.stringify({ ...modelo, tipo: "outro" }),
+        JSON.stringify({ ...modelo, versao: 99 }),
+        JSON.stringify({ ...modelo, campeonato: null }),
+        JSON.stringify({ ...modelo, campeonato: { ...modelo.campeonato, config: { ...modelo.campeonato.config, semanas: 0 } } }),
+      ];
+      for (const ruim of ruins) {
+        let erro = null;
+        try { camps.criarDeModelo(ruim); } catch (e) { erro = e; }
+        t.verdadeiro(erro, `arquivo inválido recusado (${erro && erro.message})`);
+      }
+      t.igual([camps.listar().length, camps.ativo()], [antes, novo], "nenhuma edição criada e a ativa não muda");
+      let erro = null;
+      try { camps.exportarModelo("naoexiste"); } catch (e) { erro = e; }
+      t.verdadeiro(erro, "exportar modelo de edição desconhecida: erro");
+    });
+
+    caso("A4 Duplicar leva a aparência", (t) => {
+      const arm = memoria2026();
+      const camps = Campeonatos.criar(arm);
+      const a = camps.ativo();
+      Estado.criar(arm, camps.chaveAtiva()).definirAparencia({ cor: "#004d40", logo: LOGO });
+      t.igual(edicaoGuardada(arm, camps.duplicar(a)).aparencia, { cor: "#004d40", logo: LOGO }, "a cópia tem a mesma cor e logo");
+      t.igual(edicaoGuardada(arm, camps.novo()).aparencia, null, "campeonato novo: padrão");
+    });
+
+    caso("A5 Cor do campeonato no PNG e no telão", (t) => {
+      const tabela = classificar({});
+      const png = Exportar.desenharClassificacao(tabela, { geradoEm: new Date(), lancados: 0, totalJogos: 7, cor: "#8b0000" });
+      t.igual(pixel(png, 10, 10), [139, 0, 0], "faixa do cabeçalho do PNG na cor do campeonato");
+      const mm = Exportar.desenharMataMata(Regras.resolverMataMata(Regras.gerarMataMata(tabela), tabela), nomePorId,
+        { geradoEm: new Date(), cor: "#8b0000" });
+      t.igual(pixel(mm, 10, 10), [139, 0, 0], "PNG do mata-mata também");
+
+      const est = criarEstado();
+      est.definirAparencia({ cor: "#8b0000", logo: LOGO });
+      const raiz = document.createElement("div");
+      raiz.id = "telao";
+      raiz.hidden = true;
+      document.body.appendChild(raiz);
+      const telao = Telao.criar(est);
+      try {
+        telao.abrir({ telaCheia: false });
+        t.verdadeiro(raiz.style.getPropertyValue("--telao-fundo").includes("#8b0000"), "fundo do telão a partir da cor");
+        t.igual(raiz.querySelector(".telao-logo") && raiz.querySelector(".telao-logo").getAttribute("src"), LOGO, "logo no topo do telão");
+        est.definirAparencia(null);
+        t.verdadeiro(!raiz.style.getPropertyValue("--telao-fundo") && !raiz.querySelector(".telao-logo"), "sem aparência: fundo e topo padrão");
+      } finally {
+        telao.fechar();
+        raiz.remove();
+      }
+    });
+
     // Execução e relatório
     let passaram = 0, falharam = 0, pendentes = 0;
     const container = document.getElementById("casos");

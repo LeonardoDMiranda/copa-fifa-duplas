@@ -233,9 +233,15 @@
         conteudo = telaMataMata(Regras.resolverMataMata(atual.mataMata, tabela, config));
       }
 
+      // Cor do campeonato: vira o fundo, escurecida para os verdes e o âmbar continuarem legíveis.
+      const aparencia = estado.aparencia() || {};
+      if (aparencia.cor) raiz.style.setProperty("--telao-fundo", `color-mix(in srgb, ${aparencia.cor} 45%, #050b12)`);
+      else raiz.style.removeProperty("--telao-fundo");
+
       raiz.classList.toggle("pausado", pausado);
       raiz.replaceChildren(
         el("header", { class: "telao-topo" },
+          aparencia.logo && el("img", { class: "telao-logo", src: aparencia.logo, alt: "" }),
           el("span", { class: "marca" }, atual.campeonato.nome),
           el("span", { class: "titulo", id: "telao-titulo" }, titulo,
             complemento && el("small", {}, ` · ${complemento}`)),
