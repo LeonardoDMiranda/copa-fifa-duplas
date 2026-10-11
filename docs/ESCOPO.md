@@ -76,6 +76,24 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
 
 - Entradas: jogadores, jogos por jogador (padrão 6) e semanas (padrão 8). Jogadores × jogos por jogador precisa ser divisível por 4.
 - Obrigatório: todos com o mesmo número de jogos, no máximo 1 jogo por jogador por semana e nenhum parceiro repetido. Desejável: não repetir adversário.
+- **Nível (estrelas):** cada jogador tem de 1 a 5 estrelas; o sorteio só libera com todos definidos. Desejável, além de não repetir adversário:
+  - **jogo equilibrado:** diferença posição a posição, |forte − forte| + |fraco − fraco|. **Aceitável: até 1 estrela** (`Regras.DIFERENCA_ACEITAVEL`). Ex.: 5+4 × 5+4 = 0 e 5+5 × 5+4 = 1 são aceitáveis; 5+5 × 4+4 = 2 e 5+1 × 3+3 = 4 ficam fora;
+  - duplas fortes (5+5) ou fracas (2+1) são normais, desde que o jogo seja parelho;
+  - **saldo de estrelas** de cada jogador na temporada perto de zero.
+- O sorteio minimiza um custo único (`Regras.custoDoCalendario`):
+  - 1 estrela de diferença num jogo = 8;
+  - jogo fora do aceitável = 8 × d² + 100;
+  - adversário repetido = 12;
+  - saldo = 1 por unidade ao quadrado.
+
+  Prioridade (regulamento): o equilíbrio vem antes de evitar adversário repetido. Por isso um jogo fora do aceitável (132 com d = 2) custa mais que repetir um adversário, inclusive num 3º encontro (48). Entre um jogo com Δ 1 (8) e um adversário repetido (12), o sorteio fica com o Δ 1.
+
+  Medido em 40 sorteios de 32 jogadores × 6 jogos × 8 semanas (grupo misto e grupo forte):
+  - nenhum jogo fora do aceitável;
+  - saldo de até ±3;
+  - 1 a 10 pares de adversários repetidos;
+  - menos de 1 s por sorteio.
+- As estrelas aparecem só para o organizador (aba Jogadores e Calendário), nunca no telão, nos PNGs, nas rodadas ou na classificação. O Calendário mostra `★N` em cada nome, "Δ N" nos jogos com diferença e uma linha de equilíbrio. Tudo isso é informativo, nunca violação.
 - O sorteio usa uma **semente**: a mesma semente gera o mesmo calendário. O organizador pode sortear de novo e trocar jogadores à mão antes de **confirmar**.
 - Depois de confirmado, o calendário vira os jogos (`s<semana>-j<n>`) e o cadastro trava: só dá para renomear jogadores.
 
@@ -117,7 +135,7 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
   campeonato: {
     nome: "Copa FIFA em Duplas",
     config: { pontosVitoria, pontosEmpate, pontosEmpateSemGols, vagasFaseFinal, jogosPorJogador, semanas },
-    jogadores: [ { id, nome } ],
+    jogadores: [ { id, nome, estrelas: 1..5 | null } ],   // null = nível ainda não definido
     sorteio: null | { semente, confirmado, rascunho?: [ { semana, dupla1, dupla2 } ] }
   },
   jogos: [ { id, semana, dupla1: [id, id], dupla2: [id, id],
@@ -141,8 +159,8 @@ Nome e situação de cada edição ("cadastro", "semana 5 de 8", "fase final", "
 
 Uma aba por etapa (teclas 1 a 5; a aba ativa fica no endereço, ex.: `index.html#rodadas`). Sem `#`, abre na aba da etapa do campeonato; depois a aba só muda por escolha do organizador (e ao confirmar o calendário, que leva a Rodadas).
 
-1. **Jogadores**: nome, jogos por jogador, semanas, aparência (cor e logo), diagnóstico da combinação e cadastro (um nome por linha; renomear e remover).
-2. **Calendário**: sortear, conferir as restrições, trocar jogadores à mão e confirmar.
+1. **Jogadores**: nome, jogos por jogador, semanas, aparência (cor e logo), diagnóstico da combinação e cadastro (um nome por linha; renomear, remover e nível de 1 a 5 estrelas).
+2. **Calendário**: sortear, conferir as restrições e o equilíbrio por nível, trocar jogadores à mão e confirmar.
 3. **Rodadas**: navegação por semana, cartões dos jogos com placar, "W.O.", "Anular" e "Limpar"; quem descansa na semana; agenda do jogador; top 8 ao vivo ao lado.
 4. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual. Ao lado, **o que está em jogo**: Garantidos / Em disputa / Eliminados.
 5. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
@@ -166,6 +184,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 11 | Janelas de confirmação próprias, tema escuro (segue o sistema), telas vazias com o próximo passo e foco visível |
 | 12 | Várias edições: seletor no cabeçalho, tela de Campeonatos (novo, duplicar, arquivar, excluir), importar como novo e migração automática |
 | 15 (parte 1) | Aparência por edição (cor e logo no cabeçalho, telão e PNGs) e modelo de campeonato (exportar e criar edição a partir dele) |
+| 16 | Nível dos jogadores (1 a 5 estrelas) e sorteio equilibrado por nível |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -187,6 +206,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | B | Lembrete e registro de backup |
 | E | Várias edições: migração, índice corrompido, criar/duplicar/arquivar/excluir, trocar a ativa, importar como novo ou substituindo |
 | A | Aparência (contraste, validação, fora do desfazer, backup/reset/importar), modelo de campeonato, duplicar com aparência, cor no PNG e no telão |
+| L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
 
 ## 7. Pendências
 

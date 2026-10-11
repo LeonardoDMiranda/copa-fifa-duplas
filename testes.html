@@ -57,6 +57,8 @@
     function classificar(resultados, desempates = desempatesDaBase(classificacaoBase)) {
       return Regras.calcularClassificacao(classificacaoBase, jogosCom(resultados), desempates);
     }
+    // Estrelas fictícias (1 a 5, em rodízio): o sorteio exige que todos tenham nível.
+    function comEstrelas(jogadores) { return jogadores.map((j, i) => ({ ...j, estrelas: (i % 5) + 1 })); }
     function linha(tabela, id) { return tabela.find((l) => l.id === id); }
     function baseDe(id) { return classificacaoBase.find((l) => l.id === id); }
 
@@ -221,7 +223,7 @@
         campeonato: {
           nome: "Copa de teste",
           config: { ...Regras.REGRAS_PADRAO },
-          jogadores: classificacaoBase.map((l) => ({ id: l.id, nome: l.nome })),
+          jogadores: comEstrelas(classificacaoBase.map((l) => ({ id: l.id, nome: l.nome }))),
           sorteio: null,
         },
         jogos: jogosSexta.map((j) => ({ id: j.id, semana: 1, dupla1: j.dupla1.slice(), dupla2: j.dupla2.slice(), resultado: null })),
@@ -917,7 +919,7 @@
     });
 
     caso("C4 Diagnóstico do campeonato (jogadores × jogos por jogador × semanas)", (t) => {
-      const jogadoresDe = (n) => Array.from({ length: n }, (_, i) => ({ id: `j${i}`, nome: `J${i}` }));
+      const jogadoresDe = (n) => comEstrelas(Array.from({ length: n }, (_, i) => ({ id: `j${i}`, nome: `J${i}` })));
       const ok = Regras.diagnosticarCampeonato(jogadoresDe(32));
       t.campos(ok, { jogadores: 32, totalJogos: 48, jogosPorSemanaMin: 6, jogosPorSemanaMax: 6, pronto: true }, "32 × 6 × 8");
       t.igual(ok.problemas, [], "sem problemas");
@@ -945,7 +947,7 @@
 
     // ---------- Sorteio do calendário (Fase 9) ----------
 
-    const jogadoresFicticios = (n) => Array.from({ length: n }, (_, i) => ({ id: `j${i}`, nome: `J${i}` }));
+    const jogadoresFicticios = (n) => comEstrelas(Array.from({ length: n }, (_, i) => ({ id: `j${i}`, nome: `J${i}` })));
     const configDe = (jogosPorJogador, semanas) => ({ ...Regras.REGRAS_PADRAO, jogosPorJogador, semanas });
     const sortear = (jogadores, jogosPorJogador, semanas, semente) => Regras.gerarCalendario(jogadores, { jogosPorJogador, semanas, semente });
 
@@ -956,7 +958,7 @@
     });
 
     caso("S2 Sorteio 32 jogadores × 6 jogos × 8 semanas respeita o regulamento", (t) => {
-      const jogadores = classificacaoBase.map((l) => ({ id: l.id, nome: l.nome }));
+      const jogadores = comEstrelas(classificacaoBase.map((l) => ({ id: l.id, nome: l.nome })));
       for (const semente of [1, 2, 3, 12345, 987654321]) {
         const r = sortear(jogadores, 6, 8, semente);
         t.verdadeiro(r.calendario && !r.erro, `semente ${semente}: gerou calendário`);
@@ -966,7 +968,8 @@
         t.igual([a.minJogos, a.maxJogos], [6, 6], `semente ${semente}: todos com 6 jogos`);
         t.igual(a.jogosPorSemana, [6, 6, 6, 6, 6, 6, 6, 6], `semente ${semente}: 6 jogos por semana`);
         t.igual(a.parceirosRepetidos, [], `semente ${semente}: nenhum parceiro repetido`);
-        t.verdadeiro(a.adversariosRepetidos.pares <= 2, `semente ${semente}: adversários repetidos ${a.adversariosRepetidos.pares} (≤ 2)`);
+        // Com o equilíbrio por nível, algumas repetições de adversário são o preço de jogos parelhos.
+        t.verdadeiro(a.adversariosRepetidos.pares <= 10, `semente ${semente}: adversários repetidos ${a.adversariosRepetidos.pares} (≤ 10)`);
       }
     });
 
@@ -1139,7 +1142,7 @@
       const tabela = Regras.calcularClassificacao(baseZerada(), poucos);
       const aviso = Regras.avisosParaGerarChaveamento(poucos, tabela).find((a) => a.includes("sem resultado"));
       t.verdadeiro(aviso.includes("j1") && aviso.includes("j7"), `poucos pendentes: lista os ids (${aviso})`);
-      const jogadores = classificacaoBase.map((l) => ({ id: l.id, nome: l.nome }));
+      const jogadores = comEstrelas(classificacaoBase.map((l) => ({ id: l.id, nome: l.nome })));
       const jogos = Regras.calendarioParaJogos(Regras.gerarCalendario(jogadores, { jogosPorJogador: 6, semanas: 8, semente: 5 }).calendario);
       const muitos = Regras.avisosParaGerarChaveamento(jogos, Regras.calcularClassificacao(baseZerada(), jogos)).find((a) => a.includes("sem resultado"));
       t.verdadeiro(muitos.startsWith("48 jogo(s)") && muitos.includes("semana 1: 6") && muitos.includes("semana 8: 6"), `muitos pendentes: resume por semana (${muitos})`);
@@ -1645,6 +1648,99 @@
         telao.fechar();
         raiz.remove();
       }
+    });
+
+    // ---------- Nível dos jogadores e sorteio equilibrado (Fase 16) ----------
+
+    caso("L1 Estrelas: validação, definir e jogadores sem nível", (t) => {
+      t.verdadeiro([1, 2, 3, 4, 5].every(Regras.validarEstrelas), "1 a 5 são válidas");
+      t.verdadeiro(![0, 6, 2.5, "3", null, undefined].some(Regras.validarEstrelas), "0, 6, 2,5, texto e vazio não são");
+      const lista = [{ id: "ana", nome: "Ana", estrelas: null }, { id: "bia", nome: "Bia", estrelas: 2 }];
+      t.igual(Regras.definirEstrelas(lista, "ana", 4).jogadores[0], { id: "ana", nome: "Ana", estrelas: 4 }, "define as estrelas");
+      t.verdadeiro(Regras.definirEstrelas(lista, "ana", 6).erro && Regras.definirEstrelas(lista, "zzz", 3).erro, "valor inválido ou jogador inexistente: erro");
+      t.igual(lista[0].estrelas, null, "lista original intacta");
+      t.igual(Regras.renomearJogador(lista, "bia", "Bia Exemplo").jogadores[1].estrelas, 2, "renomear mantém as estrelas");
+      t.igual(Regras.adicionarJogadores([], ["Caio"]).jogadores[0].estrelas, null, "jogador novo entra sem estrelas");
+      t.igual(Regras.jogadoresSemEstrelas(lista).map((j) => j.id), ["ana"], "lista quem falta");
+
+      const camp = Estado.validarEstado(dadosV2((d) => {
+        d.campeonato.jogadores[0].estrelas = 9;
+        delete d.campeonato.jogadores[1].estrelas;
+      })).campeonato;
+      t.igual([camp.jogadores[0].estrelas, camp.jogadores[1].estrelas, camp.jogadores[2].estrelas], [null, null, 3],
+        "importar: estrela inválida ou ausente fica a definir; válida é mantida");
+    });
+
+    caso("L2 Sorteio só libera com todos os jogadores com estrelas", (t) => {
+      const jogadores = comEstrelas(Array.from({ length: 32 }, (_, i) => ({ id: `j${i}`, nome: `J${i}` })));
+      t.verdadeiro(Regras.diagnosticarCampeonato(jogadores).pronto, "todos com estrelas: pronto");
+      const faltando = jogadores.map((j, i) => (i < 2 ? { ...j, estrelas: null } : j));
+      const diag = Regras.diagnosticarCampeonato(faltando);
+      t.verdadeiro(!diag.pronto && diag.problemas.some((p) => p.includes("2 jogador(es): J0, J1")), `faltando: ${diag.problemas.join(" ")}`);
+      const r = Regras.gerarCalendario(faltando, { jogosPorJogador: 6, semanas: 8, semente: 1 });
+      t.verdadeiro(r.erro && r.erro.includes("estrelas") && !r.calendario, "gerarCalendario recusa");
+      t.igual(Regras.avaliarCalendario(faltando, [], configDe(6, 8)).equilibrio, null, "sem estrelas de todos, o equilíbrio não é avaliado");
+    });
+
+    caso("L3 Diferença entre duplas, posição a posição", (t) => {
+      const e = new Map([["a5", 5], ["b5", 5], ["c4", 4], ["d3", 3], ["e3", 3], ["f2", 2], ["g1", 1], ["h1", 1]]);
+      t.igual(Regras.diferencaDoJogo(["a5", "g1"], ["b5", "h1"], e), 0, "5+1 × 5+1 = 0");
+      t.igual(Regras.diferencaDoJogo(["c4", "f2"], ["a5", "g1"], e), 2, "4+2 × 5+1 = 2");
+      t.igual(Regras.diferencaDoJogo(["g1", "a5"], ["d3", "e3"], e), 4, "5+1 × 3+3 = 4 (a ordem na dupla não importa)");
+      t.igual(Regras.diferencaDoJogo(["a5", "b5"], ["g1", "h1"], e), 8, "5+5 × 1+1 = 8");
+      const e2 = new Map([["a5", 5], ["b5", 5], ["c5", 5], ["d4", 4], ["e4", 4], ["f4", 4], ["g2", 2], ["h2", 2], ["i2", 2], ["j1", 1]]);
+      t.igual(Regras.diferencaDoJogo(["c5", "d4"], ["a5", "e4"], e2), 0, "5+4 × 5+4 = 0 (aceitável)");
+      t.igual(Regras.diferencaDoJogo(["a5", "b5"], ["c5", "d4"], e2), 1, "5+5 × 5+4 = 1 (aceitável)");
+      t.igual(Regras.diferencaDoJogo(["g2", "h2"], ["i2", "j1"], e2), 1, "2+2 × 2+1 = 1 (aceitável)");
+      t.igual(Regras.diferencaDoJogo(["a5", "b5"], ["d4", "e4"], e2), 2, "5+5 × 4+4 = 2 (fora do aceitável)");
+      t.igual(Regras.DIFERENCA_ACEITAVEL, 1, "aceitável: até 1 estrela de diferença");
+      const aval = Regras.avaliarCalendario(
+        [...e2].map(([id, estrelas]) => ({ id, nome: id, estrelas })),
+        [{ semana: 1, dupla1: ["a5", "b5"], dupla2: ["c5", "d4"] }, { semana: 2, dupla1: ["a5", "b5"], dupla2: ["e4", "f4"] }],
+        configDe(1, 2)).equilibrio;
+      t.campos(aval, { aceitaveis: 1, foraDoAceitavel: 1, perfeitos: 0, maiorDiferenca: 2 }, "avaliarCalendario conta aceitáveis e fora do aceitável");
+    });
+
+    caso("L4 Sorteio equilibrado: todos os jogos aceitáveis e saldo perto de zero", (t) => {
+      const niveis = [...Array(6).fill(1), ...Array(6).fill(2), ...Array(8).fill(3), ...Array(6).fill(4), ...Array(6).fill(5)];
+      const jogadores = niveis.map((estrelas, i) => ({ id: `p${i}`, nome: `P${i}`, estrelas }));
+      const neutros = jogadores.map((j) => ({ ...j, estrelas: 3 }));
+      const cfg = configDe(6, 8);
+      const e = Regras.estrelasPorId(jogadores);
+      for (const semente of [1, 2, 3]) {
+        const inicio = Date.now();
+        const cal = Regras.gerarCalendario(jogadores, { jogosPorJogador: 6, semanas: 8, semente }).calendario;
+        const ms = Date.now() - inicio;
+        const a = Regras.avaliarCalendario(jogadores, cal, cfg);
+        const q = a.equilibrio;
+        const base = Regras.avaliarCalendario(jogadores, Regras.gerarCalendario(neutros, { jogosPorJogador: 6, semanas: 8, semente }).calendario, cfg).equilibrio;
+        const media = (eq) => eq.porJogo.reduce((s, d) => s + d, 0) / eq.porJogo.length;
+        t.verdadeiro(a.pronto, `semente ${semente}: regulamento respeitado ${a.violacoes.slice(0, 2).join("; ")}`);
+        t.verdadeiro(media(q) <= 0.6 && media(q) < media(base) / 3,
+          `semente ${semente}: diferença média ${media(q).toFixed(2)} (sem estrelas: ${media(base).toFixed(2)})`);
+        t.verdadeiro(q.maiorDiferenca <= 1, `semente ${semente}: maior diferença ${q.maiorDiferenca} (sem estrelas: ${base.maiorDiferenca})`);
+        t.verdadeiro(a.adversariosRepetidos.pares <= 10, `semente ${semente}: adversários repetidos ${a.adversariosRepetidos.pares} (≤ 10)`);
+        t.igual(q.foraDoAceitavel, 0, `semente ${semente}: nenhum jogo fora do aceitável (sem estrelas: ${base.foraDoAceitavel})`);
+        t.verdadeiro(Math.abs(q.maiorSaldo.saldo) <= 3, `semente ${semente}: maior saldo de estrelas ${q.maiorSaldo.saldo} (sem estrelas: ${base.maiorSaldo.saldo})`);
+        t.verdadeiro(ms < 2500, `semente ${semente}: ${ms} ms (< 2,5 s)`);
+      }
+    });
+
+    caso("L5 Estrelas no estado: salvas, desfeitas, levadas por duplicar e pelo modelo", (t) => {
+      const arm = memoria2026();
+      const camps = Campeonatos.criar(arm);
+      const a = camps.ativo();
+      const est = Estado.criar(arm, camps.chaveAtiva());
+      const id = est.atual().campeonato.jogadores[0].id;
+      est.modificar("estrelas", (s) => { s.campeonato.jogadores = Regras.definirEstrelas(s.campeonato.jogadores, id, 5).jogadores; });
+      t.igual(Estado.criar(arm, camps.chaveAtiva()).atual().campeonato.jogadores[0].estrelas, 5, "reabrir recupera as estrelas");
+      const copia = edicaoGuardada(arm, camps.duplicar(a));
+      t.igual(copia.campeonato.jogadores[0].estrelas, 5, "duplicar leva as estrelas");
+      t.igual(JSON.parse(camps.exportarModelo(a)).campeonato.jogadores[0].estrelas, 5, "o modelo leva as estrelas");
+      camps.abrir(a);
+      est.trocarChave(camps.chaveAtiva());
+      est.desfazer();
+      t.igual(est.atual().campeonato.jogadores[0].estrelas, 1, "desfazer volta ao valor anterior");
     });
 
     // Execução e relatório

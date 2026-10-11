@@ -9,6 +9,17 @@
     const { estado, nomePorId, avisar, renderizar, cadastroTravado } = app;
 
     let editandoSlot = null; // { indice, lado, pos } do jogador do rascunho em troca
+    let nivelPorId = new Map(); // id -> estrelas (ou null), refeito a cada desenho
+
+    // Estrelas ao lado do nome: só nesta tela e na de jogadores (nunca no telão nem nos PNGs).
+    function nivel(id) {
+      const e = nivelPorId.get(id);
+      return Regras.validarEstrelas(e) ? e : null;
+    }
+    function marcaNivel(id) {
+      const e = nivel(id);
+      return e ? el("small", { class: "nivel" }, `★${e}`) : null;
+    }
 
     async function sortear() {
       if (cadastroTravado()) return;
@@ -19,9 +30,15 @@
         // Outra janela pode ter mudado o campeonato enquanto a pergunta estava aberta.
         if (!ok || cadastroTravado() || estado.atual().campeonato.sorteio !== anterior) return;
       }
+      // O sorteio leva cerca de 1 s: mostra que está trabalhando antes de começar a conta.
+      const botao = document.getElementById("btn-sortear");
+      if (botao) { botao.disabled = true; botao.textContent = "🎲 Sorteando…"; }
+      await new Promise((resolver) => setTimeout(resolver, 30));
+      if (cadastroTravado()) return;
       const { jogadores, config: cfg } = estado.atual().campeonato;
       const semente = Math.floor(Math.random() * 2147483646) + 1;
       const r = Regras.gerarCalendario(jogadores, { jogosPorJogador: cfg.jogosPorJogador, semanas: cfg.semanas, semente });
+      renderizar(); // devolve o botão ao normal (também quando dá erro)
       if (r.erro) {
         avisar(r.erro, "erro");
         return;
@@ -86,7 +103,7 @@
       },
         jogadores.map(([id, nome]) => {
           const onde = doJogo.get(id);
-          let rotulo = nome;
+          let rotulo = nivel(id) ? `${nome} ★${nivel(id)}` : nome;
           if (id === atualId) rotulo += " (atual)";
           else if (onde) rotulo += ` — joga no jogo ${onde.numero} (trocam de lugar)`;
           else rotulo += " — descansa nesta semana";
@@ -101,15 +118,26 @@
           seletorDeJogador(calendario, indice, lado, pos),
           el("button", { type: "button", class: "discreto mini", onclick: () => { editandoSlot = null; renderizar(); } }, "Cancelar"));
       }
-      if (!editavel) return el("span", { class: "nome" }, nomePorId.get(id));
+      if (!editavel) return el("span", { class: "nome" }, nomePorId.get(id), nivel(id) ? " " : null, marcaNivel(id));
       return el("button", {
         type: "button", class: "nome-slot", title: `Trocar ${nomePorId.get(id)}`,
         id: `slot-${indice}-${lado}-${pos}`,
         onclick: () => { editandoSlot = { indice, lado, pos }; app.focarDepois("troca-jogador"); renderizar(); },
-      }, nomePorId.get(id));
+      }, nomePorId.get(id), nivel(id) ? " " : null, marcaNivel(id));
     }
 
-    function semanaDoCalendario(calendario, semana, editavel) {
+    // Diferença de nível do jogo (posição a posição); nada quando é 0 ou não dá para calcular.
+    function marcaDiferenca(diferenca) {
+      if (!diferenca) return null;
+      const fora = diferenca > Regras.DIFERENCA_ACEITAVEL;
+      return el("span", {
+        class: `diferenca${fora ? " alta" : ""}`,
+        title: `Diferença de nível entre as duplas: ${diferenca} estrela(s), comparando o mais forte com o mais forte e o mais fraco com o mais fraco`
+          + (fora ? ". Fora do aceitável (máximo de 1)." : ""),
+      }, `Δ ${diferenca}`);
+    }
+
+    function semanaDoCalendario(calendario, semana, editavel, diferencas) {
       const doJogo = calendario.map((j, i) => ({ j, i })).filter(({ j }) => j.semana === semana);
       const jogam = new Set(doJogo.flatMap(({ j }) => [...j.dupla1, ...j.dupla2]));
       const descansam = [...nomePorId].filter(([id]) => !jogam.has(id)).map(([, nome]) => nome);
@@ -118,13 +146,14 @@
         el("ol", {}, doJogo.map(({ j, i }) => el("li", {},
           nomeNoCalendario(calendario, i, 1, 0, editavel), " + ", nomeNoCalendario(calendario, i, 1, 1, editavel),
           el("span", { class: "x" }, " × "),
-          nomeNoCalendario(calendario, i, 2, 0, editavel), " + ", nomeNoCalendario(calendario, i, 2, 1, editavel)))),
+          nomeNoCalendario(calendario, i, 2, 0, editavel), " + ", nomeNoCalendario(calendario, i, 2, 1, editavel),
+          diferencas ? marcaDiferenca(diferencas[i]) : null))),
         descansam.length
           ? el("p", { class: "descansam" }, `Descansam (${descansam.length}): ${descansam.join(", ")}`)
           : null);
     }
 
-    function painelQualidade(aval, cfg) {
+    function painelQualidade(aval, cfg, confirmado) {
       const porSemana = aval.jogosPorSemana.join(" · ");
       return el("div", { class: "qualidade", id: "qualidade-calendario" },
         aval.pronto
@@ -135,7 +164,24 @@
           aval.adversariosRepetidos.pares
             ? `Adversários repetidos: ${aval.adversariosRepetidos.pares} par(es), no máximo ${aval.adversariosRepetidos.maxVezes} vezes (o sorteio evita, mas pode acontecer).`
             : "Adversários repetidos: nenhum.",
-          ` Jogos por semana: ${porSemana}.`));
+          ` Jogos por semana: ${porSemana}.`),
+        linhaEquilibrio(aval.equilibrio, confirmado));
+    }
+
+    function linhaEquilibrio(eq, confirmado) {
+      if (!eq) {
+        // Confirmado sem estrelas (campeonato de antes delas): o cadastro já travou, não dá mais para definir.
+        return el("p", { class: "legenda", id: "equilibrio-calendario" }, confirmado
+          ? "Equilíbrio por nível: não avaliado (o calendário foi confirmado sem as estrelas de todos os jogadores)."
+          : "Equilíbrio por nível: defina as estrelas de todos os jogadores na aba Jogadores para ver.");
+      }
+      const saldo = eq.maiorSaldo ? `${eq.maiorSaldo.saldo > 0 ? "+" : ""}${eq.maiorSaldo.saldo} (${eq.maiorSaldo.nome})` : "0";
+      const total = eq.aceitaveis + eq.foraDoAceitavel;
+      return el("p", { class: `equilibrio${eq.foraDoAceitavel ? " alerta" : ""}`, id: "equilibrio-calendario" },
+        el("strong", {}, "Equilíbrio por nível: "),
+        `${eq.aceitaveis} de ${total} jogo(s) aceitáveis (diferença de até ${Regras.DIFERENCA_ACEITAVEL} estrela; ${eq.perfeitos} sem diferença)`,
+        eq.foraDoAceitavel ? `, ${eq.foraDoAceitavel} fora do aceitável (maior diferença: ${eq.maiorDiferenca})` : "",
+        `. Maior saldo de estrelas na temporada: ${saldo}.`);
     }
 
     function renderizarCalendario(atual) {
@@ -143,6 +189,7 @@
       const confirmado = Regras.cadastroTravado(camp, atual.jogos);
       const diag = Regras.diagnosticarCampeonato(camp.jogadores, camp.config);
       const rascunho = !confirmado && camp.sorteio ? camp.sorteio.rascunho || null : null;
+      nivelPorId = new Map(camp.jogadores.map((j) => [j.id, j.estrelas]));
       if (editandoSlot && (!rascunho || !rascunho[editandoSlot.indice])) editandoSlot = null;
 
       const resumo = document.getElementById("resumo-calendario");
@@ -153,7 +200,8 @@
 
       if (!calendario) {
         const explicacao = el("p", { class: "legenda" },
-          "Sorteia as duplas e os jogos de todas as semanas de uma vez: todos com o mesmo número de jogos, no máximo um por semana e sem repetir parceiro. Depois você pode trocar jogadores à mão e confirmar.");
+          "Sorteia as duplas e os jogos de todas as semanas de uma vez: todos com o mesmo número de jogos, no máximo um por semana e sem repetir parceiro. "
+          + "Também equilibra os jogos pelo nível (estrelas) de cada jogador. Depois você pode trocar jogadores à mão e confirmar.");
         const botaoSortear = el("button", { type: "button", id: "btn-sortear", class: "primario", disabled: !diag.pronto, onclick: sortear }, "🎲 Sortear calendário");
         if (diag.pronto) {
           alvo.replaceChildren(explicacao, botaoSortear);
@@ -176,8 +224,9 @@
               el("button", { type: "button", id: "btn-confirmar-calendario", class: "primario", onclick: confirmarCalendario }, "✔ Confirmar calendário"),
               el("button", { type: "button", id: "btn-descartar-sorteio", class: "discreto", onclick: descartarSorteio }, "Descartar"),
               el("span", { class: "legenda" }, `Semente do sorteio: ${camp.sorteio.semente}. Clique num nome para trocar o jogador.`)),
-        painelQualidade(aval, camp.config),
-        el("div", { class: "semanas-calendario" }, semanas.map((n) => semanaDoCalendario(calendario, n, !confirmado))));
+        painelQualidade(aval, camp.config, confirmado),
+        el("div", { class: "semanas-calendario" },
+          semanas.map((n) => semanaDoCalendario(calendario, n, !confirmado, aval.equilibrio && aval.equilibrio.porJogo))));
     }
 
     return {

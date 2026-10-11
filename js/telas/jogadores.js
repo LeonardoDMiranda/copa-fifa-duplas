@@ -150,6 +150,33 @@
       return el("label", { class: `campo-config ${classe}` }, rotulo, entrada);
     }
 
+    // Estrelas entram no desfazer e não descartam o rascunho do sorteio (o painel de equilíbrio
+    // do calendário só é recalculado).
+    function definirNivel(id, estrelas) {
+      if (cadastroTravado()) return;
+      const r = Regras.definirEstrelas(estado.atual().campeonato.jogadores, id, estrelas);
+      if (r.erro) { avisar(r.erro, "erro"); return; }
+      if (!estado.modificar(`estrelas de ${nomePorId.get(id)}: ${estrelas}`, (s) => { s.campeonato.jogadores = r.jogadores; })) renderizar();
+    }
+
+    function seletorDeEstrelas(jogador, travado) {
+      const valor = jogador.estrelas;
+      const rotulo = Regras.validarEstrelas(valor) ? `${valor} estrela${valor > 1 ? "s" : ""}` : "sem nível definido";
+      if (travado) {
+        return el("span", { class: "estrelas fixas", role: "img", "aria-label": `Nível de ${jogador.nome}: ${rotulo}`, title: rotulo },
+          Array.from({ length: Regras.ESTRELAS_MAX }, (_, i) => el("span", { class: `estrela${i < valor ? " cheia" : ""}`, "aria-hidden": "true" }, "★")));
+      }
+      return el("span", { class: "estrelas", role: "group", "aria-label": `Nível de ${jogador.nome}`, title: rotulo },
+        Array.from({ length: Regras.ESTRELAS_MAX }, (_, i) => {
+          const n = i + 1;
+          return el("button", {
+            type: "button", id: `estrela-${jogador.id}-${n}`, class: `estrela${n <= valor ? " cheia" : ""}`,
+            "aria-label": `${n} estrela${n > 1 ? "s" : ""}`, "aria-pressed": String(n === valor),
+            onclick: () => definirNivel(jogador.id, n),
+          }, "★");
+        }));
+    }
+
     function itemJogador(jogador, travado) {
       if (renomeando && renomeando.id === jogador.id) {
         return el("li", { class: "jogador editando" },
@@ -166,8 +193,10 @@
           el("button", { type: "button", id: `salvar-nome-${jogador.id}`, class: "primario mini", onclick: salvarRenomeacao }, "Salvar"),
           el("button", { type: "button", class: "discreto mini", onclick: () => { renomeando = null; renderizar(); } }, "Cancelar"));
       }
-      return el("li", { class: "jogador", id: `jogador-${jogador.id}` },
+      const semNivel = !Regras.validarEstrelas(jogador.estrelas);
+      return el("li", { class: `jogador${semNivel ? " sem-estrelas" : ""}`, id: `jogador-${jogador.id}` },
         el("span", { class: "nome-jogador" }, jogador.nome),
+        seletorDeEstrelas(jogador, travado),
         el("button", {
           type: "button", id: `renomear-${jogador.id}`, class: "discreto mini", title: `Renomear ${jogador.nome}`,
           onclick: () => { renomeando = { id: jogador.id, valor: jogador.nome }; app.focarDepois(`nome-${jogador.id}`); renderizar(); },
@@ -184,8 +213,9 @@
       const diag = Regras.diagnosticarCampeonato(camp.jogadores, camp.config);
       if (renomeando && !camp.jogadores.some((j) => j.id === renomeando.id)) renomeando = null;
 
+      const semNivel = Regras.jogadoresSemEstrelas(camp.jogadores).length;
       document.getElementById("resumo-jogadores").textContent =
-        `${diag.jogadores} jogador(es)${travado ? " · calendário confirmado" : ""}`;
+        `${diag.jogadores} jogador(es)${travado ? " · calendário confirmado" : semNivel ? ` · ${semNivel} sem estrelas` : ""}`;
 
       const porSemana = diag.jogosPorSemanaMin === diag.jogosPorSemanaMax
         ? `${diag.jogosPorSemanaMax}` : `${diag.jogosPorSemanaMin} a ${diag.jogosPorSemanaMax}`;
@@ -197,7 +227,8 @@
         onfocus: (ev) => ev.target.select(),
       });
 
-      document.getElementById("conteudo-jogadores").replaceChildren(
+      // replaceChildren não descarta os false (como el() faz): filtra antes.
+      document.getElementById("conteudo-jogadores").replaceChildren(...[
         el("div", { class: "config-campeonato" },
           campoConfig("nome", "Nome do campeonato", el("input", {
             id: "nome-campeonato", type: "text", maxlength: "60", autocomplete: "off", value: camp.nome,
@@ -228,9 +259,12 @@
               }, rascunhoNomes),
               el("div", { class: "acoes" },
                 el("button", { type: "button", id: "btn-adicionar-nomes", class: "primario", onclick: adicionarNomes }, "Adicionar"))),
+        camp.jogadores.length > 0 && el("p", { class: "legenda", id: "legenda-estrelas" },
+          "★ Nível de 1 a 5 estrelas: usado só para equilibrar o sorteio. Só você vê (não aparece no telão, nas imagens nem na classificação)."),
         camp.jogadores.length
           ? el("ol", { class: "lista-jogadores", id: "lista-jogadores" }, camp.jogadores.map((j) => itemJogador(j, travado)))
-          : app.proximoPasso("Nenhum jogador cadastrado ainda. Cole os nomes no campo acima, um por linha, e clique em \"Adicionar\"."));
+          : app.proximoPasso("Nenhum jogador cadastrado ainda. Cole os nomes no campo acima, um por linha, e clique em \"Adicionar\"."),
+      ].filter(Boolean));
     }
 
     return {

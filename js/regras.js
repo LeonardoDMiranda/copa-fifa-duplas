@@ -271,7 +271,7 @@
         ignorados.push({ nome, motivo: erro });
         continue;
       }
-      lista.push({ id: gerarIdJogador(nome, lista.map((j) => j.id)), nome });
+      lista.push({ id: gerarIdJogador(nome, lista.map((j) => j.id)), nome, estrelas: null });
       adicionados.push(nome);
     }
     return { jogadores: lista, adicionados, ignorados };
@@ -288,6 +288,61 @@
 
   function removerJogador(jogadores, id) {
     return jogadores.filter((j) => j.id !== id);
+  }
+
+  // ---------- Nível (estrelas) ----------
+  // De 1 a 5, definido pelo organizador; só serve ao sorteio (docs/REGULAMENTO.md, "Equilíbrio
+  // por nível"). null = ainda não definido.
+
+  const ESTRELAS_MIN = 1;
+  const ESTRELAS_MAX = 5;
+  const ESTRELAS_NEUTRAS = 3; // usado só nas contas, se faltar algum valor
+
+  function validarEstrelas(valor) {
+    return Number.isInteger(valor) && valor >= ESTRELAS_MIN && valor <= ESTRELAS_MAX;
+  }
+
+  // Retorna { jogadores } com as estrelas do jogador definidas ou { erro }.
+  function definirEstrelas(jogadores, id, estrelas) {
+    if (!jogadores.some((j) => j.id === id)) return { erro: "Jogador não encontrado." };
+    if (!validarEstrelas(estrelas)) return { erro: `Use de ${ESTRELAS_MIN} a ${ESTRELAS_MAX} estrelas.` };
+    return { jogadores: jogadores.map((j) => (j.id === id ? { ...j, estrelas } : j)) };
+  }
+
+  function jogadoresSemEstrelas(jogadores) {
+    return jogadores.filter((j) => !validarEstrelas(j.estrelas));
+  }
+
+  function estrelasPorId(jogadores) {
+    return new Map(jogadores.map((j) => [j.id, validarEstrelas(j.estrelas) ? j.estrelas : ESTRELAS_NEUTRAS]));
+  }
+
+  // Diferença entre duas duplas, posição a posição: |forte − forte| + |fraco − fraco|.
+  // Ex.: 5+5 × 5+4 = 1; 4+2 × 5+1 = 2; 5+5 × 4+4 = 2; 5+1 × 3+3 = 4; 5+5 × 1+1 = 8.
+  function diferencaDoJogo(dupla1, dupla2, estrelas) {
+    const e = (id) => estrelas.get(id) ?? ESTRELAS_NEUTRAS;
+    const [a1, a2] = [e(dupla1[0]), e(dupla1[1])];
+    const [b1, b2] = [e(dupla2[0]), e(dupla2[1])];
+    return Math.abs(Math.max(a1, a2) - Math.max(b1, b2)) + Math.abs(Math.min(a1, a2) - Math.min(b1, b2));
+  }
+
+  // Jogo aceitável: diferença de no máximo 1 estrela (docs/REGULAMENTO.md). Duplas fortes ou
+  // fracas são normais, desde que enfrentem uma parecida.
+  const DIFERENCA_ACEITAVEL = 1;
+
+  // Equilíbrio de um calendário: diferença de cada jogo e saldo de estrelas de cada jogador
+  // (soma do seu lado − soma do lado adversário, somado nos seus jogos).
+  function medirEquilibrio(calendario, estrelas) {
+    const e = (id) => estrelas.get(id) ?? ESTRELAS_NEUTRAS;
+    const saldos = new Map([...estrelas.keys()].map((id) => [id, 0]));
+    const diferencas = [];
+    for (const jogo of calendario) {
+      diferencas.push(diferencaDoJogo(jogo.dupla1, jogo.dupla2, estrelas));
+      const delta = e(jogo.dupla1[0]) + e(jogo.dupla1[1]) - e(jogo.dupla2[0]) - e(jogo.dupla2[1]);
+      for (const id of jogo.dupla1) saldos.set(id, (saldos.get(id) || 0) + delta);
+      for (const id of jogo.dupla2) saldos.set(id, (saldos.get(id) || 0) - delta);
+    }
+    return { diferencas, saldos };
   }
 
   // Depois que o calendário é confirmado (ou já há jogos), a lista de jogadores e os
@@ -316,6 +371,11 @@
     if (n > 0 && jogos > n - 1) {
       problemas.push(`Sem repetir parceiro, ${n} jogadores permitem no máximo ${n - 1} jogos por jogador.`);
     }
+    const semEstrelas = jogadoresSemEstrelas(jogadores);
+    if (semEstrelas.length) {
+      const nomes = semEstrelas.slice(0, 5).map((j) => j.nome).join(", ") + (semEstrelas.length > 5 ? ` e mais ${semEstrelas.length - 5}` : "");
+      problemas.push(`Defina as estrelas (nível de ${ESTRELAS_MIN} a ${ESTRELAS_MAX}) de ${semEstrelas.length} jogador(es): ${nomes}.`);
+    }
     return {
       jogadores: n,
       totalJogos,
@@ -331,9 +391,41 @@
   // (docs/REGULAMENTO.md): todos com o mesmo número de jogos, no máximo 1 jogo por jogador por
   // semana e nenhum parceiro repetido; adversários repetidos são evitados, mas podem acontecer.
 
-  const TENTATIVAS_SORTEIO = 40; // calendários completos construídos; fica o melhor
-  const TENTATIVAS_SEMANA = 40; // formas de montar cada semana; fica a melhor
-  const MELHORAS_POR_TENTATIVA = 60;
+  // Poucas tentativas, mas cada uma bem melhorada (trocas locais): mais eficiente que muitas
+  // tentativas pouco melhoradas. Medido com 32 jogadores × 6 jogos × 8 semanas: ~1 s por sorteio.
+  const TENTATIVAS_SORTEIO = 8; // calendários completos construídos; fica o melhor
+  const TENTATIVAS_SEMANA = 6; // formas de montar cada semana; fica a melhor
+  const MELHORAS_POR_TENTATIVA = 1000;
+
+  // Pesos dos critérios desejáveis (docs/REGULAMENTO.md), aplicados ao quadrado de cada desvio:
+  // 1 estrela de diferença num jogo custa 8; um adversário repetido custa 12; um jogo fora do
+  // aceitável (2 estrelas ou mais) custa 8 × d² + 100. Assim quase todo jogo fica aceitável e as
+  // repetições de adversário, poucas.
+  const PESO_JOGO = 8;
+  const PESO_FORA_DO_ACEITAVEL = 100;
+  const PESO_SALDO = 1;
+  const PESO_ADVERSARIO = 12;
+
+  function custoDaDiferenca(d) {
+    return PESO_JOGO * d * d + (d > DIFERENCA_ACEITAVEL ? PESO_FORA_DO_ACEITAVEL : 0);
+  }
+
+  // Custo total de um calendário (menor = melhor): o mesmo critério para escolher entre tentativas.
+  function custoDoCalendario(calendario, estrelas) {
+    const encontros = new Map();
+    for (const jogo of calendario) {
+      for (const a of jogo.dupla1) for (const b of jogo.dupla2) {
+        const chave = chaveDoPar(a, b);
+        encontros.set(chave, (encontros.get(chave) || 0) + 1);
+      }
+    }
+    let repetidos = 0;
+    for (const vezes of encontros.values()) if (vezes > 1) repetidos += (vezes - 1) ** 2;
+    const eq = medirEquilibrio(calendario, estrelas);
+    let saldos = 0;
+    for (const s of eq.saldos.values()) saldos += s * s;
+    return PESO_ADVERSARIO * repetidos + eq.diferencas.reduce((soma, d) => soma + custoDaDiferenca(d), 0) + PESO_SALDO * saldos;
+  }
 
   // Gerador pseudoaleatório com semente (mulberry32): a mesma semente dá o mesmo calendário.
   function criarSorteador(semente) {
@@ -368,10 +460,12 @@
     return Array.from({ length: semanas }, (_, i) => base + (i < sobra ? 1 : 0));
   }
 
-  // Monta os jogos de uma semana com os 4×g jogadores `jogam`: primeiro as duplas (sem repetir
-  // parceiro), depois quem enfrenta quem (trocando duplas de lugar para evitar adversário repetido).
+  // Monta os jogos de uma semana com os 4×g jogadores `jogam`: primeiro duplas sorteadas (sem
+  // repetir parceiro); depois melhora aos poucos, trocando duplas de jogo ou jogadores de dupla
+  // (sem criar parceiro repetido), para evitar adversário repetido e equilibrar o nível.
+  // nivel = { estrelas: Map id -> estrelas, saldos: Map id -> saldo até aqui }.
   // Retorna { jogos: [{ dupla1, dupla2 }], custo } ou null se não achou duplas válidas.
-  function montarSemana(jogam, parceiros, encontros, sorteio) {
+  function montarSemana(jogam, parceiros, encontros, sorteio, nivel) {
     const fila = embaralhar(jogam, sorteio);
     const duplas = [];
     while (fila.length) {
@@ -384,26 +478,46 @@
     }
 
     const vezes = (a, b) => encontros.get(chaveDoPar(a, b)) || 0;
-    const custoEntre = (x, y) => {
-      let c = 0;
-      for (const a of x) for (const b of y) c += vezes(a, b) ** 2;
-      return c;
+    const { estrelas, saldos } = nivel;
+    const e = (id) => estrelas.get(id) ?? ESTRELAS_NEUTRAS;
+    const custoDoJogo = (k) => {
+      const x = duplas[2 * k], y = duplas[2 * k + 1];
+      let repetidos = 0;
+      for (const a of x) for (const b of y) repetidos += vezes(a, b) ** 2;
+      // Saldo: cada jogador joga uma vez na semana, então comparar (saldo + delta)² equivale a
+      // comparar o quanto o saldo de cada um piora ou melhora.
+      const delta = e(x[0]) + e(x[1]) - e(y[0]) - e(y[1]);
+      const s = (id) => saldos.get(id) || 0;
+      const saldo = (s(x[0]) + delta) ** 2 + (s(x[1]) + delta) ** 2 + (s(y[0]) - delta) ** 2 + (s(y[1]) - delta) ** 2;
+      return PESO_ADVERSARIO * repetidos + custoDaDiferenca(diferencaDoJogo(x, y, estrelas)) + PESO_SALDO * saldo;
     };
-    const custoDoJogo = (k) => custoEntre(duplas[2 * k], duplas[2 * k + 1]);
     const quantidadeJogos = duplas.length / 2;
     let custo = 0;
     for (let k = 0; k < quantidadeJogos; k++) custo += custoDoJogo(k);
 
-    for (let tentativa = 0; tentativa < MELHORAS_POR_TENTATIVA && custo > 0 && quantidadeJogos > 1; tentativa++) {
+    for (let tentativa = 0; tentativa < MELHORAS_POR_TENTATIVA && custo > 0; tentativa++) {
       const x = Math.floor(sorteio() * duplas.length);
       const y = Math.floor(sorteio() * duplas.length);
       const kx = Math.floor(x / 2), ky = Math.floor(y / 2);
-      if (kx === ky) continue;
-      const antes = custoDoJogo(kx) + custoDoJogo(ky);
-      [duplas[x], duplas[y]] = [duplas[y], duplas[x]];
-      const depois = custoDoJogo(kx) + custoDoJogo(ky);
-      if (depois < antes) custo += depois - antes;
-      else [duplas[x], duplas[y]] = [duplas[y], duplas[x]]; // não melhorou: desfaz
+      if (x === y) continue;
+      const custoDosJogos = () => custoDoJogo(kx) + (kx === ky ? 0 : custoDoJogo(ky));
+      const antes = custoDosJogos();
+      if (kx !== ky && sorteio() < 0.5) {
+        // Troca as duplas de jogo.
+        [duplas[x], duplas[y]] = [duplas[y], duplas[x]];
+        const depois = custoDosJogos();
+        if (depois < antes) custo += depois - antes;
+        else [duplas[x], duplas[y]] = [duplas[y], duplas[x]]; // não melhorou: desfaz
+      } else {
+        // Troca um jogador de uma dupla com um da outra, se não formar parceiro repetido.
+        const px = Math.floor(sorteio() * 2), py = Math.floor(sorteio() * 2);
+        const dx = duplas[x], dy = duplas[y];
+        if (parceiros.has(chaveDoPar(dx[1 - px], dy[py])) || parceiros.has(chaveDoPar(dy[1 - py], dx[px]))) continue;
+        [dx[px], dy[py]] = [dy[py], dx[px]];
+        const depois = custoDosJogos();
+        if (depois < antes) custo += depois - antes;
+        else [dx[px], dy[py]] = [dy[py], dx[px]];
+      }
     }
 
     const jogos = [];
@@ -412,10 +526,13 @@
   }
 
   // Uma tentativa de calendário completo. Retorna { calendario, custo } ou null.
-  function construirCalendario(ids, jogosPorJogador, tamanhos, sorteio) {
+  function construirCalendario(ids, jogosPorJogador, tamanhos, sorteio, estrelas) {
     const restantes = new Map(ids.map((id) => [id, jogosPorJogador]));
     const parceiros = new Set();
     const encontros = new Map();
+    const saldos = new Map(ids.map((id) => [id, 0]));
+    const nivel = { estrelas, saldos };
+    const e = (id) => estrelas.get(id) ?? ESTRELAS_NEUTRAS;
     const calendario = [];
 
     for (let semana = 0; semana < tamanhos.length; semana++) {
@@ -431,7 +548,7 @@
 
       let melhor = null;
       for (let t = 0; t < TENTATIVAS_SEMANA; t++) {
-        const montada = montarSemana(jogam, parceiros, encontros, sorteio);
+        const montada = montarSemana(jogam, parceiros, encontros, sorteio, nivel);
         if (montada && (!melhor || montada.custo < melhor.custo)) melhor = montada;
         if (melhor && melhor.custo === 0) break;
       }
@@ -445,13 +562,14 @@
           const chave = chaveDoPar(a, b);
           encontros.set(chave, (encontros.get(chave) || 0) + 1);
         }
+        const delta = e(jogo.dupla1[0]) + e(jogo.dupla1[1]) - e(jogo.dupla2[0]) - e(jogo.dupla2[1]);
+        for (const id of jogo.dupla1) saldos.set(id, saldos.get(id) + delta);
+        for (const id of jogo.dupla2) saldos.set(id, saldos.get(id) - delta);
       }
       for (const id of jogam) restantes.set(id, restantes.get(id) - 1);
     }
 
-    let custo = 0;
-    for (const vezes of encontros.values()) if (vezes > 1) custo += (vezes - 1) ** 2;
-    return { calendario, custo };
+    return { calendario, custo: custoDoCalendario(calendario, estrelas) };
   }
 
   // Sorteia o calendário inteiro. `semente` (inteiro) torna o resultado reproduzível.
@@ -461,11 +579,12 @@
     if (!diagnostico.pronto) return { erro: diagnostico.problemas.join(" ") };
 
     const ids = jogadores.map((j) => j.id);
+    const estrelas = estrelasPorId(jogadores);
     const tamanhos = jogosPorSemana(diagnostico.totalJogos, semanas);
     const sorteio = criarSorteador(semente);
     let melhor = null;
     for (let t = 0; t < TENTATIVAS_SORTEIO; t++) {
-      const tentativa = construirCalendario(ids, jogosPorJogador, tamanhos, sorteio);
+      const tentativa = construirCalendario(ids, jogosPorJogador, tamanhos, sorteio, estrelas);
       if (tentativa && (!melhor || tentativa.custo < melhor.custo)) melhor = tentativa;
       if (melhor && melhor.custo === 0) break;
     }
@@ -539,8 +658,34 @@
       parceirosRepetidos,
       adversariosRepetidos: { pares: repetidosContra.length, maxVezes: repetidosContra.length ? Math.max(...repetidosContra) : 0 },
       jogosPorSemana: porSemana,
+      equilibrio: avaliarEquilibrio(jogadores, calendario),
       violacoes,
       pronto: violacoes.length === 0,
+    };
+  }
+
+  // Equilíbrio por nível (só informativo; nunca é violação). null se falta estrela de alguém
+  // (ex.: campeonato anterior às estrelas).
+  // Retorna { porJogo: [diferença], perfeitos (0), aceitaveis (até DIFERENCA_ACEITAVEL, inclui os
+  //           perfeitos), foraDoAceitavel, maiorDiferenca, saldos: [{ id, nome, saldo }],
+  //           maiorSaldo: { id, nome, saldo } | null }
+  function avaliarEquilibrio(jogadores, calendario) {
+    if (!jogadores.length || jogadoresSemEstrelas(jogadores).length) return null;
+    const estrelas = estrelasPorId(jogadores);
+    const validos = calendario.filter((j) => [...j.dupla1, ...j.dupla2].every((id) => estrelas.has(id)));
+    const eq = medirEquilibrio(validos, estrelas);
+    const saldos = jogadores.map((j) => ({ id: j.id, nome: j.nome, saldo: eq.saldos.get(j.id) || 0 }));
+    const maiorSaldo = saldos.reduce((maior, s) => (!maior || Math.abs(s.saldo) > Math.abs(maior.saldo) ? s : maior), null);
+    const porJogo = calendario.map((j) => (validos.includes(j) ? diferencaDoJogo(j.dupla1, j.dupla2, estrelas) : null));
+    const difs = eq.diferencas;
+    return {
+      porJogo,
+      perfeitos: difs.filter((d) => d === 0).length,
+      aceitaveis: difs.filter((d) => d <= DIFERENCA_ACEITAVEL).length,
+      foraDoAceitavel: difs.filter((d) => d > DIFERENCA_ACEITAVEL).length,
+      maiorDiferenca: difs.length ? Math.max(...difs) : 0,
+      saldos,
+      maiorSaldo,
     };
   }
 
@@ -1151,6 +1296,15 @@
     adicionarJogadores,
     renomearJogador,
     removerJogador,
+    ESTRELAS_MIN,
+    ESTRELAS_MAX,
+    validarEstrelas,
+    definirEstrelas,
+    jogadoresSemEstrelas,
+    estrelasPorId,
+    diferencaDoJogo,
+    DIFERENCA_ACEITAVEL,
+    custoDoCalendario,
     cadastroTravado,
     diagnosticarCampeonato,
     semanaDoJogo,

@@ -289,9 +289,49 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 15.12 | Duplicar uma edição com cor e logo. | A cópia tem a mesma cor e o mesmo logo. |
 | 15.13 | Aba Jogadores e cabeçalho com logo em ~400 px e no tema escuro. | O bloco "Aparência" quebra a linha sem rolagem horizontal; o logo não empurra os botões do cabeçalho para fora; legível no escuro. |
 
+## 16. Nível dos jogadores (estrelas) e sorteio equilibrado
+
+| # | Passos | Esperado |
+|---|---|---|
+| 16.1 | Adicionar 32 jogadores. | Cada um aparece com 5 estrelas vazias e o nome destacado em âmbar; o resumo diz "32 sem estrelas"; a legenda explica que as estrelas só servem ao sorteio e só o organizador vê. |
+| 16.2 | Com estrelas faltando, ver o diagnóstico e a aba Calendário. | Aviso "Defina as estrelas ... de N jogador(es): ..." (até 5 nomes); sem "Combinação válida"; botão "Sortear calendário" desabilitado. |
+| 16.3 | Clicar na 4ª estrela de um jogador; depois Desfazer. | 4 estrelas cheias, a 4ª com `aria-pressed="true"`; Desfazer volta ao estado anterior ("estrelas de X: 4"). |
+| 16.4 | Só com o teclado: Tab até as estrelas, Enter/Espaço. | Foco visível em cada estrela; Enter define o nível e o foco continua na estrela. |
+| 16.5 | Definir as estrelas de todos e sortear. | O botão mostra "🎲 Sorteando…" e sai do ar enquanto calcula (~1 s). Nomes com `★N` no calendário; jogos com diferença mostram "Δ N" (destaque a partir de 2, fora do aceitável). Linha "Equilíbrio por nível: X de Y jogo(s) aceitáveis (diferença de até 1 estrela; Z sem diferença)... Maior saldo de estrelas...". Regulamento respeitado. |
+| 16.5b | Trocar jogadores à mão até um jogo ficar com diferença 2 ou mais. | Δ desse jogo destacado; a linha de equilíbrio fica em alerta e passa a dizer "N fora do aceitável (maior diferença: ...)". |
+| 16.6 | Trocar um jogador à mão por outro de nível bem diferente. | O seletor mostra `★N` ao lado de cada nome. Depois da troca, o Δ do jogo e a linha de equilíbrio mudam na hora. |
+| 16.7 | Com o rascunho aberto, mudar as estrelas de alguém na aba Jogadores e voltar. | O rascunho continua (não é descartado); Δ e equilíbrio refletem o novo nível. |
+| 16.8 | Confirmar o calendário. | Na aba Jogadores, as estrelas ficam só para ver (sem botões); no Calendário, `★N` e Δ continuam. |
+| 16.9 | Telão (todas as telas), PNG da classificação e do mata-mata, aba Rodadas e Classificação. | Nenhuma estrela nem Δ em lugar nenhum. |
+| 16.10 | Importar um backup de antes das estrelas (jogadores sem `estrelas`), com o calendário confirmado. | Abre normalmente; na aba Jogadores, estrelas vazias (só para ver) e nomes em âmbar. No Calendário, sem `★N` nem Δ, e a linha "Equilíbrio por nível: não avaliado (o calendário foi confirmado sem as estrelas...)". Sem calendário confirmado, o resumo diz "N sem estrelas" e o sorteio pede para defini-las. |
+| 16.11 | Aba Jogadores e Calendário em ~400 px e no tema escuro. | Estrelas legíveis (cheias em âmbar, vazias em cinza) e sem rolagem horizontal. |
+
 ---
 
 ## Última execução
+
+**Fase 16 (nível dos jogadores), 2026-10-10**, Playwright (Chromium) via servidor local, antes do commit da
+fase. Partindo do app vazio, com 32 jogadores fictícios (6×1, 6×2, 8×3, 6×4, 6×5 estrelas).
+
+- `testes.html`: 95 passaram, 0 falharam (inclui L1 a L5; S2 agora aceita até 10 pares de adversários
+  repetidos, o preço dos jogos equilibrados).
+- **Passaram:** 16.1 a 16.11 (16.4 com a tecla Enter de verdade; 16.11 em 400 px e no tema escuro). Sorteio
+  em ~1 s, com 28 jogos sem diferença e 20 com Δ 1. Nenhuma estrela ou Δ no telão, nas rodadas, na
+  classificação nem nos 335 textos desenhados no PNG. Sem erros de JavaScript (só o 404 do `favicon.ico`).
+- **Falharam e foram corrigidos na hora:**
+  - Aviso de estrelas faltando terminava em "....": agora "... e mais N."
+  - Backup antigo com calendário confirmado mostrava "★?" em todos os nomes e mandava definir estrelas que já
+    estavam travadas. Agora não mostra marca e diz "não avaliado".
+  - Em 400 px, os cartões das semanas do Calendário passavam ~7 px da borda (problema antigo: a grade exigia
+    340 px). Agora a coluna mínima respeita a largura disponível.
+- **Regra ajustada no mesmo dia (decisão do organizador):** saiu "sem duplas extremas"; vale "jogo aceitável =
+  diferença de até 1 estrela" (5+5 × 5+4 e 2+2 × 2+1 são aceitáveis; 5+5 × 4+4 não). Refeitos 16.5 e o novo
+  16.5b: sorteio com 48 de 48 jogos aceitáveis (34 sem diferença); uma troca à mão que deixou um jogo com
+  Δ 2 destacou o jogo e pôs a linha de equilíbrio em alerta ("1 fora do aceitável"). Análise de 40 sorteios
+  (grupo misto e grupo forte): nenhum jogo fora do aceitável em 1.920.
+- **Observação:** depois de mudar os `.js`, o cache do servidor do Python serviu o `regras.js` antigo com o
+  `jogadores.js` novo (erro "jogadoresSemEstrelas is not a function"). Antes de testar, rebuscar os arquivos
+  com `fetch(arquivo, { cache: "reload" })` e recarregar.
 
 **Fase 15 (parte 1: cor/logo e modelo), 2026-10-10**, Playwright (Chromium) via servidor local, depois do commit
 `f1e504e`. Partindo do app vazio, com 32 jogadores fictícios, calendário sorteado e confirmado pela tela.

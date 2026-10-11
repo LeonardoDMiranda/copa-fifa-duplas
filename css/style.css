@@ -872,10 +872,30 @@ body.telao-ativo { overflow: hidden; }
 }
 .adicionar-jogadores textarea:focus, .campo-config input:focus { outline: 2px solid var(--destaque); outline-offset: 1px; }
 
-ol.lista-jogadores { columns: 3 220px; column-gap: 24px; margin: 12px 0 0; padding-left: 2em; }
+ol.lista-jogadores { columns: 3 300px; column-gap: 24px; margin: 12px 0 0; padding-left: 2em; }
 .lista-jogadores li { break-inside: avoid; padding: 3px 0; }
 .lista-jogadores .nome-jogador { display: inline-block; min-width: 8em; }
 .lista-jogadores button { margin-left: 4px; }
+
+/* Nível (estrelas): só nas telas do organizador. Cheia em âmbar escuro (contraste ≥ 3:1). */
+.estrelas { display: inline-flex; vertical-align: middle; margin: 0 4px; }
+.lista-jogadores .estrelas button.estrela {
+  margin: 0; padding: 0 1px; border: none; background: none; box-shadow: none;
+  font-size: 1.05rem; line-height: 1.2; color: var(--borda-forte); cursor: pointer;
+}
+.estrela.cheia, .lista-jogadores .estrelas button.estrela.cheia { color: var(--ambar-texto); }
+.lista-jogadores .estrelas button.estrela:hover { color: var(--ambar); }
+.lista-jogadores .estrelas button.estrela:focus-visible { outline: 2px solid var(--destaque); outline-offset: 1px; border-radius: 3px; }
+.estrelas.fixas .estrela { font-size: .95rem; color: var(--borda-forte); }
+.estrelas.fixas .estrela.cheia { color: var(--ambar-texto); }
+.lista-jogadores li.sem-estrelas .nome-jogador { color: var(--ambar-texto); font-weight: 600; }
+.semana-calendario .nivel { color: var(--ambar-texto); font-size: .75rem; font-weight: 600; }
+.diferenca {
+  margin-left: 8px; padding: 0 6px; border-radius: 8px;
+  font-size: .75rem; font-weight: 700; background: var(--superficie-2); color: var(--texto-suave);
+}
+.diferenca.alta { background: var(--alerta-fundo); color: var(--alerta-texto); }
+.equilibrio { margin: 6px 0 0; font-size: .85rem; }
 .lista-jogadores li.editando input {
   font: inherit; font-size: .95rem; padding: 2px 6px; width: 11em;
   border: 1px solid var(--borda); border-radius: 4px;
@@ -886,7 +906,7 @@ ol.lista-jogadores { columns: 3 220px; column-gap: 24px; margin: 12px 0 0; paddi
 .acoes-calendario { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 8px 0 12px; }
 .qualidade { margin-bottom: 12px; }
 .qualidade .avisos-chave { margin-bottom: 6px; }
-.semanas-calendario { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.semanas-calendario { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 12px; }
 .semana-calendario { border: 1px solid var(--borda); border-radius: 6px; padding: 8px 12px 10px; background: var(--superficie-2); }
 .semana-calendario h3 { margin: 0 0 6px; font-size: 1rem; }
 .semana-calendario h3 .contagem { font-weight: 400; font-size: .85rem; color: var(--texto-suave); }

@@ -66,7 +66,8 @@
       if (!j || !textoNaoVazio(j.id) || !textoNaoVazio(j.nome)) throw new Error("jogador sem id ou sem nome.");
       if (ids.has(j.id)) throw new Error(`jogador repetido: ${j.id}.`);
       ids.add(j.id);
-      return { id: j.id, nome: j.nome.trim() };
+      // Estrelas ausentes ou inválidas (backup antigo) ficam a definir.
+      return { id: j.id, nome: j.nome.trim(), estrelas: Regras.validarEstrelas(j.estrelas) ? j.estrelas : null };
     });
     let sorteio = null;
     if (c.sorteio !== null && c.sorteio !== undefined) {

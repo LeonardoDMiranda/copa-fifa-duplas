@@ -15,6 +15,13 @@ Regras que o app implementa. Só vale o que está aqui.
 - O app sorteia o calendário **inteiro de uma vez**, a partir de: nº de jogadores, jogos por jogador (padrão 6) e nº de semanas (padrão 8).
 - Restrições **obrigatórias**: todos os jogadores com o **mesmo número de jogos**; **no máximo 1 jogo por jogador por semana**; **nenhum parceiro repetido** (ninguém joga duas vezes com a mesma pessoa).
 - Restrição **desejável** (evitada, mas pode acontecer): repetir adversário.
+- **Equilíbrio por nível:** cada jogador tem de **1 a 5 estrelas**, definidas pelo organizador. O sorteio só é liberado quando todos têm estrelas. Elas servem só ao sorteio e aparecem apenas para o organizador (cadastro e calendário), nunca no telão, nas imagens ou na classificação. São **desejáveis** (o sorteio tenta ao máximo, sem quebrar as restrições obrigatórias; o organizador vê o resultado e decide se sorteia de novo, troca à mão ou confirma):
+  - **Jogo equilibrado:** a diferença entre as duplas é comparada posição a posição: |mais forte de uma − mais forte da outra| + |mais fraco de uma − mais fraco da outra|. Quanto menor, melhor. **Aceitável: diferença de no máximo 1 estrela**; 2 ou mais fica fora do aceitável.
+    - Aceitáveis: 5+4 × 5+4 (0), 5+5 × 5+5 (0), 5+5 × 5+4 (1), 2+2 × 2+1 (1), 5+1 × 4+1 (1).
+    - Fora do aceitável: 5+5 × 4+4 (2), 4+2 × 5+1 (2), 5+1 × 3+3 (4), 5+5 × 1+1 (8).
+  - O que importa é o jogo ser parelho, não a dupla ser mista: duplas fortes (5+5) ou fracas (2+1) são normais, desde que enfrentem uma dupla parecida.
+  - **Justiça na temporada:** o saldo de estrelas de cada jogador (soma das estrelas do seu lado − soma das estrelas do lado adversário, somado em todos os seus jogos) fica o mais perto possível de zero.
+  - **Prioridade:** quando não der para evitar as duas coisas, o equilíbrio vem antes. É melhor repetir um adversário do que ter um jogo fora do aceitável.
 - Jogos por semana = total de jogos ÷ semanas (ex.: 32 jogadores × 6 jogos ÷ 4 = 48 jogos, 6 por semana). Se não divide, as primeiras semanas ficam com 1 jogo a mais. O total só fecha se jogadores × jogos por jogador for divisível por 4.
 - O sorteio usa uma **semente** (guardada no backup): a mesma semente gera o mesmo calendário. O organizador pode sortear de novo e trocar jogadores à mão antes de **confirmar**; depois de confirmado, só dá para renomear jogadores.
 - Reposição: não há remarcação de jogos. Quem não comparece leva W.O.; o W.O. das duas duplas (ou outro caso em que o jogo não vale) é **anulado**: sem pontos, V/E/D nem gols para ninguém.
