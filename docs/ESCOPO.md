@@ -165,9 +165,9 @@ Uma aba por etapa (Alt+1 a Alt+5; a aba ativa fica no endereço, ex.: `index.htm
 4. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual. Ao lado, **o que está em jogo**: Garantidos / Em disputa / Eliminados.
 5. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
 
-**Campeonatos** (`index.html#campeonatos`, fora das abas de etapa): edições em uso e arquivadas, com Abrir, Duplicar, Exportar, Modelo, Arquivar/Desarquivar e Excluir; "Novo campeonato" e "Novo a partir de modelo"; espaço usado.
+**Campeonatos** (`index.html#campeonatos`, fora das abas de etapa): edições em uso e arquivadas, em cartões com Abrir (ou Desarquivar) à vista e um menu ⋯ com Duplicar, Exportar backup, Exportar modelo, Arquivar e Excluir; a aberta fica destacada; "Novo campeonato" e "Novo a partir de modelo"; espaço usado, em barra.
 
-**Cabeçalho**: na cor do campeonato, com o logo ao lado do título. O título é o seletor de campeonatos (edições não arquivadas, "+ Novo campeonato" e "Gerenciar campeonatos"). Desfazer, menu Backup (exportar/importar JSON), Modo telão e menu ⋯ (PNG da classificação e do mata-mata, Resetar). Lembrete de backup quando for a hora.
+**Cabeçalho**: na cor do campeonato, com o logo ao lado do título. O botão "Trocar" abre o seletor de campeonatos (edições não arquivadas, "+ Novo campeonato" e "Gerenciar campeonatos"). Desfazer, Modo telão e o menu "Campeonato" (exportar e importar o backup em JSON, Gerenciar campeonatos). Lembrete de backup quando for a hora. Os PNGs e o Resetar saíram do cabeçalho na Fase 19 e voltam nas fases 21 e 20.
 
 ## 5. Como o projeto foi construído
 
@@ -187,6 +187,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 16 | Nível dos jogadores (1 a 5 estrelas) e sorteio equilibrado por nível |
 | 17 | Cada tela monta o próprio conteúdo (sem mudança visível) e testes das telas (`testes-telas.html`) |
 | 18 | Base visual e acessível: ícones SVG no lugar dos emojis, tokens de espaçamento e fonte, botões de 28 px, contraste do tema escuro, avisos que se fecham, erro junto do campo, plurais, "Semana 3 · Jogo 2" no lugar do id e atalhos Alt+1…5 |
+| 19 | Cabeçalho novo (título simples, botão "Trocar", menu "Campeonato") e tela de Campeonatos com cartões e menu ⋯ por edição |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -211,7 +212,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
 | U | Base da interface: `plural`, `numero` (formato brasileiro), `rotuloDoJogo`, `botaoIcone` (nome acessível), ícones decorativos e atributos do erro junto do campo |
 
-`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo) e V5 (erro junto do campo).
+`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo) V5 (erro junto do campo) e V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu).
 
 ## 7. Pendências
 

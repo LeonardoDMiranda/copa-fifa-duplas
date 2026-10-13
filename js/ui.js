@@ -241,7 +241,7 @@
     }
   }
 
-  // Seletor de edições (título do cabeçalho): as não arquivadas, "Novo" e "Gerenciar".
+  // Seletor de edições (botão "Trocar" ao lado do título): as não arquivadas, "Novo" e "Gerenciar".
   function renderizarSeletor() {
     const edicoes = campeonatos.listar().filter((c) => !c.arquivado);
     document.getElementById("itens-campeonatos").replaceChildren(
@@ -283,11 +283,6 @@
     const botao = document.getElementById("btn-desfazer");
     botao.disabled = !ultima;
     botao.title = ultima ? `Desfazer: ${ultima} (Ctrl+Z)` : "Nada para desfazer";
-    const pngMataMata = document.getElementById("btn-png-mata-mata");
-    pngMataMata.disabled = !estado.atual().mataMata;
-    pngMataMata.title = pngMataMata.disabled
-      ? "Gere o chaveamento para exportar o mata-mata"
-      : "Baixar o chaveamento como imagem (1080 px) para o grupo";
 
     // A linha de status não é anunciada a cada salvamento; só o erro de salvamento vira aviso (uma vez).
     const st = estado.status();
@@ -624,9 +619,7 @@
   document.getElementById("btn-exportar").addEventListener("click", () => exportar());
   document.getElementById("btn-importar").addEventListener("click", () => document.getElementById("arquivo-importar").click());
   document.getElementById("arquivo-importar").addEventListener("change", importar);
-  document.getElementById("btn-resetar").addEventListener("click", resetar);
-  document.getElementById("btn-png-classificacao").addEventListener("click", () => exportarPNG("classificacao"));
-  document.getElementById("btn-png-mata-mata").addEventListener("click", () => exportarPNG("mata-mata"));
+  document.getElementById("btn-campeonato-gerenciar").addEventListener("click", () => irParaAba("campeonatos"));
   document.getElementById("btn-telao").addEventListener("click", () => telao.abrir());
 
   // Menus do cabeçalho (<details>): fecham ao escolher um item, ao clicar fora e com Esc.

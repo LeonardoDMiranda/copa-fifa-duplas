@@ -380,18 +380,15 @@ button.mini { padding: 2px var(--esp-2); font-size: var(--fonte-sm); }
 /* Tela estreita: os botões quebram linha e o menu pode ficar à esquerda; a lista ocupa a largura do cabeçalho. */
 @media (max-width: 600px) {
   .topo { position: relative; }
-  .menu { position: static; }
-  .menu-itens { left: var(--esp-4); right: var(--esp-4); top: auto; margin-top: var(--esp-1); }
+  .topo .menu { position: static; }
+  .topo .menu-itens { left: var(--esp-4); right: var(--esp-4); top: auto; margin-top: var(--esp-1); }
 }
 
-/* Seletor de campeonatos: o título do cabeçalho abre a lista de edições. */
-.menu-campeonatos { display: inline-block; max-width: 100%; }
-.menu-campeonatos > summary {
-  display: flex; align-items: center; gap: var(--esp-2); max-width: 100%;
-  padding: 2px var(--esp-2); font-size: inherit; border-color: transparent; background: transparent;
-}
-.menu-campeonatos h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.menu-campeonatos .seta { display: inline-flex; font-size: var(--fonte-lg); }
+/* Título do campeonato com o botão "Trocar", que abre a lista de edições. */
+.topo-linha-titulo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1) var(--esp-3); }
+.topo-linha-titulo h1 { min-width: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.menu-campeonatos { display: inline-block; }
+.menu-campeonatos .seta { display: inline-flex; }
 .menu-campeonatos .menu-itens {
   left: 0; right: auto; min-width: 300px; max-width: min(460px, calc(100vw - 32px));
   max-height: 70vh; overflow-y: auto; color: var(--texto);
@@ -403,7 +400,7 @@ button.mini { padding: 2px var(--esp-2); font-size: var(--fonte-sm); }
 .item-edicao.edicao-ativa { font-weight: 600; }
 .marca-ativa { display: inline-flex; color: var(--sobe); }
 @media (max-width: 600px) {
-  .menu-campeonatos .menu-itens { left: var(--esp-4); right: var(--esp-4); min-width: 0; max-width: none; }
+  .topo .menu-campeonatos .menu-itens { min-width: 0; max-width: none; }
 }
 
 .status-salvamento { flex-basis: 100%; margin: 0; font-size: var(--fonte-xs); text-align: right; }
@@ -631,13 +628,23 @@ dialog.dialogo::backdrop { background: var(--veu); }
 /* ---------- campeonatos (edições) ---------- */
 
 .acoes-campeonatos { margin: var(--esp-1) 0 var(--esp-3); display: flex; flex-wrap: wrap; gap: var(--esp-2); }
-.lista-campeonatos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--esp-2); }
+.lista-campeonatos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: var(--esp-3); }
 .item-campeonato {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2) var(--esp-4);
-  padding: 10px 14px; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie);
+  display: flex; flex-direction: column; justify-content: space-between; gap: var(--esp-3);
+  padding: var(--esp-3) var(--esp-4); border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie);
 }
 .item-campeonato.ativo { border-color: var(--destaque); box-shadow: inset 3px 0 0 var(--destaque); }
-.item-campeonato-texto { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.item-campeonato-texto { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.item-campeonato .detalhe-edicao { font-size: var(--fonte-sm); color: var(--texto-suave); }
+.menu-cartao { position: relative; margin-left: auto; }
+.menu-cartao > summary {
+  display: inline-flex; align-items: center; min-height: var(--alvo-min); list-style: none; cursor: pointer; user-select: none;
+  border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie); color: var(--texto);
+}
+.menu-cartao > summary::-webkit-details-marker { display: none; }
+.menu-cartao > summary:hover, .menu-cartao[open] > summary { background: var(--superficie-hover); }
+.menu-cartao .menu-itens { color: var(--texto); }
+.espaco-usado progress { display: block; width: 100%; max-width: 320px; height: 8px; margin-top: var(--esp-1); accent-color: var(--destaque); }
 .titulo-edicao { font-weight: 600; overflow-wrap: anywhere; }
 .item-campeonato .situacao { font-size: var(--fonte-sm); color: var(--texto-suave); }
 .item-campeonato .situacao.etapa-campeoes { color: var(--ambar-texto); }

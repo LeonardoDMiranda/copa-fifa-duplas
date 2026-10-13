@@ -38,12 +38,18 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
   direto, não por um observador instalado depois.
 - Cada tela fica numa aba: abrir a aba certa antes de usar a tela (`#aba-btn-rodadas` etc. ou
   navegar para `index.html#rodadas`). Só a aba visível é redesenhada.
-- Exportar/importar ficam no menu "Backup" e os PNGs e o Resetar no menu "Mais ações" (botão de três pontos): abrir o menu
-  (`#menu-backup > summary`, `#menu-mais > summary`) antes de clicar no item. Para importar, dá para
-  mandar o arquivo direto em `#arquivo-importar` (`setInputFiles`); depois escolher na janela
-  `#importar-novo` ou `#importar-substituir`.
-- O seletor de campeonatos é o título do cabeçalho (`#menu-campeonatos > summary`); a tela de
-  Campeonatos fica em `index.html#campeonatos`.
+- Exportar/importar e "Gerenciar campeonatos" ficam no menu "Campeonato" do cabeçalho: abrir o menu
+  (`#menu-campeonato > summary`) antes de clicar no item. Para importar, dá para mandar o arquivo
+  direto em `#arquivo-importar` (`setInputFiles`); depois escolher na janela `#importar-novo` ou
+  `#importar-substituir`.
+- **Fase 19:** os PNGs e o Resetar saíram do cabeçalho e ainda não têm botão na tela (os PNGs voltam
+  na Fase 21, o Resetar na Fase 20). Os casos 1b.9 (parte do Resetar), 1b.10, 9.6, 9.14, 10.x e 15.6
+  a 15.8 que dependem deles ficam suspensos até lá; o código (`exportarPNG`, `resetar` em `ui.js`)
+  continua e dá para chamar pelo console.
+- O seletor de campeonatos é o botão "Trocar" ao lado do título (`#menu-campeonatos > summary`); a
+  tela de Campeonatos fica em `index.html#campeonatos`. Em cada cartão, o menu ⋯
+  (`#campeonato-menu-<id> > summary`) guarda Duplicar, Exportar backup, Exportar modelo, Arquivar e
+  Excluir; "Abrir" (ou "Desarquivar") fica à vista.
 - O servidor do Python manda o CSS com cache: depois de mudar o `style.css`, recarregar ignorando o
   cache (CDP `Page.reload` com `ignoreCache: true`).
 - Usar só nomes fictícios ("Jogador 01" a "Jogador 32"). O repositório é público.
@@ -79,7 +85,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 1b.5 | Voltar e avançar do navegador; F5. | Volta/avança entre as abas visitadas; F5 mantém a aba. |
 | 1b.6 | Indicadores das abas. | Jogadores: nº de jogadores. Calendário: "rascunho" ou ícone de confirmado. Rodadas: "lançados/total". Classificação: ícone de balança com empate técnico sem ordem no top 8. Mata-mata: troféu com campeões. O leitor de tela ouve o indicador por extenso (ex.: "Rodadas, 18 de 48 jogos lançados"). |
 | 1b.7 | Rodadas em tela larga (≥ 1100 px). | Jogos da semana em duas colunas e, ao lado, "Top 8 ao vivo" (até o 10º, com a linha de corte no 8º) atualizando a cada placar. "Ver classificação completa" abre a aba Classificação. |
-| 1b.8 | Menus "Backup" e "Mais ações". | Abrem por cima do conteúdo; abrir um fecha o outro; fecham ao escolher um item, ao clicar fora e com Esc (o foco volta para o botão do menu). Em ~400 px a lista ocupa a largura do cabeçalho, sem sair da tela. |
+| 1b.8 | Menus "Trocar" e "Campeonato" do cabeçalho. | Abrem por cima do conteúdo; abrir um fecha o outro; fecham ao escolher um item, ao clicar fora e com Esc (o foco volta para o botão do menu). Em ~400 px a lista ocupa a largura do cabeçalho, sem sair da tela. "Campeonato" tem Exportar backup, Importar backup e Gerenciar campeonatos. |
 | 1b.9 | Resetar ou importar um backup. | Vai para a aba da etapa do campeonato resultante. |
 | 1b.10 | "PNG da classificação" com "após a semana N" escolhido. | Na aba Classificação, exporta a semana N (`...-classificacao-semana-N-...png`); em outra aba, exporta ao vivo. |
 
@@ -261,19 +267,20 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | # | Passos | Esperado |
 |---|---|---|
 | 14.1 | `localStorage` só com a chave antiga `copa-fifa-duplas-campeonato` (um campeonato com jogos) e abrir o app. | Abre esse campeonato, na aba da etapa. Existem `copa-fifa-duplas-indice` e `copa-fifa-duplas-campeonato-<id>`; a chave antiga continua igual. Recarregar não cria outra edição. |
-| 14.2 | Clicar no título do cabeçalho. | Abre a lista "Campeonatos" com as edições não arquivadas (a aberta com o ícone de confirmado e a situação embaixo de cada nome), "Novo campeonato" e "Gerenciar campeonatos". Fecha ao escolher, ao clicar fora e com Esc. Nome longo não empurra os botões do cabeçalho. |
+| 14.2 | Clicar em "Trocar" ao lado do título. | Abre a lista "Campeonatos" com as edições não arquivadas (a aberta com o ícone de confirmado e a situação embaixo de cada nome), "Novo campeonato" e "Gerenciar campeonatos". Fecha ao escolher, ao clicar fora e com Esc. Nome longo quebra linha, sem empurrar os botões do cabeçalho. |
 | 14.3 | "+ Novo campeonato". | Vai para a aba Jogadores com o nome "Copa FIFA em Duplas" selecionado: digitar substitui. Desfazer fica desabilitado (edição nova). |
 | 14.4 | Escolher outra edição no seletor. | Carrega a edição, vai para a aba da etapa dela, aviso "Campeonato aberto: ...". O desfazer é o daquela edição. O lembrete de backup é o dela. |
 | 14.5 | Telão em outra janela (`index.html#telao`) e trocar de edição na primeira. | O telão passa a mostrar a nova edição sozinho (nome no topo e rodízio de telas). |
-| 14.6 | "Gerenciar campeonatos". | `#campeonatos`, nenhuma aba de etapa selecionada. Edições em uso (a aberta com a etiqueta "aberto" e sem botão Abrir) e "Arquivados"; cada uma com situação, nº de jogadores e data de criação; espaço usado no rodapé. |
+| 14.6 | "Gerenciar campeonatos" (pelo "Trocar" ou pelo menu "Campeonato"). | `#campeonatos`, nenhuma aba de etapa selecionada. Edições em cartões, em uso (a aberta destacada, com a etiqueta "aberto" e sem botão Abrir) e "Arquivados"; cada cartão com situação, nº de jogadores, data de criação, "Abrir" à vista e o menu ⋯. Espaço usado no rodapé, como barra de progresso com o texto. |
 | 14.7 | Duplicar uma edição com jogos. | Nova edição "Nome (2)" aberta na aba Jogadores, com os mesmos jogadores e configuração, sem calendário nem jogos, cadastro livre. Duplicar de novo: "(3)". |
-| 14.8 | Arquivar uma edição (e depois a aberta). | Sai do seletor e vai para "Arquivados", sem botão Abrir. Arquivar a aberta abre a última não arquivada. Desarquivar devolve ao seletor. |
+| 14.8 | Arquivar uma edição pelo menu ⋯ (e depois a aberta). | Sai do seletor e vai para "Arquivados", sem botão Abrir e com "Desarquivar" à vista (o menu ⋯ dela não tem "Arquivar"). Arquivar a aberta abre a última não arquivada. Desarquivar devolve ao seletor. |
 | 14.9 | Excluir uma edição. | Janela "Excluir o campeonato?" com botão vermelho e foco em "Cancelar". "⬇ Exportar backup antes" baixa o JSON dela e a janela continua aberta. "Excluir" apaga a chave dela; sem desfazer. Excluir a última cria uma edição vazia. |
 | 14.10 | Exportar uma edição que não está aberta (tela de Campeonatos). | Baixa o JSON daquela edição; o registro de backup é gravado nela; a aberta não muda. |
 | 14.11 | Importar um backup válido. | Janela "Importar backup" com o nome do campeonato do arquivo, "Cancelar", "Substituir o ativo" e "Importar como novo campeonato" (com o foco). "Novo": edição nova aberta na aba da etapa, sem desfazer; a anterior continua na lista. Esc ou "Cancelar": nada muda. |
 | 14.12 | Importar um arquivo inválido. | Erro na hora, sem a janela de escolha; nenhuma edição criada. |
 | 14.13 | Gravar texto inválido em `copa-fifa-duplas-indice` e recarregar. | Aviso "A lista de campeonatos estava inválida (...)"; as edições continuam todas no seletor; existe `copa-fifa-duplas-indice-corrompido-<data>`. |
-| 14.14 | Seletor e tela de Campeonatos em ~400 px e no tema escuro. | Sem rolagem horizontal; a lista do seletor ocupa a largura do cabeçalho; legível no escuro. |
+| 14.14 | Seletor e tela de Campeonatos em ~400 px e no tema escuro. | Sem rolagem horizontal; a lista do seletor ocupa a largura do cabeçalho; cartões em uma coluna; legível no escuro. |
+| 14.15 | Menu ⋯ de um cartão: abrir, abrir o de outro cartão, escolher um item, clicar fora, Esc. | Só um menu fica aberto; fecha ao escolher um item, ao clicar fora e com Esc (o foco volta ao ⋯). O leitor de tela ouve "Mais ações de <nome>". |
 
 ## 15. Aparência (cor e logo) e modelo de campeonato
 

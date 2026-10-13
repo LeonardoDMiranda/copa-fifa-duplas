@@ -79,25 +79,63 @@
       return el("button", { type: "button", id, class: `mini ${extra.classe || ""}`.trim(), title: titulo, disabled: extra.disabled, onclick }, rotulo);
     }
 
+    // Botão de item do menu ⋯ do cartão (mesmo estilo dos menus do cabeçalho).
+    function itemMenu(id, icone, rotulo, titulo, onclick, extra = {}) {
+      return el("button", { type: "button", id, class: extra.classe || null, title: titulo, disabled: extra.disabled, onclick },
+        Icones.svg(icone), rotulo);
+    }
+
+    function menuDoCartao(c, invalido) {
+      return el("details", { class: "menu-cartao", id: `campeonato-menu-${c.id}` },
+        el("summary", { class: "mini", "aria-label": `Mais ações de ${c.nome}`, title: "Mais ações" }, Icones.svg("mais")),
+        el("div", { class: "menu-itens" },
+          itemMenu(`campeonato-duplicar-${c.id}`, "novo", "Duplicar", "Nova edição com o mesmo nome (2), configuração e jogadores; sem calendário nem jogos",
+            () => duplicar(c), { disabled: invalido }),
+          itemMenu(`campeonato-exportar-${c.id}`, "baixar", "Exportar backup", "Baixar o backup em JSON desta edição",
+            () => app.exportarEdicao(c.id), { disabled: invalido }),
+          itemMenu(`campeonato-modelo-${c.id}`, "baixar", "Exportar modelo",
+            "Baixar um modelo (nome, configuração, jogadores, cor e logo) para outro organizador ou outra edição",
+            () => app.exportarModelo(c.id), { disabled: invalido }),
+          !c.arquivado && itemMenu(`campeonato-arquivar-${c.id}`, "backup", "Arquivar",
+            "Tira do seletor e apaga o histórico do desfazer desta edição", () => arquivar(c)),
+          el("hr"),
+          itemMenu(`campeonato-excluir-${c.id}`, "remover", "Excluir", "Apagar esta edição do navegador (sem desfazer)",
+            () => excluir(c), { classe: "perigo" })));
+    }
+
     function itemCampeonato(c) {
       const invalido = c.situacao.etapa === "invalido";
       return el("li", { class: `item-campeonato${c.ativo ? " ativo" : ""}`, id: `campeonato-${c.id}` },
         el("div", { class: "item-campeonato-texto" },
           el("span", { class: "titulo-edicao" }, c.nome, c.ativo && el("span", { class: "tag-ativo" }, "aberto")),
-          el("span", { class: `situacao etapa-${c.situacao.etapa}` },
-            `${c.situacao.texto} · ${plural(c.jogadores, "jogador", "jogadores")} · criado em ${formatarData(c.criadoEm)}`)),
+          el("span", { class: `situacao etapa-${c.situacao.etapa}` }, c.situacao.texto),
+          el("span", { class: "detalhe-edicao" }, `${plural(c.jogadores, "jogador", "jogadores")} · criado em ${formatarData(c.criadoEm)}`)),
         el("div", { class: "item-campeonato-acoes" },
           !c.arquivado && !c.ativo && botao(`campeonato-abrir-${c.id}`, "Abrir", `Trabalhar em "${c.nome}"`, () => abrir(c), { classe: "primario" }),
-          botao(`campeonato-duplicar-${c.id}`, "Duplicar", "Nova edição com o mesmo nome (2), configuração e jogadores; sem calendário nem jogos",
-            () => duplicar(c), { disabled: invalido }),
-          botao(`campeonato-exportar-${c.id}`, [Icones.svg("baixar"), "Exportar"], "Baixar o backup em JSON desta edição", () => app.exportarEdicao(c.id), { disabled: invalido }),
-          botao(`campeonato-modelo-${c.id}`, [Icones.svg("baixar"), "Modelo"], "Baixar um modelo (nome, configuração, jogadores, cor e logo) para outro organizador ou outra edição",
-            () => app.exportarModelo(c.id), { disabled: invalido }),
-          c.arquivado
-            ? botao(`campeonato-desarquivar-${c.id}`, "Desarquivar", "Volta para a lista do seletor", () => desarquivar(c))
-            : botao(`campeonato-arquivar-${c.id}`, "Arquivar", "Tira do seletor e apaga o histórico do desfazer desta edição", () => arquivar(c)),
-          botao(`campeonato-excluir-${c.id}`, "Excluir", "Apagar esta edição do navegador (sem desfazer)", () => excluir(c), { classe: "perigo" })));
+          c.arquivado && botao(`campeonato-desarquivar-${c.id}`, "Desarquivar", "Volta para a lista do seletor", () => desarquivar(c)),
+          menuDoCartao(c, invalido)));
     }
+
+    // Menus ⋯ dos cartões: um só aberto por vez; fecham ao escolher um item, ao clicar fora e com Esc.
+    function menusAbertos() {
+      return [...raiz.querySelectorAll("details.menu-cartao[open]")];
+    }
+    raiz.addEventListener("toggle", (ev) => {
+      if (ev.target.open) for (const m of menusAbertos()) if (m !== ev.target) m.open = false;
+    }, true);
+    raiz.addEventListener("click", (ev) => {
+      if (ev.target.closest(".menu-itens button")) for (const m of menusAbertos()) m.open = false;
+    });
+    raiz.ownerDocument.addEventListener("click", (ev) => {
+      for (const m of menusAbertos()) if (!m.contains(ev.target)) m.open = false;
+    });
+    raiz.addEventListener("keydown", (ev) => {
+      const aberto = ev.key === "Escape" && menusAbertos()[0];
+      if (!aberto) return;
+      ev.stopPropagation();
+      aberto.open = false;
+      aberto.querySelector("summary").focus();
+    });
 
     function renderizar() {
       const lista = campeonatos.listar();
@@ -118,9 +156,11 @@
         el("ul", { class: "lista-campeonatos", id: "lista-campeonatos" }, ativos.map(itemCampeonato)),
         arquivados.length > 0 && el("h3", { class: "titulo-arquivados" }, "Arquivados"),
         arquivados.length > 0 && el("ul", { class: "lista-campeonatos arquivados", id: "lista-arquivados" }, arquivados.map(itemCampeonato)),
-        el("p", { class: `espaco-usado${pct >= 80 ? " cheio" : ""}`, id: "espaco-usado" },
-          `Espaço usado no navegador: ${formatarTamanho(espaco.bytes)} de ~${formatarTamanho(espaco.limite)} (${pct}%).`,
-          pct >= 80 ? " Arquive ou exclua edições antigas (exporte o backup antes)." : ""),
+        el("div", { class: `espaco-usado${pct >= 80 ? " cheio" : ""}`, id: "espaco-usado" },
+          el("label", { for: "barra-espaco" },
+            `Espaço usado no navegador: ${formatarTamanho(espaco.bytes)} de ~${formatarTamanho(espaco.limite)} (${pct}%).`,
+            pct >= 80 ? " Arquive ou exclua edições antigas (exporte o backup antes)." : ""),
+          el("progress", { id: "barra-espaco", max: 100, value: Math.min(pct, 100) })),
       ].filter(Boolean));
     }
 

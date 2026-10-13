@@ -15,35 +15,29 @@
   <header class="topo">
     <img id="logo-campeonato" class="logo-campeonato" alt="" hidden>
     <div class="topo-titulo">
-      <details class="menu menu-campeonatos" id="menu-campeonatos">
-        <summary title="Trocar de campeonato, criar um novo ou gerenciar os guardados">
-          <h1 id="titulo-campeonato">Copa FIFA em Duplas</h1><span class="seta" data-icone="abrir-menu"></span>
-        </summary>
-        <div class="menu-itens" id="itens-campeonatos"></div>
-      </details>
+      <div class="topo-linha-titulo">
+        <h1 id="titulo-campeonato">Copa FIFA em Duplas</h1>
+        <details class="menu menu-campeonatos" id="menu-campeonatos">
+          <summary title="Trocar de campeonato ou criar um novo">Trocar<span class="seta" data-icone="abrir-menu"></span></summary>
+          <div class="menu-itens" id="itens-campeonatos"></div>
+        </details>
+      </div>
       <p class="subtitulo" id="subtitulo-campeonato"></p>
     </div>
-    <nav class="barra-acoes" aria-label="Ações">
+    <div class="barra-acoes" role="group" aria-label="Ações">
       <button type="button" id="btn-desfazer" data-icone="desfazer" title="Desfazer a última alteração (Ctrl+Z)">Desfazer</button>
-      <details class="menu" id="menu-backup">
-        <summary data-icone="backup" title="Exportar ou importar o backup em JSON">Backup</summary>
+      <button type="button" id="btn-telao" data-icone="telao" title="Tela cheia para a TV, alternando as telas a cada 15 s">Modo telão</button>
+      <details class="menu" id="menu-campeonato">
+        <summary data-icone="configurar" title="Backup e gerenciamento dos campeonatos">Campeonato</summary>
         <div class="menu-itens">
           <button type="button" id="btn-exportar" data-icone="baixar" title="Baixar um backup em JSON">Exportar backup (JSON)</button>
           <button type="button" id="btn-importar" data-icone="enviar" title="Restaurar um backup em JSON ou criar um campeonato a partir de um modelo">Importar backup (JSON)</button>
+          <hr>
+          <button type="button" id="btn-campeonato-gerenciar" data-icone="configurar" title="Duplicar, arquivar, exportar ou excluir os campeonatos guardados">Gerenciar campeonatos</button>
         </div>
       </details>
       <input type="file" id="arquivo-importar" accept=".json,application/json" hidden>
-      <button type="button" id="btn-telao" data-icone="telao" title="Tela cheia para a TV, alternando as telas a cada 15 s">Modo telão</button>
-      <details class="menu" id="menu-mais">
-        <summary data-icone="mais" title="Mais ações" aria-label="Mais ações"></summary>
-        <div class="menu-itens">
-          <button type="button" id="btn-png-classificacao" data-icone="imagem" title="Baixar a classificação como imagem (1080 px) para o grupo">PNG da classificação</button>
-          <button type="button" id="btn-png-mata-mata" data-icone="imagem" title="Baixar o chaveamento como imagem (1080 px) para o grupo">PNG do mata-mata</button>
-          <hr>
-          <button type="button" id="btn-resetar" data-icone="resetar" class="perigo" title="Apagar o campeonato inteiro e começar de novo">Resetar campeonato</button>
-        </div>
-      </details>
-    </nav>
+    </div>
     <p id="status-salvamento" class="status-salvamento"></p>
   </header>
 

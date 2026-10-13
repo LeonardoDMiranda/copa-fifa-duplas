@@ -613,6 +613,83 @@
       t.igual(avisos, [], "nenhum aviso no canto");
     });
 
+    // ---------- V6: tela de Campeonatos com cartões ----------
+
+    // Três edições: a aberta, outra em uso e uma arquivada (`aberta`, `outra` e `arquivada` no retorno).
+    function appCom3Edicoes() {
+      const ctx = criarAppFalso(dadosComCalendario());
+      const { campeonatos } = ctx.app;
+      const original = campeonatos.ativo();
+      campeonatos.duplicar(original);
+      campeonatos.duplicar(original);
+      const copias = campeonatos.listar().filter((c) => c.id !== original);
+      campeonatos.arquivar(copias[1].id);
+      campeonatos.abrir(original);
+      Object.assign(ctx, { aberta: original, outra: copias[0].id, arquivada: copias[1].id, chamadas: [] });
+      ctx.app.exportarEdicao = (id) => ctx.chamadas.push(["exportar", id]);
+      ctx.app.exportarModelo = (id) => ctx.chamadas.push(["modelo", id]);
+      return ctx;
+    }
+
+    caso("V6.1 Campeonatos com 3 edições (1 arquivada): cartões, destaque da aberta e resumo", (t) => {
+      const { montar, app, aberta, outra, arquivada } = appCom3Edicoes();
+      const raiz = montar("campeonatos");
+      verificarLimpeza(t, raiz, "campeonatos");
+      t.igual(buscar(raiz, "lista-campeonatos").children.length, 2, "2 cartões em uso");
+      t.igual(buscar(raiz, "lista-arquivados").children.length, 1, "1 cartão arquivado");
+      t.igual(texto(raiz, "resumo-campeonatos"), "2 em uso · 1 arquivado", "resumo no título");
+      t.verdadeiro(buscar(raiz, `campeonato-${aberta}`).classList.contains("ativo"), "a aberta fica destacada");
+      t.verdadeiro(!buscar(raiz, `campeonato-${outra}`).classList.contains("ativo"), "a outra não");
+      t.verdadeiro(!buscar(raiz, `campeonato-abrir-${aberta}`), "a aberta não tem botão Abrir");
+      t.verdadeiro(buscar(raiz, `campeonato-abrir-${outra}`), "a outra tem o botão Abrir à vista");
+      t.verdadeiro(!buscar(raiz, `campeonato-abrir-${arquivada}`), "a arquivada não abre direto");
+      t.verdadeiro(buscar(raiz, `campeonato-desarquivar-${arquivada}`), "a arquivada tem Desarquivar à vista");
+      t.verdadeiro(!buscar(raiz, `campeonato-arquivar-${arquivada}`), "a arquivada não tem Arquivar no menu");
+      t.verdadeiro(buscar(raiz, `campeonato-arquivar-${outra}`), "a outra tem Arquivar no menu");
+      const barra = buscar(raiz, "barra-espaco");
+      t.verdadeiro(barra && barra.tagName === "PROGRESS" && barra.labels.length === 1, "o espaço usado é uma barra com rótulo");
+    });
+
+    caso("V6.2 Campeonatos: as ações dos cartões chamam o app e o estado certos", (t) => {
+      const { montar, app, chamadas, aberta, outra, arquivada } = appCom3Edicoes();
+      const raiz = montar("campeonatos");
+      buscar(raiz, `campeonato-exportar-${outra}`).click();
+      buscar(raiz, `campeonato-modelo-${outra}`).click();
+      t.igual(chamadas, [["exportar", outra], ["modelo", outra]], "exportar e modelo recebem o id do cartão");
+      buscar(raiz, `campeonato-abrir-${outra}`).click();
+      t.igual(app.campeonatos.ativo(), outra, "Abrir troca a edição ativa");
+      buscar(raiz, `campeonato-arquivar-${aberta}`).click();
+      t.verdadeiro(app.campeonatos.listar().find((c) => c.id === aberta).arquivado, "Arquivar marca a edição");
+      t.igual(buscar(raiz, "lista-arquivados").children.length, 2, "e ela vai para a lista de arquivados");
+      buscar(raiz, `campeonato-desarquivar-${arquivada}`).click();
+      t.verdadeiro(!app.campeonatos.listar().find((c) => c.id === arquivada).arquivado, "Desarquivar volta para a lista");
+      const antes = app.campeonatos.listar().length;
+      buscar(raiz, `campeonato-duplicar-${outra}`).click();
+      t.igual(app.campeonatos.listar().length, antes + 1, "Duplicar cria uma edição");
+    });
+
+    caso("V6.3 Campeonatos: o menu ⋯ abre um por vez e fecha ao escolher, ao clicar fora e com Esc", (t) => {
+      const { montar, app, aberta, outra, arquivada } = appCom3Edicoes();
+      const raiz = montar("campeonatos");
+      const menuA = buscar(raiz, `campeonato-menu-${aberta}`);
+      const menuB = buscar(raiz, `campeonato-menu-${outra}`);
+      t.verdadeiro(menuA.querySelector("summary").getAttribute("aria-label").includes(app.campeonatos.listar().find((c) => c.id === aberta).nome), "o ⋯ diz de qual campeonato é");
+      // O "toggle" do navegador é assíncrono; o teste dispara o evento na hora.
+      menuA.open = true;
+      menuA.dispatchEvent(new Event("toggle"));
+      menuB.open = true;
+      menuB.dispatchEvent(new Event("toggle"));
+      t.verdadeiro(menuB.open && !menuA.open, "abrir um menu fecha o outro");
+      buscar(raiz, `campeonato-exportar-${outra}`).click();
+      t.verdadeiro(!menuB.open, "escolher um item fecha o menu");
+      menuB.open = true;
+      raiz.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      t.verdadeiro(!menuB.open, "Esc fecha o menu");
+      menuB.open = true;
+      document.body.click();
+      t.verdadeiro(!menuB.open, "clicar fora fecha o menu");
+    });
+
     // ---------- execução e relatório ----------
 
     let passaram = 0, falharam = 0;
