@@ -3,7 +3,7 @@
 (function () {
   "use strict";
 
-  const { el, confirmar, MAX_GOLS, lerGols } = Util;
+  const { el, buscar, confirmar, MAX_GOLS, lerGols } = Util;
 
   const ROTULOS = { semi1: "Semifinal 1", semi2: "Semifinal 2", terceiro: "3º lugar", final: "Final" };
   const ORIGEM_DUPLA = {
@@ -16,8 +16,17 @@
     gols: "tempo normal", prorrogacao: "prorrogação", penaltis: "pênaltis",
   };
 
-  function criar(app) {
+  function criar(app, raiz) {
     const { estado, nomePorId, avisar, renderizar, tabelaAtual, nomesDupla } = app;
+
+    const alvo = el("div", { id: "conteudo-mata-mata" });
+    raiz.append(el("section", { id: "tela-mata-mata", class: "tela" },
+      el("div", { class: "tela-cabecalho" },
+        el("h2", {}, "Mata-mata"),
+        el("p", { class: "legenda" },
+          "Semi 1 = 1º+8º × 2º+7º · Semi 2 = 3º+6º × 4º+5º · sem empate: prorrogação e, se preciso, pênaltis"
+          + " · final em melhor de 3 · ✎ troca uma dupla (surpresa da final). Não altera a classificação.")),
+      alvo));
 
     const rascunhosMM = new Map(); // id do campo do mata-mata -> texto inválido digitado
     let editandoDupla = null; // { chave, lado } da dupla do mata-mata em edição
@@ -257,7 +266,6 @@
     }
 
     function renderizarMataMata(atual, tabela) {
-      const alvo = document.getElementById("conteudo-mata-mata");
       if (!atual.mataMata) {
         alvo.replaceChildren(painelGerar(atual, tabela));
         return;
@@ -314,7 +322,7 @@
     // campo tenha sumido): nesse caso o foco anterior não é restaurado.
     function focarCampoSeguinte() {
       if (!focarAposId) return false;
-      const anterior = document.getElementById(focarAposId);
+      const anterior = buscar(raiz, focarAposId);
       focarAposId = null;
       if (!anterior) return true;
       const campos = [...anterior.closest(".confronto").querySelectorAll("input")];

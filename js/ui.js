@@ -59,22 +59,6 @@
     return dupla.map((id) => nomePorId.get(id)).join(" + ");
   }
 
-  // id do jogo -> número do jogo dentro da sua semana (1, 2...). Guardado enquanto a lista não muda.
-  let cacheNumeros = { jogos: null, mapa: null };
-  function numerosNaSemana(jogos) {
-    if (cacheNumeros.jogos !== jogos) {
-      const contagem = new Map();
-      const mapa = new Map();
-      for (const j of jogos) {
-        const semana = Regras.semanaDoJogo(j);
-        contagem.set(semana, (contagem.get(semana) || 0) + 1);
-        mapa.set(j.id, contagem.get(semana));
-      }
-      cacheNumeros = { jogos, mapa };
-    }
-    return cacheNumeros.mapa;
-  }
-
   // ---------- telas ----------
 
   const app = {
@@ -87,15 +71,10 @@
     renderizar,
     focarDepois(id, { selecionar = false } = {}) { focoPendente = { id, selecionar }; },
     irParaAba,
-    // Tela vazia ou etapa pendente: diz o que falta e leva até a aba onde se resolve.
-    proximoPasso(texto, aba, rotulo) {
-      return el("div", { class: "vazio" },
-        el("p", {}, texto),
-        aba && el("button", { type: "button", class: "primario", dataset: { ir: aba }, onclick: () => irParaAba(aba) }, rotulo));
-    },
+    proximoPasso: (texto, aba, rotulo) => Util.proximoPasso(texto, aba, rotulo, irParaAba),
     cadastroTravado,
     nomesDupla,
-    numerosNaSemana,
+    numerosNaSemana: Util.numerosNaSemana,
     tabelaAtual,
     limparRascunhos,
     resetar,
@@ -105,14 +84,17 @@
     exportarModelo,
     escolherArquivoParaImportar,
   };
+  // Cada tela monta o próprio conteúdo dentro da <section> da sua aba (a Classificação e o
+  // "O que está em jogo" dividem a mesma, nesta ordem).
+  const raiz = (aba) => document.getElementById(`aba-${aba}`);
   const telas = {
-    jogadores: Telas.jogadores.criar(app),
-    calendario: Telas.calendario.criar(app),
-    rodadas: Telas.rodadas.criar(app),
-    classificacao: Telas.classificacao.criar(app),
-    emJogo: Telas.emJogo.criar(app),
-    mataMata: Telas.mataMata.criar(app),
-    campeonatos: Telas.campeonatos.criar(app),
+    jogadores: Telas.jogadores.criar(app, raiz("jogadores")),
+    calendario: Telas.calendario.criar(app, raiz("calendario")),
+    rodadas: Telas.rodadas.criar(app, raiz("rodadas")),
+    classificacao: Telas.classificacao.criar(app, raiz("classificacao")),
+    emJogo: Telas.emJogo.criar(app, raiz("classificacao")),
+    mataMata: Telas.mataMata.criar(app, raiz("mata-mata")),
+    campeonatos: Telas.campeonatos.criar(app, raiz("campeonatos")),
   };
 
   // Descarta o que foi digitado e não lançado em todas as telas (ex.: depois de desfazer).

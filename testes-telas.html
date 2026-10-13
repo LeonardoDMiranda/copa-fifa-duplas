@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Testes das telas – Copa FIFA em Duplas</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; background: #f4f6f8; color: #1d2733; }
+    h1 { margin: 0 0 4px; font-size: 1.4rem; }
+    #resumo { font-weight: 600; margin: 8px 0 20px; padding: 10px 14px; border-radius: 6px; }
+    #resumo.ok { background: #d9f2df; color: #145a26; }
+    #resumo.falha { background: #fbdcdc; color: #8a1616; }
+    .caso { background: #fff; border-left: 5px solid #999; border-radius: 4px; padding: 10px 14px; margin-bottom: 10px; }
+    .caso.passou { border-color: #2e9e4a; }
+    .caso.falhou { border-color: #d03030; }
+    .caso h2 { font-size: 1rem; margin: 0 0 6px; }
+    .caso ul { margin: 0; padding-left: 20px; font-size: .9rem; }
+    .caso li.erro { color: #b01e1e; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Testes das telas</h1>
+  <div>Cada tela (<code>js/telas/*.js</code>) desenhada sozinha, com um app falso e o <code>Estado</code> real em memória.</div>
+  <div id="resumo"></div>
+  <div id="casos"></div>
+  <!-- As telas dos casos são montadas aqui (fora da vista). -->
+  <div id="area-telas" hidden></div>
+
+  <script src="testes/dados-exemplo.js"></script>
+  <script src="js/regras.js"></script>
+  <script src="js/estado.js"></script>
+  <script src="js/campeonatos.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/telas/jogadores.js"></script>
+  <script src="js/telas/calendario.js"></script>
+  <script src="js/telas/rodadas.js"></script>
+  <script src="js/telas/classificacao.js"></script>
+  <script src="js/telas/em-jogo.js"></script>
+  <script src="js/telas/mata-mata.js"></script>
+  <script src="js/telas/campeonatos.js"></script>
+  <script>
+    "use strict";
+
+    const { el, buscar } = Util;
+    const casos = [];
+    function caso(titulo, fn) { casos.push({ titulo, fn }); }
+
+    // Asserções: cada uma registra uma linha no relatório do caso.
+    function criarVerificador(registro) {
+      return {
+        igual(atual, esperado, descricao) {
+          const ok = JSON.stringify(atual) === JSON.stringify(esperado);
+          registro.push({ ok, texto: ok ? descricao : `${descricao}: esperado ${JSON.stringify(esperado)}, veio ${JSON.stringify(atual)}` });
+        },
+        verdadeiro(cond, descricao) {
+          registro.push({ ok: Boolean(cond), texto: descricao });
+        },
+      };
+    }
+
+    // ---------- dados ----------
+
+    // Armazenamento em memória com a interface do localStorage (não mexe nos dados reais do app).
+    function memoria(inicial = {}) {
+      const dados = { ...inicial };
+      return {
+        dados,
+        get length() { return Object.keys(dados).length; },
+        key: (i) => Object.keys(dados)[i] ?? null,
+        getItem: (k) => (k in dados ? dados[k] : null),
+        setItem: (k, v) => { dados[k] = String(v); },
+        removeItem: (k) => { delete dados[k]; },
+      };
+    }
+
+    // Os 32 jogadores fictícios da fixture, com estrelas de 1 a 5 em rodízio.
+    const JOGADORES = window.DADOS_INICIAIS.classificacaoBase.map((l, i) => ({ id: l.id, nome: l.nome, estrelas: (i % 5) + 1 }));
+    const SEMENTE = 5;
+    let calendarioGuardado = null; // o sorteio leva ~1 s: feito uma vez só
+    function calendarioDaFixture() {
+      if (!calendarioGuardado) {
+        calendarioGuardado = Regras.gerarCalendario(JOGADORES, { jogosPorJogador: 6, semanas: 8, semente: SEMENTE }).calendario;
+      }
+      return calendarioGuardado;
+    }
+
+    // Estado v2 com o calendário confirmado (48 jogos em 8 semanas) e as `semanasLancadas` primeiras
+    // com placar. Com `mataMata`, todos os jogos lançados e o chaveamento gerado.
+    function dadosComCalendario({ semanasLancadas = 1, mataMata = false } = {}) {
+      const jogos = Regras.calendarioParaJogos(calendarioDaFixture());
+      const ate = mataMata ? Infinity : semanasLancadas;
+      jogos.forEach((j, i) => {
+        if (j.semana <= ate) j.resultado = { tipo: "placar", gols1: (i % 3) + 1, gols2: i % 2 };
+      });
+      const dados = {
+        versao: 2,
+        campeonato: {
+          nome: "Copa de teste",
+          config: { ...Regras.REGRAS_PADRAO },
+          jogadores: JOGADORES.map((j) => ({ ...j })),
+          sorteio: { semente: SEMENTE, confirmado: true },
+        },
+        jogos,
+        desempatesManuais: [],
+        mataMata: null,
+        historico: [],
+      };
+      if (mataMata) {
+        const tabela = Regras.calcularClassificacao(Regras.baseDosJogadores(dados.campeonato.jogadores), jogos, [], dados.campeonato.config);
+        dados.mataMata = Regras.gerarMataMata(tabela);
+      }
+      return dados;
+    }
+
+    // ---------- app falso ----------
+
+    // Mesma interface do `app` do ui.js, com o Estado e os Campeonatos reais sobre um armazenamento
+    // em memória. O redesenho é síncrono; avisos e pedidos de troca de aba só ficam registrados.
+    // `dados`: estado v2 inicial (sem ele, o app começa vazio, como na primeira abertura).
+    function criarAppFalso(dados = null) {
+      const area = document.getElementById("area-telas");
+      area.replaceChildren();
+      const armazenamento = memoria(dados ? { [Estado.CHAVE]: JSON.stringify(dados) } : {});
+      const campeonatos = Campeonatos.criar(armazenamento);
+      const estado = Estado.criar(armazenamento, campeonatos.chaveAtiva());
+      const nomePorId = new Map();
+      const avisos = [];
+      const abasPedidas = [];
+      const telas = [];
+
+      const base = () => Regras.baseDosJogadores(estado.atual().campeonato.jogadores);
+      function tabelaAtual() {
+        const atual = estado.atual();
+        return Regras.classificacaoPorSemana(base(), atual.jogos, atual.desempatesManuais, atual.campeonato.config);
+      }
+      function sincronizarJogadores() {
+        nomePorId.clear();
+        for (const j of estado.atual().campeonato.jogadores) nomePorId.set(j.id, j.nome);
+      }
+      function renderizar() {
+        const atual = estado.atual();
+        const tabela = tabelaAtual();
+        for (const tela of telas) tela.renderizar(atual, tabela);
+      }
+      const irParaAba = (aba) => { abasPedidas.push(aba); };
+
+      const app = {
+        estado,
+        campeonatos,
+        nomePorId,
+        base,
+        config: () => estado.atual().campeonato.config,
+        avisar: (texto, tipo = "info") => { avisos.push({ texto, tipo }); },
+        renderizar,
+        focarDepois() {},
+        irParaAba,
+        proximoPasso: (texto, aba, rotulo) => Util.proximoPasso(texto, aba, rotulo, irParaAba),
+        cadastroTravado: () => Regras.cadastroTravado(estado.atual().campeonato, estado.atual().jogos),
+        nomesDupla: (dupla) => dupla.map((id) => nomePorId.get(id)).join(" + "),
+        numerosNaSemana: Util.numerosNaSemana,
+        tabelaAtual,
+        limparRascunhos() { for (const t of telas) if (t.limparRascunhos) t.limparRascunhos(); },
+        resetar() {},
+        sincronizarEdicao() {
+          if (estado.chave() !== campeonatos.chaveAtiva()) estado.trocarChave(campeonatos.chaveAtiva());
+          renderizar();
+        },
+        novoCampeonato() {},
+        exportarEdicao() {},
+        exportarModelo() {},
+        escolherArquivoParaImportar() {},
+      };
+      sincronizarJogadores();
+      estado.aoMudar(sincronizarJogadores);
+      estado.aoMudar(renderizar);
+
+      // Monta a tela `nome` (chave de Telas) numa raiz nova e desenha.
+      function montar(nome) {
+        const raiz = el("section", { class: "aba" });
+        area.appendChild(raiz);
+        telas.push(Telas[nome].criar(app, raiz));
+        renderizar();
+        return raiz;
+      }
+
+      return { app, estado, avisos, abasPedidas, montar, tabelaAtual };
+    }
+
+    // ---------- verificações comuns ----------
+
+    // Nada de "undefined", "null" ou "NaN" no texto nem nos atributos, e nenhum id repetido.
+    function verificarLimpeza(t, raiz, nome) {
+      const lixo = /\b(undefined|null|NaN)\b/;
+      t.verdadeiro(!lixo.test(raiz.textContent), `${nome}: sem "undefined", "null" ou "NaN" no texto`);
+      const atributos = [...raiz.querySelectorAll("*")].flatMap((e) => [...e.attributes].map((a) => `${a.name}="${a.value}"`));
+      const sujos = atributos.filter((a) => lixo.test(a));
+      t.igual(sujos, [], `${nome}: sem "undefined", "null" ou "NaN" nos atributos`);
+      const ids = [...raiz.querySelectorAll("[id]")].map((e) => e.id);
+      t.igual(ids.filter((id, i) => ids.indexOf(id) !== i), [], `${nome}: nenhum id repetido`);
+    }
+
+    function texto(raiz, id) {
+      const alvo = buscar(raiz, id);
+      return alvo ? alvo.textContent : null;
+    }
+
+    function botoesProximoPasso(raiz) {
+      return [...raiz.querySelectorAll("button[data-ir]")].map((b) => b.dataset.ir);
+    }
+
+    // ---------- V1: app vazio ----------
+
+    caso("V1.1 Jogadores com o app vazio: cadastro aberto e sem jogadores", (t) => {
+      const { montar } = criarAppFalso();
+      const raiz = montar("jogadores");
+      verificarLimpeza(t, raiz, "jogadores");
+      t.verdadeiro(buscar(raiz, "tela-jogadores"), "a tela monta o próprio esqueleto (#tela-jogadores)");
+      t.verdadeiro(buscar(raiz, "novos-nomes"), "campo para adicionar nomes");
+      t.verdadeiro(raiz.textContent.includes("Nenhum jogador cadastrado ainda"), "diz que não há jogadores");
+      t.igual(botoesProximoPasso(raiz), [], "sem botão de próximo passo (o passo é nesta tela)");
+      t.igual(texto(raiz, "resumo-jogadores"), "0 jogador(es)", "resumo no título");
+    });
+
+    caso("V1.2 Calendário com o app vazio: sorteio bloqueado e caminho para Jogadores", (t) => {
+      const { montar } = criarAppFalso();
+      const raiz = montar("calendario");
+      verificarLimpeza(t, raiz, "calendário");
+      t.verdadeiro(buscar(raiz, "btn-sortear").disabled, "\"Sortear calendário\" desabilitado");
+      t.igual(botoesProximoPasso(raiz), ["jogadores"], "botão \"Ir para Jogadores\"");
+      t.igual(texto(raiz, "resumo-calendario"), "", "resumo vazio");
+    });
+
+    caso("V1.3 Rodadas com o app vazio: próximo passo leva a Jogadores", (t) => {
+      const { montar, abasPedidas } = criarAppFalso();
+      const raiz = montar("rodadas");
+      verificarLimpeza(t, raiz, "rodadas");
+      t.igual(botoesProximoPasso(raiz), ["jogadores"], "botão \"Ir para Jogadores\"");
+      t.verdadeiro(buscar(raiz, "painel-top").hidden, "top 8 ao vivo escondido");
+      t.igual(raiz.querySelectorAll(".jogo").length, 0, "nenhum cartão de jogo");
+      raiz.querySelector("button[data-ir]").click();
+      t.igual(abasPedidas, ["jogadores"], "o clique pede a aba Jogadores");
+    });
+
+    caso("V1.4 Classificação com o app vazio: linha única com o próximo passo", (t) => {
+      const { montar } = criarAppFalso();
+      const raiz = montar("classificacao");
+      verificarLimpeza(t, raiz, "classificação");
+      t.igual(raiz.querySelectorAll("thead th").length, 11, "11 colunas no cabeçalho da tabela");
+      t.igual(buscar(raiz, "corpo-classificacao").rows.length, 1, "uma linha no corpo");
+      t.igual(botoesProximoPasso(raiz), ["jogadores"], "botão \"Ir para Jogadores\"");
+    });
+
+    caso("V1.5 O que está em jogo com o app vazio", (t) => {
+      const { montar } = criarAppFalso();
+      const raiz = montar("emJogo");
+      verificarLimpeza(t, raiz, "em jogo");
+      t.igual(texto(raiz, "conteudo-em-jogo"), "Ainda não há jogos.", "avisa que não há jogos");
+    });
+
+    caso("V1.6 Mata-mata com o app vazio: precisa de jogadores", (t) => {
+      const { montar } = criarAppFalso();
+      const raiz = montar("mataMata");
+      verificarLimpeza(t, raiz, "mata-mata");
+      t.igual(botoesProximoPasso(raiz), ["jogadores"], "botão \"Ir para Jogadores\"");
+      t.verdadeiro(!buscar(raiz, "btn-gerar-chave"), "sem botão de gerar chaveamento");
+    });
+
+    caso("V1.7 Campeonatos com o app vazio: uma edição, aberta", (t) => {
+      const { montar } = criarAppFalso();
+      const raiz = montar("campeonatos");
+      verificarLimpeza(t, raiz, "campeonatos");
+      const itens = buscar(raiz, "lista-campeonatos").children;
+      t.igual(itens.length, 1, "uma edição na lista");
+      t.verdadeiro(itens[0].classList.contains("ativo"), "marcada como aberta");
+      t.igual(texto(raiz, "resumo-campeonatos"), "1 em uso", "resumo no título");
+      t.verdadeiro(buscar(raiz, "titulo-tela-campeonatos"), "título com o id usado pelo aria-labelledby da aba");
+    });
+
+    // ---------- V2: fixture (32 jogadores, calendário confirmado, semana 1 lançada) ----------
+
+    caso("V2.1 Jogadores com a fixture: 32 jogadores e cadastro travado", (t) => {
+      const { montar } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("jogadores");
+      verificarLimpeza(t, raiz, "jogadores");
+      t.igual(buscar(raiz, "lista-jogadores").children.length, 32, "32 jogadores na lista");
+      t.igual(texto(raiz, "resumo-jogadores"), "32 jogador(es) · calendário confirmado", "resumo no título");
+      t.verdadeiro(buscar(raiz, "btn-reiniciar"), "botão \"Reiniciar campeonato\"");
+      t.verdadeiro(!buscar(raiz, "novos-nomes"), "sem campo para adicionar nomes");
+    });
+
+    caso("V2.2 Calendário com a fixture: 8 semanas confirmadas", (t) => {
+      const { montar } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("calendario");
+      verificarLimpeza(t, raiz, "calendário");
+      t.igual(raiz.querySelectorAll(".semana-calendario").length, 8, "8 semanas");
+      t.igual(texto(raiz, "resumo-calendario"), "confirmado · 48 jogos", "resumo no título");
+      t.verdadeiro(!buscar(raiz, "btn-sortear"), "sem botão de sortear");
+    });
+
+    caso("V2.3 Rodadas com a fixture: abre na semana em andamento", (t) => {
+      const dados = dadosComCalendario();
+      const { montar } = criarAppFalso(dados);
+      const raiz = montar("rodadas");
+      verificarLimpeza(t, raiz, "rodadas");
+      const semana = Regras.semanaAtual(dados.jogos, dados.campeonato.config);
+      t.igual(semana, 2, "semana em andamento = 2 (a 1 está completa)");
+      t.igual(texto(raiz, "contador-jogos"), "6/48 lançados", "contador no título");
+      t.igual(raiz.querySelector(".chip-semana.selecionada").textContent, `S${semana}`, "chip da semana em andamento selecionado");
+      t.igual(buscar(raiz, "lista-jogos").querySelectorAll(".jogo").length, 6, "6 cartões de jogo");
+      const painel = buscar(raiz, "painel-top");
+      t.verdadeiro(!painel.hidden, "top 8 ao vivo visível");
+      t.igual(painel.querySelectorAll("tbody tr").length, 10, "top 8 + 2 perseguidores");
+    });
+
+    caso("V2.4 Classificação com a fixture: 32 linhas e top 8 marcado", (t) => {
+      const { montar, tabelaAtual } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("classificacao");
+      verificarLimpeza(t, raiz, "classificação");
+      const linhas = buscar(raiz, "corpo-classificacao").rows;
+      t.igual(linhas.length, 32, "32 linhas");
+      t.igual(raiz.querySelectorAll("tr.classificado").length, 8, "8 classificados");
+      t.verdadeiro(linhas[0].textContent.includes(tabelaAtual()[0].nome), "1º lugar igual ao das regras");
+      t.verdadeiro(buscar(raiz, "select-semana-classificacao"), "escolha de semana disponível");
+    });
+
+    caso("V2.5 O que está em jogo com a fixture: pendentes demais", (t) => {
+      const dados = dadosComCalendario();
+      const { montar } = criarAppFalso(dados);
+      const raiz = montar("emJogo");
+      verificarLimpeza(t, raiz, "em jogo");
+      const limite = Regras.limitePendentesSituacoes(dados.campeonato.config);
+      t.igual(texto(raiz, "conteudo-em-jogo"), `Disponível quando faltarem até ${limite} jogos (faltam 42).`, "explica quando fica disponível");
+    });
+
+    caso("V2.6 Mata-mata com a fixture: prévia do chaveamento", (t) => {
+      const { montar } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("mataMata");
+      verificarLimpeza(t, raiz, "mata-mata");
+      t.verdadeiro(buscar(raiz, "btn-gerar-chave"), "botão \"Gerar chaveamento\"");
+      t.igual(raiz.querySelectorAll(".previa li").length, 2, "prévia das 2 semifinais");
+    });
+
+    caso("V2.7 Mata-mata com o chaveamento gerado: 4 confrontos e pódio", (t) => {
+      const { montar } = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const raiz = montar("mataMata");
+      verificarLimpeza(t, raiz, "mata-mata");
+      t.igual(raiz.querySelectorAll(".confronto").length, 4, "semis, final e 3º lugar");
+      t.verdadeiro(buscar(raiz, "podio"), "pódio");
+      t.verdadeiro(buscar(raiz, "mm-semi1-0-gols1"), "campo de placar da semifinal 1");
+    });
+
+    // ---------- V3: lançar pela tela ----------
+
+    // Preenche os dois campos de placar de um jogo como o organizador faria e dispara o "change".
+    function digitarPlacar(raiz, id, gols1, gols2) {
+      const campo1 = buscar(raiz, `gols-${id}-1`);
+      campo1.value = gols1;
+      campo1.dispatchEvent(new Event("input", { bubbles: true }));
+      const campo2 = buscar(raiz, `gols-${id}-2`);
+      campo2.value = gols2;
+      campo2.dispatchEvent(new Event("input", { bubbles: true }));
+      campo2.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    caso("V3.1 Lançar um placar pela tela muda o estado e a classificação", (t) => {
+      const { montar, estado, tabelaAtual } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      const jogo = estado.atual().jogos.find((j) => j.semana === 2);
+      const vencedor = jogo.dupla1[0];
+      const antes = tabelaAtual().find((l) => l.id === vencedor);
+      digitarPlacar(raiz, jogo.id, "3", "1");
+      const depois = estado.atual().jogos.find((j) => j.id === jogo.id).resultado;
+      t.igual(depois, { tipo: "placar", gols1: 3, gols2: 1 }, "placar 3×1 no estado");
+      const linha = tabelaAtual().find((l) => l.id === vencedor);
+      t.igual([linha.pontos, linha.v, linha.gp], [antes.pontos + 3, antes.v + 1, antes.gp + 3], "vencedor ganha 3 pontos, 1 vitória e 3 gols");
+      t.verdadeiro(buscar(raiz, `jogo-${jogo.id}`).classList.contains("lancado"), "o cartão redesenhado aparece como lançado");
+      t.igual(texto(raiz, "contador-jogos"), "7/48 lançados", "contador atualizado");
+      t.verdadeiro(estado.ultimaAcao().includes("3×1"), "a ação entra no desfazer");
+    });
+
+    caso("V3.2 Placar inválido pela tela: aviso de erro e nada muda", (t) => {
+      const { montar, estado, avisos } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      const jogo = estado.atual().jogos.find((j) => j.semana === 2);
+      const historico = estado.atual().historico.length;
+      digitarPlacar(raiz, jogo.id, "x", "1");
+      t.igual(estado.atual().jogos.find((j) => j.id === jogo.id).resultado, null, "o jogo continua pendente");
+      t.igual(estado.atual().historico.length, historico, "nada entra no desfazer");
+      const ultimo = avisos[avisos.length - 1];
+      t.verdadeiro(ultimo && ultimo.tipo === "erro" && ultimo.texto.includes("Placar inválido"), "aviso de erro");
+      const campo = buscar(raiz, `gols-${jogo.id}-1`);
+      t.igual(campo.value, "x", "o texto digitado continua no campo");
+      t.verdadeiro(campo.classList.contains("invalido"), "o campo fica marcado como inválido");
+    });
+
+    // ---------- execução e relatório ----------
+
+    let passaram = 0, falharam = 0;
+    const container = document.getElementById("casos");
+    for (const c of casos) {
+      const registro = [];
+      try {
+        c.fn(criarVerificador(registro));
+      } catch (erro) {
+        registro.push({ ok: false, texto: `Exceção: ${erro.message}` });
+      }
+      const ok = registro.length > 0 && registro.every((r) => r.ok);
+      ok ? passaram++ : falharam++;
+      const ul = document.createElement("ul");
+      for (const r of registro) {
+        const li = document.createElement("li");
+        li.textContent = `${r.ok ? "✔" : "✘"} ${r.texto}`;
+        if (!r.ok) li.className = "erro";
+        ul.appendChild(li);
+      }
+      const h2 = document.createElement("h2");
+      h2.textContent = `${ok ? "✅" : "❌"} ${c.titulo}`;
+      const div = document.createElement("div");
+      div.className = `caso ${ok ? "passou" : "falhou"}`;
+      div.append(h2, ul);
+      container.appendChild(div);
+    }
+    document.getElementById("area-telas").replaceChildren();
+
+    const resumo = document.getElementById("resumo");
+    resumo.textContent = `${passaram} passaram, ${falharam} falharam`;
+    resumo.className = falharam ? "falha" : "ok";
+    document.title = `${falharam ? "❌" : "✅"} Testes das telas – Copa FIFA em Duplas`;
+  </script>
+</body>
+</html>

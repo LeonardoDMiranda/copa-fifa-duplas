@@ -15,8 +15,18 @@
     return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB` : `${Math.ceil(bytes / 1024)} KB`;
   }
 
-  function criar(app) {
+  function criar(app, raiz) {
     const { campeonatos, avisar } = app;
+
+    const resumo = el("span", { id: "resumo-campeonatos", class: "contador" });
+    const conteudo = el("div", { id: "conteudo-campeonatos" });
+    raiz.append(el("section", { id: "tela-campeonatos", class: "tela" },
+      el("div", { class: "tela-cabecalho" },
+        el("h2", { id: "titulo-tela-campeonatos" }, "Campeonatos ", resumo),
+        el("p", { class: "legenda" },
+          "Cada edição guarda os seus jogadores, calendário, placares, mata-mata e desfazer. O campeonato aberto vale "
+          + "para todas as janelas do app neste navegador (inclusive o telão). Para passar a outra pessoa, exporte o backup.")),
+      conteudo));
 
     // Toda ação passa por aqui: erro vira aviso e, se a ativa mudou, o app carrega a nova.
     function executar(acao, aposMudar) {
@@ -95,10 +105,10 @@
       const arquivados = lista.filter((c) => c.arquivado);
       const espaco = campeonatos.espacoUsado();
       const pct = Math.round((espaco.bytes / espaco.limite) * 100);
-      document.getElementById("resumo-campeonatos").textContent =
+      resumo.textContent =
         `${ativos.length} em uso${arquivados.length ? ` · ${arquivados.length} arquivado(s)` : ""}`;
       // replaceChildren não descarta os false (como el() faz): filtra antes.
-      document.getElementById("conteudo-campeonatos").replaceChildren(...[
+      conteudo.replaceChildren(...[
         el("div", { class: "acoes-campeonatos" },
           el("button", { type: "button", id: "btn-campeonato-novo", class: "primario", onclick: app.novoCampeonato }, "+ Novo campeonato"),
           el("button", {

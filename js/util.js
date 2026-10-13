@@ -156,6 +156,36 @@
     }
   }
 
+  // ---------- telas ----------
+
+  // Elemento de id `id` dentro da raiz de uma tela (ids de jogadores importados podem ter qualquer caractere).
+  function buscar(raiz, id) {
+    return raiz.querySelector(`#${CSS.escape(id)}`);
+  }
+
+  // Tela vazia ou etapa pendente: diz o que falta e, com `aba`, leva até a aba onde se resolve.
+  function proximoPasso(texto, aba, rotulo, irParaAba) {
+    return el("div", { class: "vazio" },
+      el("p", {}, texto),
+      aba && el("button", { type: "button", class: "primario", dataset: { ir: aba }, onclick: () => irParaAba(aba) }, rotulo));
+  }
+
+  // id do jogo -> número do jogo dentro da sua semana (1, 2...). Guardado enquanto a lista não muda.
+  let cacheNumeros = { jogos: null, mapa: null };
+  function numerosNaSemana(jogos) {
+    if (cacheNumeros.jogos !== jogos) {
+      const contagem = new Map();
+      const mapa = new Map();
+      for (const j of jogos) {
+        const semana = Regras.semanaDoJogo(j);
+        contagem.set(semana, (contagem.get(semana) || 0) + 1);
+        mapa.set(j.id, contagem.get(semana));
+      }
+      cacheNumeros = { jogos, mapa };
+    }
+    return cacheNumeros.mapa;
+  }
+
   // Classe CSS (com espaço na frente) do lado de um jogo de classificação, conforme o resultado.
   function classeDoLado(resultado, lado) {
     if (resultado && resultado.tipo === "anulado") return " anulada";
@@ -169,5 +199,6 @@
   globalThis.Util = {
     el, escolher, confirmar, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado,
     contraste, CONTRASTE_MINIMO, corLegivelComBranco, carregarImagem, prepararLogo,
+    buscar, proximoPasso, numerosNaSemana,
   };
 })();

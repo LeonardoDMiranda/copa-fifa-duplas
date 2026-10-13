@@ -4,18 +4,24 @@
 (function () {
   "use strict";
 
-  const { el } = Util;
+  const { el, buscar } = Util;
   const COR_PADRAO = "#0d3b66"; // azul do cabeçalho (--topo)
 
-  function criar(app) {
+  function criar(app, raiz) {
     const { estado, nomePorId, avisar, renderizar, cadastroTravado } = app;
+
+    const resumo = el("span", { id: "resumo-jogadores", class: "contador" });
+    const conteudo = el("div", { id: "conteudo-jogadores" });
+    raiz.append(el("section", { id: "tela-jogadores", class: "tela" },
+      el("div", { class: "tela-cabecalho" }, el("h2", {}, "Campeonato e jogadores ", resumo)),
+      conteudo));
 
     let rascunhoNomes = ""; // nomes digitados/colados e ainda não adicionados
     let renomeando = null; // { id, valor } do jogador em edição
 
     function adicionarNomes() {
       if (cadastroTravado()) return;
-      const campo = document.getElementById("novos-nomes");
+      const campo = buscar(raiz, "novos-nomes");
       const nomes = Regras.interpretarListaNomes(campo ? campo.value : rascunhoNomes);
       if (!nomes.length) {
         avisar("Digite ao menos um nome (um por linha).", "erro");
@@ -48,7 +54,7 @@
     function salvarRenomeacao() {
       if (!renomeando) return;
       const { id } = renomeando;
-      const campo = document.getElementById(`nome-${id}`);
+      const campo = buscar(raiz, `nome-${id}`);
       const valor = campo ? campo.value : renomeando.valor;
       const r = Regras.renomearJogador(estado.atual().campeonato.jogadores, id, valor);
       if (r.erro) {
@@ -136,7 +142,7 @@
           ap.logo ? el("img", { class: "previa-logo", id: "previa-logo", src: ap.logo, alt: "Logo do campeonato" }) : el("span", { class: "sem-logo" }, "nenhum"),
           el("button", {
             type: "button", id: "aparencia-logo-escolher", class: "mini", title: "Imagem PNG, JPG ou WebP; é reduzida para caber em 256×128",
-            onclick: () => document.getElementById("aparencia-logo-arquivo").click(),
+            onclick: () => buscar(raiz, "aparencia-logo-arquivo").click(),
           }, ap.logo ? "Trocar" : "Escolher imagem"),
           ap.logo && el("button", {
             type: "button", id: "aparencia-logo-remover", class: "discreto mini perigo",
@@ -214,7 +220,7 @@
       if (renomeando && !camp.jogadores.some((j) => j.id === renomeando.id)) renomeando = null;
 
       const semNivel = Regras.jogadoresSemEstrelas(camp.jogadores).length;
-      document.getElementById("resumo-jogadores").textContent =
+      resumo.textContent =
         `${diag.jogadores} jogador(es)${travado ? " · calendário confirmado" : semNivel ? ` · ${semNivel} sem estrelas` : ""}`;
 
       const porSemana = diag.jogosPorSemanaMin === diag.jogosPorSemanaMax
@@ -228,7 +234,7 @@
       });
 
       // replaceChildren não descarta os false (como el() faz): filtra antes.
-      document.getElementById("conteudo-jogadores").replaceChildren(...[
+      conteudo.replaceChildren(...[
         el("div", { class: "config-campeonato" },
           campoConfig("nome", "Nome do campeonato", el("input", {
             id: "nome-campeonato", type: "text", maxlength: "60", autocomplete: "off", value: camp.nome,

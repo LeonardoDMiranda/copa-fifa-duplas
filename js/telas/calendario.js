@@ -3,10 +3,16 @@
 (function () {
   "use strict";
 
-  const { el, confirmar } = Util;
+  const { el, confirmar, buscar } = Util;
 
-  function criar(app) {
+  function criar(app, raiz) {
     const { estado, nomePorId, avisar, renderizar, cadastroTravado } = app;
+
+    const resumo = el("span", { id: "resumo-calendario", class: "contador" });
+    const alvo = el("div", { id: "conteudo-calendario" });
+    raiz.append(el("section", { id: "tela-calendario", class: "tela" },
+      el("div", { class: "tela-cabecalho" }, el("h2", {}, "Calendário ", resumo)),
+      alvo));
 
     let editandoSlot = null; // { indice, lado, pos } do jogador do rascunho em troca
     let nivelPorId = new Map(); // id -> estrelas (ou null), refeito a cada desenho
@@ -31,7 +37,7 @@
         if (!ok || cadastroTravado() || estado.atual().campeonato.sorteio !== anterior) return;
       }
       // O sorteio leva cerca de 1 s: mostra que está trabalhando antes de começar a conta.
-      const botao = document.getElementById("btn-sortear");
+      const botao = buscar(raiz, "btn-sortear");
       if (botao) { botao.disabled = true; botao.textContent = "🎲 Sorteando…"; }
       await new Promise((resolver) => setTimeout(resolver, 30));
       if (cadastroTravado()) return;
@@ -192,11 +198,9 @@
       nivelPorId = new Map(camp.jogadores.map((j) => [j.id, j.estrelas]));
       if (editandoSlot && (!rascunho || !rascunho[editandoSlot.indice])) editandoSlot = null;
 
-      const resumo = document.getElementById("resumo-calendario");
       resumo.textContent = confirmado ? `confirmado · ${atual.jogos.length} jogos` : rascunho ? "sorteio em análise" : "";
 
       const calendario = confirmado ? atual.jogos : rascunho;
-      const alvo = document.getElementById("conteudo-calendario");
 
       if (!calendario) {
         const explicacao = el("p", { class: "legenda" },

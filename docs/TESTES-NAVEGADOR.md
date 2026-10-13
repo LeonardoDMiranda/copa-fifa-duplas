@@ -310,6 +310,22 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 
 ## Última execução
 
+**Fase 17 (telas testáveis, sem mudança visível), 2026-10-13**, Playwright (Chromium) via servidor local, antes
+do commit da fase.
+
+- `testes.html`: 95 passaram, 0 falharam. `testes-telas.html` (novo): 16 passaram, 0 falharam (V1 a V3).
+- **Comparação com a versão anterior:** a mesma sequência de 102 passos rodou na versão do último commit
+  (servida em outra porta) e na nova, com `Math.random` e a data fixos. Os passos foram: app vazio em
+  cada aba, cadastro, renomear, estrelas, cor e logo, sorteio, troca e confirmação, placar com Enter e com
+  Tab, inválido, W.O., anular, limpar, semanas, agenda, teclas 3/4 e Ctrl+Z, os 48 jogos (com a classificação
+  em 5 pendentes), semana e desempate na classificação, mata-mata completo com prorrogação, pênaltis e final
+  MD3, telão, backup, resetar e desfazer, seletor e tela de Campeonatos, e as abas em 400 e 1920 px. As 102
+  telas saíram idênticas: HTML do conteúdo, abas, cabeçalho, avisos, janelas, telão, foco e downloads. O
+  foco depois de cada Enter (placar, mata-mata, renomear) foi o mesmo, e não houve rolagem horizontal.
+- **Observação:** um único `ERR_CONNECTION_REFUSED` no console da versão nova, que não se repetiu em mais
+  três aberturas. Todos os arquivos do app voltaram com 200, e o pedido do `favicon.ico` não chegou ao
+  servidor. Provavelmente o servidor do Python recusou o pedido do ícone por receber muitos pedidos ao mesmo tempo.
+
 **Fase 16 (nível dos jogadores), 2026-10-10**, Playwright (Chromium) via servidor local, antes do commit da
 fase. Partindo do app vazio, com 32 jogadores fictícios (6×1, 6×2, 8×3, 6×4, 6×5 estrelas).
 

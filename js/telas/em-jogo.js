@@ -5,8 +5,18 @@
 
   const { el } = Util;
 
-  function criar(app) {
+  function criar(app, raiz) {
     const { nomePorId, numerosNaSemana, nomesDupla } = app;
+
+    const resumo = el("span", { id: "resumo-em-jogo", class: "contador" });
+    const conteudo = el("div", { id: "conteudo-em-jogo", class: "colunas-em-jogo" });
+    raiz.append(el("section", { id: "tela-em-jogo", class: "tela" },
+      el("div", { class: "tela-cabecalho" },
+        el("h2", {}, "O que está em jogo ", resumo),
+        el("p", { class: "legenda" },
+          "Considera todos os resultados possíveis dos jogos pendentes (vitória, empate com gols, 0×0, derrota), "
+          + "comparando pontos e vitórias. Saldo e gols pró só contam entre quem já não joga mais.")),
+      conteudo));
 
     // O cálculo enumera até Regras.MAX_CENARIOS_SITUACOES cenários: só refaz quando jogos,
     // desempates ou jogadores mudam. Devolve null se houver pendentes demais
@@ -59,8 +69,8 @@
       const pendentes = atual.jogos.filter((j) => !j.resultado).length;
       const situacoes = atual.jogos.length ? situacoesDe(atual) : null;
       if (!situacoes) {
-        document.getElementById("resumo-em-jogo").textContent = "";
-        document.getElementById("conteudo-em-jogo").replaceChildren(el("p", { class: "legenda mensagem-em-jogo" },
+        resumo.textContent = "";
+        conteudo.replaceChildren(el("p", { class: "legenda mensagem-em-jogo" },
           atual.jogos.length
             ? `Disponível quando faltarem até ${Regras.limitePendentesSituacoes(atual.campeonato.config)} jogos (faltam ${pendentes}).`
             : "Ainda não há jogos."));
@@ -72,7 +82,7 @@
         const s = porId.get(linha.id);
         colunas[s.situacao].push(itemEmJogo(s, linha, atual.jogos));
       }
-      document.getElementById("resumo-em-jogo").textContent = pendentes
+      resumo.textContent = pendentes
         ? `${pendentes} jogo(s) pendente(s) · ${Regras.contarCenarios(pendentes, atual.campeonato.config).toLocaleString("pt-BR")} cenários`
         : "todos os jogos lançados";
 
@@ -81,7 +91,7 @@
         colunas[tipo].length
           ? el("ul", {}, colunas[tipo])
           : el("p", { class: "legenda" }, "Ninguém."));
-      document.getElementById("conteudo-em-jogo").replaceChildren(
+      conteudo.replaceChildren(
         coluna("garantido", "✅ Garantidos no top 8"),
         coluna("disputa", "⚔️ Em disputa"),
         coluna("eliminado", "❌ Eliminados"));

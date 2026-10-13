@@ -6,8 +6,29 @@
   const { el, formatarSaldo } = Util;
   const { VAGAS_FASE_FINAL } = Regras;
 
-  function criar(app) {
+  function criar(app, raiz) {
     const { estado, nomePorId, renderizar } = app;
+
+    const rotulo = el("span", { id: "rotulo-classificacao", class: "contador" });
+    const controle = el("div", { id: "controle-classificacao" });
+    const corpo = el("tbody", { id: "corpo-classificacao" });
+    const colunas = [
+      ["Pos", null, "col-pos"], ["", null, "col-var"], ["Jogador", null, "col-jogador"],
+      ["Pts", "Pontos"], ["V", "Vitórias"], ["E", "Empates"], ["D", "Derrotas"],
+      ["GP", "Gols pró"], ["GC", "Gols contra"], ["SG", "Saldo de gols"], ["Jogos", "Jogos disputados"],
+    ];
+    raiz.append(el("section", { id: "tela-classificacao", class: "tela" },
+      el("div", { class: "tela-cabecalho" },
+        el("h2", {}, "Classificação ", rotulo),
+        controle,
+        el("p", { class: "legenda" },
+          el("span", { class: "amostra-classificado" }),
+          " Top 8 vai para a fase final · ▲▼ variação em relação à semana anterior"
+          + " · ⚖️ empate técnico: use ↑↓ para definir a ordem (confronto direto/sorteio)")),
+      el("div", { class: "tabela-rolagem" },
+        el("table", { class: "classificacao" },
+          el("thead", {}, el("tr", {}, colunas.map(([texto, titulo, classe]) => el("th", { class: classe, title: titulo }, texto)))),
+          corpo))));
 
     // Semana escolhida para ver a classificação (null = ao vivo). Só leitura quando não é ao vivo.
     let semanaClassificacao = null;
@@ -63,16 +84,15 @@
     }
 
     function controleClassificacao(ultimaSemana) {
-      const alvo = document.getElementById("controle-classificacao");
       if (!ultimaSemana) {
-        alvo.replaceChildren();
+        controle.replaceChildren();
         return;
       }
       const opcoes = [el("option", { value: "", selected: semanaClassificacao === null }, "Atual (ao vivo)")];
       for (let n = 1; n <= ultimaSemana; n++) {
         opcoes.push(el("option", { value: String(n), selected: semanaClassificacao === n }, `Após a semana ${n}`));
       }
-      alvo.replaceChildren(el("label", { class: "campo-config" }, "Ver classificação",
+      controle.replaceChildren(el("label", { class: "campo-config" }, "Ver classificação",
         el("select", {
           id: "select-semana-classificacao",
           onchange: (ev) => { semanaClassificacao = ev.target.value === "" ? null : Number(ev.target.value); renderizar(); },
@@ -81,11 +101,11 @@
 
     function renderizarTabela(tabela, editavel) {
       if (!tabela.length) {
-        document.getElementById("corpo-classificacao").replaceChildren(el("tr", {}, el("td", { colspan: "11", class: "celula-vazia" },
+        corpo.replaceChildren(el("tr", {}, el("td", { colspan: String(colunas.length), class: "celula-vazia" },
           app.proximoPasso("Nenhum jogador cadastrado ainda.", "jogadores", "Ir para Jogadores"))));
         return;
       }
-      document.getElementById("corpo-classificacao").replaceChildren(
+      corpo.replaceChildren(
         ...tabela.map((linha) => {
           let classe = linha.posicao <= VAGAS_FASE_FINAL ? "classificado" : "";
           if (linha.posicao === VAGAS_FASE_FINAL) classe += " linha-corte";
@@ -115,7 +135,7 @@
         ? tabela
         : Regras.classificacaoPorSemana(app.base(), atual.jogos, atual.desempatesManuais, cfg, semanaClassificacao);
       controleClassificacao(ultimaSemana);
-      document.getElementById("rotulo-classificacao").textContent = semanaClassificacao === null ? "" : `após a semana ${semanaClassificacao}`;
+      rotulo.textContent = semanaClassificacao === null ? "" : `após a semana ${semanaClassificacao}`;
       renderizarTabela(tabelaVista, semanaClassificacao === null);
     }
 

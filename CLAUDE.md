@@ -40,13 +40,14 @@ Só o organizador usa. Não tem servidor, login nem compartilhamento online.
 ```
 index.html          # app
 testes.html         # testes das regras (abrir no navegador; mostra passou/falhou)
+testes-telas.html   # testes das telas: cada js/telas/*.js desenhada sozinha com um app falso (casos V)
 css/style.css
 testes/dados-exemplo.js  # fixture de teste: dados fictícios (não é carregado pelo app)
 js/regras.js        # FUNÇÕES PURAS: pontuação, classificação, desempate, mata-mata, "o que está em jogo"
 js/estado.js        # estado v2 de uma edição (campeonato, jogadores, jogos): carregar/salvar localStorage, desfazer, exportar/importar JSON
 js/campeonatos.js   # várias edições: índice (ativa, arquivadas), migração, novo/duplicar/arquivar/excluir, importar como novo
 js/util.js          # helpers de apresentação compartilhados (el, lerGols, formatarSaldo, carimbo, classeDoLado)
-js/telas/*.js       # uma tela cada (jogadores, calendario, rodadas, classificacao, em-jogo, mata-mata, campeonatos): Telas.<nome>.criar(app)
+js/telas/*.js       # uma tela cada (jogadores, calendario, rodadas, classificacao, em-jogo, mata-mata, campeonatos): Telas.<nome>.criar(app, raiz), que monta o próprio conteúdo na raiz
 js/ui.js            # orquestração: cria o estado e as telas, redesenho, foco, cabeçalho (seletor de edições) e barra de ações
 js/exportar.js      # geração de PNG via Canvas API
 js/telao.js         # modo telão (tela cheia, alterna telas); também abre sozinho em index.html#telao

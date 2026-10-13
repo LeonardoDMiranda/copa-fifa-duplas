@@ -3,10 +3,25 @@
 (function () {
   "use strict";
 
-  const { el, MAX_GOLS, lerGols, formatarSaldo, classeDoLado } = Util;
+  const { el, buscar, MAX_GOLS, lerGols, formatarSaldo, classeDoLado } = Util;
 
-  function criar(app) {
+  function criar(app, raiz) {
     const { estado, nomePorId, avisar, renderizar, numerosNaSemana, nomesDupla } = app;
+
+    const contador = el("span", { id: "contador-jogos", class: "contador" });
+    const navegacao = el("div", { id: "navegacao-semanas" });
+    const lista = el("div", { id: "lista-jogos", class: "lista-jogos" });
+    const agenda = el("div", { id: "agenda-jogador" });
+    const painel = el("aside", { id: "painel-top", class: "tela painel-top", "aria-label": "Classificação ao vivo", hidden: true });
+    raiz.append(
+      el("section", { id: "tela-jogos", class: "tela" },
+        el("div", { class: "tela-cabecalho" },
+          el("h2", {}, "Rodadas ", contador),
+          el("p", { class: "legenda" },
+            "Digite o placar e aperte Tab/Enter. 0×0 conta empate, mas vale 0 ponto. \"Anular\" fecha um jogo sem efeito "
+            + "(ex.: W.O. das duas duplas).")),
+        navegacao, lista, agenda),
+      painel);
 
     // Texto digitado nos campos de placar e ainda não lançado (placar pela metade, inválido
     // ou em edição). Não vai para o estado; tem prioridade sobre o estado ao redesenhar.
@@ -210,10 +225,6 @@
     }
 
     function renderizarJogos(atual, tabela) {
-      const lista = document.getElementById("lista-jogos");
-      const navegacao = document.getElementById("navegacao-semanas");
-      const agenda = document.getElementById("agenda-jogador");
-      const painel = document.getElementById("painel-top");
       painel.hidden = !atual.jogos.length;
       if (!atual.jogos.length) {
         painel.replaceChildren();
@@ -224,7 +235,7 @@
         lista.replaceChildren(cadastroPronto
           ? app.proximoPasso("Nenhum jogo ainda: os jogos aparecem aqui depois de sortear e confirmar o calendário.", "calendario", "Ir para o Calendário")
           : app.proximoPasso("Nenhum jogo ainda: cadastre os jogadores e depois sorteie o calendário.", "jogadores", "Ir para Jogadores"));
-        document.getElementById("contador-jogos").textContent = "";
+        contador.textContent = "";
         return;
       }
       const semana = semanaExibida(atual);
@@ -236,7 +247,7 @@
       agenda.replaceChildren(agendaDoJogador(atual, tabela));
       painelTop(painel, tabela);
       const lancados = atual.jogos.filter((j) => j.resultado).length;
-      document.getElementById("contador-jogos").textContent = `${lancados}/${atual.jogos.length} lançados`;
+      contador.textContent = `${lancados}/${atual.jogos.length} lançados`;
     }
 
     // ---------- lançamento ----------
@@ -245,8 +256,8 @@
     function guardarRascunho(ev) {
       const id = ev.target.dataset.jogo;
       rascunhos.set(id, {
-        1: document.getElementById(`gols-${id}-1`).value,
-        2: document.getElementById(`gols-${id}-2`).value,
+        1: buscar(raiz, `gols-${id}-1`).value,
+        2: buscar(raiz, `gols-${id}-2`).value,
       });
     }
 
@@ -255,7 +266,7 @@
       if (ev.key !== "Enter") return;
       ev.preventDefault();
       const { jogo: id, lado } = ev.target.dataset;
-      if (lado === "1") document.getElementById(`gols-${id}-2`).focus();
+      if (lado === "1") buscar(raiz, `gols-${id}-2`).focus();
       else ev.target.blur();
     }
 
