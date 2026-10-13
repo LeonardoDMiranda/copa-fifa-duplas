@@ -41,18 +41,24 @@
     <p id="status-salvamento" class="status-salvamento"></p>
   </header>
 
+  <!-- Etapas: antes de confirmar o calendário, os 3 passos da preparação; depois, as 3 telas da temporada
+       e Ajustes. ui.js mostra só as abas da fase atual, numera os atalhos (Alt+1...) e preenche os indicadores. -->
   <nav class="abas" aria-label="Etapas do campeonato">
     <div class="abas-lista" role="tablist">
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-jogadores" aria-controls="aba-jogadores" data-aba="jogadores" aria-keyshortcuts="Alt+1" title="Atalho: Alt+1">
-        Jogadores<span class="indicador" id="indicador-jogadores"></span></button>
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-calendario" aria-controls="aba-calendario" data-aba="calendario" aria-keyshortcuts="Alt+2" title="Atalho: Alt+2">
-        Calendário<span class="indicador" id="indicador-calendario"></span></button>
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-rodadas" aria-controls="aba-rodadas" data-aba="rodadas" aria-keyshortcuts="Alt+3" title="Atalho: Alt+3">
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-configuracao" aria-controls="aba-configuracao" data-aba="configuracao" hidden>
+        <span class="passo" aria-hidden="true">1</span>Configuração<span class="indicador" id="indicador-configuracao"></span></button>
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-jogadores" aria-controls="aba-jogadores" data-aba="jogadores" hidden>
+        <span class="passo" aria-hidden="true">2</span>Jogadores<span class="indicador" id="indicador-jogadores"></span></button>
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-sorteio" aria-controls="aba-sorteio" data-aba="sorteio" hidden>
+        <span class="passo" aria-hidden="true">3</span>Sorteio<span class="indicador" id="indicador-sorteio"></span></button>
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-rodadas" aria-controls="aba-rodadas" data-aba="rodadas" hidden>
         Rodadas<span class="indicador" id="indicador-rodadas"></span></button>
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-classificacao" aria-controls="aba-classificacao" data-aba="classificacao" aria-keyshortcuts="Alt+4" title="Atalho: Alt+4">
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-classificacao" aria-controls="aba-classificacao" data-aba="classificacao" hidden>
         Classificação<span class="indicador" id="indicador-classificacao"></span></button>
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-mata-mata" aria-controls="aba-mata-mata" data-aba="mata-mata" aria-keyshortcuts="Alt+5" title="Atalho: Alt+5">
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-mata-mata" aria-controls="aba-mata-mata" data-aba="mata-mata" hidden>
         Mata-mata<span class="indicador" id="indicador-mata-mata"></span></button>
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-campeonato" aria-controls="aba-campeonato" data-aba="campeonato" hidden>
+        <span data-icone="configurar"></span>Ajustes<span class="indicador" id="indicador-campeonato"></span></button>
     </div>
   </nav>
 
@@ -62,12 +68,14 @@
 
   <!-- Cada tela monta o próprio conteúdo dentro da sua aba: Telas.<nome>.criar(app, raiz). -->
   <main class="painel" id="conteudo-principal" tabindex="-1">
+    <section id="aba-configuracao" class="aba" role="tabpanel" aria-labelledby="aba-btn-configuracao" hidden></section>
     <section id="aba-jogadores" class="aba" role="tabpanel" aria-labelledby="aba-btn-jogadores" hidden></section>
-    <section id="aba-calendario" class="aba" role="tabpanel" aria-labelledby="aba-btn-calendario" hidden></section>
+    <section id="aba-sorteio" class="aba" role="tabpanel" aria-labelledby="aba-btn-sorteio" hidden></section>
     <section id="aba-rodadas" class="aba aba-rodadas" role="tabpanel" aria-labelledby="aba-btn-rodadas" hidden></section>
     <section id="aba-classificacao" class="aba aba-classificacao" role="tabpanel" aria-labelledby="aba-btn-classificacao" hidden></section>
-    <section id="aba-campeonatos" class="aba" aria-labelledby="titulo-tela-campeonatos" hidden></section>
     <section id="aba-mata-mata" class="aba" role="tabpanel" aria-labelledby="aba-btn-mata-mata" hidden></section>
+    <section id="aba-campeonato" class="aba" role="tabpanel" aria-labelledby="aba-btn-campeonato" hidden></section>
+    <section id="aba-campeonatos" class="aba" aria-labelledby="titulo-tela-campeonatos" hidden></section>
   </main>
 
   <div id="telao" class="telao" hidden></div>
@@ -75,17 +83,20 @@
   <!-- Scripts clássicos (sem módulos) para funcionar em file://. A ordem importa. -->
   <script src="js/regras.js"></script>
   <script src="js/estado.js"></script>
+  <script src="js/abas.js"></script>
   <script src="js/campeonatos.js"></script>
   <script src="js/icones.js"></script>
   <script src="js/util.js"></script>
   <script src="js/exportar.js"></script>
   <script src="js/telao.js"></script>
+  <script src="js/telas/configuracao.js"></script>
   <script src="js/telas/jogadores.js"></script>
-  <script src="js/telas/calendario.js"></script>
+  <script src="js/telas/sorteio.js"></script>
   <script src="js/telas/rodadas.js"></script>
   <script src="js/telas/classificacao.js"></script>
   <script src="js/telas/em-jogo.js"></script>
   <script src="js/telas/mata-mata.js"></script>
+  <script src="js/telas/campeonato.js"></script>
   <script src="js/telas/campeonatos.js"></script>
   <script src="js/ui.js"></script>
 </body>

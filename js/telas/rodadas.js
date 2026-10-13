@@ -250,7 +250,7 @@
         const camp = atual.campeonato;
         const cadastroPronto = Regras.diagnosticarCampeonato(camp.jogadores, camp.config).pronto;
         lista.replaceChildren(cadastroPronto
-          ? app.proximoPasso("Nenhum jogo ainda: os jogos aparecem aqui depois de sortear e confirmar o calendário.", "calendario", "Ir para o Calendário")
+          ? app.proximoPasso("Nenhum jogo ainda: os jogos aparecem aqui depois de sortear e confirmar o calendário.", "sorteio", "Ir para o Sorteio")
           : app.proximoPasso("Nenhum jogo ainda: cadastre os jogadores e depois sorteie o calendário.", "jogadores", "Ir para Jogadores"));
         contador.textContent = "";
         return;

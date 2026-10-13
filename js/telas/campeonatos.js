@@ -46,7 +46,7 @@
     }
 
     function duplicar(c) {
-      if (executar(() => campeonatos.duplicar(c.id), "jogadores")) {
+      if (executar(() => campeonatos.duplicar(c.id), "configuracao")) {
         app.focarDepois("nome-campeonato", { selecionar: true });
         avisar(`Nova edição criada a partir de "${c.nome}", com a mesma configuração e os mesmos jogadores.`);
       }

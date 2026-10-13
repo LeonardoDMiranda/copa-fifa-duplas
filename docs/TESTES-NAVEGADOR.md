@@ -42,10 +42,14 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
   (`#menu-campeonato > summary`) antes de clicar no item. Para importar, dá para mandar o arquivo
   direto em `#arquivo-importar` (`setInputFiles`); depois escolher na janela `#importar-novo` ou
   `#importar-substituir`.
-- **Fase 19:** os PNGs e o Resetar saíram do cabeçalho e ainda não têm botão na tela (os PNGs voltam
-  na Fase 21, o Resetar na Fase 20). Os casos 1b.9 (parte do Resetar), 1b.10, 9.6, 9.14, 10.x e 15.6
-  a 15.8 que dependem deles ficam suspensos até lá; o código (`exportarPNG`, `resetar` em `ui.js`)
-  continua e dá para chamar pelo console.
+- **Fase 19:** os PNGs saíram do cabeçalho e ainda não têm botão na tela (voltam na Fase 21). Os casos
+  1b.10, 10.x e 15.6 a 15.8 que dependem deles ficam suspensos até lá; o código (`exportarPNG` em
+  `ui.js`) continua e dá para chamar pelo console. O Resetar voltou na Fase 20, como "Reiniciar
+  campeonato" na zona de perigo da aba Ajustes (`#btn-reiniciar`).
+- **Fase 20:** antes de confirmar o calendário as abas são os 3 passos Configuração (`#configuracao`),
+  Jogadores (`#jogadores`) e Sorteio (`#sorteio`); depois, Rodadas, Classificação, Mata-mata e Ajustes
+  (`#campeonato`), que mostra Configuração, Jogadores, Sorteio e a zona de perigo juntos, em modo só
+  leitura. Ids dos botões das abas: `#aba-btn-<id>`. O endereço antigo `#calendario` vale `#sorteio`.
 - O seletor de campeonatos é o botão "Trocar" ao lado do título (`#menu-campeonatos > summary`); a
   tela de Campeonatos fica em `index.html#campeonatos`. Em cada cartão, o menu ⋯
   (`#campeonato-menu-<id> > summary`) guarda Duplicar, Exportar backup, Exportar modelo, Arquivar e
@@ -78,18 +82,24 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 
 | # | Passos | Esperado |
 |---|---|---|
-| 1b.1 | Abrir sem `#` no endereço, em cada etapa. | Abre na aba da etapa e o endereço passa a ter o `#` dela: sem cadastro pronto → Jogadores; cadastro pronto ou sorteio em rascunho → Calendário; calendário confirmado → Rodadas; chaveamento gerado → Mata-mata. |
+| 1b.1 | Abrir sem `#` no endereço, em cada etapa. | Abre na aba da etapa e o endereço passa a ter o `#` dela: sem jogadores → Configuração; jogadores sem o cadastro pronto → Jogadores; cadastro pronto ou sorteio em rascunho → Sorteio; calendário confirmado → Rodadas; chaveamento gerado → Mata-mata. |
 | 1b.2 | Na aba Jogadores, cadastrar o 8º jogador (a etapa muda). | Continua na aba Jogadores: a aba só muda por escolha. |
-| 1b.3 | Confirmar o calendário. | Vai sozinho para a aba Rodadas. |
-| 1b.4 | Clicar nas abas; usar ← → com o foco numa aba; Alt+1 a Alt+5 (também com o foco num campo). | Troca a aba e o endereço (`#jogadores`, `#calendario`, `#rodadas`, `#classificacao`, `#mata-mata`). As teclas 1 a 5 sozinhas não trocam de aba (digitam normalmente). Com o telão aberto, Alt+número não faz nada. |
+| 1b.3 | Confirmar o calendário. | As abas passam a ser Rodadas, Classificação, Mata-mata e Ajustes, e o app vai sozinho para Rodadas. |
+| 1b.4 | Clicar nas abas; usar ← → com o foco numa aba; Alt+1 a Alt+3 na preparação e Alt+1 a Alt+4 na temporada (também com o foco num campo). | Troca a aba e o endereço (`#configuracao`, `#jogadores`, `#sorteio`; `#rodadas`, `#classificacao`, `#mata-mata`, `#campeonato`). ← → só passam pelas abas visíveis. As teclas 1 a 9 sozinhas não trocam de aba (digitam normalmente). Alt+número sem aba correspondente não faz nada, nem com o telão aberto. |
 | 1b.5 | Voltar e avançar do navegador; F5. | Volta/avança entre as abas visitadas; F5 mantém a aba. |
-| 1b.6 | Indicadores das abas. | Jogadores: nº de jogadores. Calendário: "rascunho" ou ícone de confirmado. Rodadas: "lançados/total". Classificação: ícone de balança com empate técnico sem ordem no top 8. Mata-mata: troféu com campeões. O leitor de tela ouve o indicador por extenso (ex.: "Rodadas, 18 de 48 jogos lançados"). |
+| 1b.6 | Indicadores das abas. | Configuração: ícone de completo (jogos por jogador cabem nas semanas) ou de alerta. Jogadores: ícone de pronto para sortear ou o nº de jogadores enquanto falta acertar o cadastro. Sorteio: "rascunho" ou ícone de confirmado. Rodadas: "lançados/total". Classificação: ícone de balança com empate técnico sem ordem no top 8. Mata-mata: troféu com campeões. O leitor de tela ouve o indicador por extenso (ex.: "Rodadas, 18 de 48 jogos lançados"). |
 | 1b.7 | Rodadas em tela larga (≥ 1100 px). | Jogos da semana em duas colunas e, ao lado, "Top 8 ao vivo" (até o 10º, com a linha de corte no 8º) atualizando a cada placar. "Ver classificação completa" abre a aba Classificação. |
 | 1b.8 | Menus "Trocar" e "Campeonato" do cabeçalho. | Abrem por cima do conteúdo; abrir um fecha o outro; fecham ao escolher um item, ao clicar fora e com Esc (o foco volta para o botão do menu). Em ~400 px a lista ocupa a largura do cabeçalho, sem sair da tela. "Campeonato" tem Exportar backup, Importar backup e Gerenciar campeonatos. |
 | 1b.9 | Resetar ou importar um backup. | Vai para a aba da etapa do campeonato resultante. |
+| 1b.11 | Antes de confirmar, abrir `#rodadas`, `#campeonato` e `#calendario` à mão. | `#rodadas` e `#campeonato` não valem: o app mostra a aba da etapa e o endereço é corrigido. `#calendario` vira `#sorteio`. |
+| 1b.12 | Depois de confirmar, abrir `#jogadores`, `#sorteio` e `#calendario` à mão. | Os três caem em Ajustes (`#campeonato`). |
+| 1b.13 | Aba Ajustes. | Mostra, em ordem, Configuração (jogos e semanas desabilitados; nome e aparência editáveis), Jogadores (só renomear, estrelas fixas, sem "Combinação válida"), "Sorteio do calendário" confirmado com as 8 semanas e "Zona de perigo" com "Reiniciar campeonato". |
+| 1b.14 | "Reiniciar campeonato" na zona de perigo. | Janela "Resetar o campeonato?" (botão vermelho, foco em "Cancelar"); aceitando, volta ao cadastro vazio, as abas voltam a ser os 3 passos, no passo Configuração; Desfazer devolve o campeonato e as abas da temporada. |
 | 1b.10 | "PNG da classificação" com "após a semana N" escolhido. | Na aba Classificação, exporta a semana N (`...-classificacao-semana-N-...png`); em outra aba, exporta ao vivo. |
 
-## 2. Campeonato e jogadores
+## 2. Configuração e jogadores
+
+Os casos de nome, jogos por jogador, semanas e aparência são do passo **Configuração**; os de cadastro, estrelas e diagnóstico do cadastro são do passo **Jogadores** (a linha "N jogadores × J jogos ÷ 4 = ..." fica na Configuração). O botão "Próximo: jogadores" (Configuração) e "Próximo: sortear o calendário" (Jogadores, só com o cadastro pronto) levam ao passo seguinte.
 
 | # | Passos | Esperado |
 |---|---|---|
@@ -111,6 +121,8 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 
 ## 3. Sorteio e calendário
 
+Tela do passo **Sorteio** (`#sorteio`); depois da confirmação, o calendário completo fica em Ajustes.
+
 | # | Passos | Esperado |
 |---|---|---|
 | 3.1 | Com 32 jogadores, clicar em "Sortear calendário". | Rascunho com 8 semanas e 6 jogos por semana; botões "Sortear de novo", "Confirmar calendário" e "Descartar". |
@@ -119,7 +131,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 3.4 | Trocar um jogador num jogo do rascunho pelo seletor. | As opções dizem "(atual)", "— joga no jogo N (trocam de lugar)" ou "— descansa nesta semana". Escolhendo, o rascunho muda na hora. |
 | 3.5 | Trocar um jogador por alguém que descansa na semana. | O painel mostra "... tem 5 jogos (o esperado é 6).", "... tem 7 jogos ..." (cada um com o ícone de alerta) e, se for o caso, "... são parceiros 2 vezes.". "Confirmar" abre "Confirmar o calendário?" começando com "Atenção, o calendário não respeita o regulamento: ..." e o botão de ação em vermelho. |
 | 3.6 | "Descartar". | Volta para antes do sorteio. |
-| 3.7 | "Confirmar calendário". | Janela "Confirmar o calendário?"; aceitando, cria os 48 jogos (`s1-j1` ...), o cadastro trava (só renomear), aparece "Reiniciar campeonato" e o app vai para a aba Rodadas. |
+| 3.7 | "Confirmar calendário". | Janela "Confirmar o calendário?"; aceitando, cria os 48 jogos (`s1-j1` ...), o cadastro trava (só renomear), o "Reiniciar campeonato" fica em Ajustes e o app vai para a aba Rodadas. |
 | 3.8 | Depois de confirmado, tentar adicionar ou remover jogador. | Campo de nomes e botões de remover não aparecem; só "Renomear". |
 | 3.9 | Exportar o backup, resetar, importar e comparar o calendário. | Mesmo calendário (a semente vai no backup). |
 
@@ -215,7 +227,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 9.11 | Importar um arquivo que não é JSON. | "Não foi possível importar: o arquivo não é um JSON válido." |
 | 9.12 | Importar um backup da versão 1. | "Não foi possível importar: este backup é do formato antigo (versão 1, ...)". |
 | 9.13 **(R)** | Importar ("Substituir o ativo") e depois desfazer. | Volta o campeonato de antes da importação, com o registro de backup dele. |
-| 9.14 | "Reiniciar campeonato" (no cadastro travado). | Mesmo comportamento do "Resetar". |
+| 9.14 | "Reiniciar campeonato" (zona de perigo, na aba Ajustes). | Mesmo comportamento do "Resetar". |
 
 ## 10. Imagens (PNG)
 
@@ -268,11 +280,11 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 |---|---|---|
 | 14.1 | `localStorage` só com a chave antiga `copa-fifa-duplas-campeonato` (um campeonato com jogos) e abrir o app. | Abre esse campeonato, na aba da etapa. Existem `copa-fifa-duplas-indice` e `copa-fifa-duplas-campeonato-<id>`; a chave antiga continua igual. Recarregar não cria outra edição. |
 | 14.2 | Clicar em "Trocar" ao lado do título. | Abre a lista "Campeonatos" com as edições não arquivadas (a aberta com o ícone de confirmado e a situação embaixo de cada nome), "Novo campeonato" e "Gerenciar campeonatos". Fecha ao escolher, ao clicar fora e com Esc. Nome longo quebra linha, sem empurrar os botões do cabeçalho. |
-| 14.3 | "+ Novo campeonato". | Vai para a aba Jogadores com o nome "Copa FIFA em Duplas" selecionado: digitar substitui. Desfazer fica desabilitado (edição nova). |
+| 14.3 | "+ Novo campeonato". | Vai para o passo Configuração com o nome "Copa FIFA em Duplas" selecionado: digitar substitui. Desfazer fica desabilitado (edição nova). |
 | 14.4 | Escolher outra edição no seletor. | Carrega a edição, vai para a aba da etapa dela, aviso "Campeonato aberto: ...". O desfazer é o daquela edição. O lembrete de backup é o dela. |
 | 14.5 | Telão em outra janela (`index.html#telao`) e trocar de edição na primeira. | O telão passa a mostrar a nova edição sozinho (nome no topo e rodízio de telas). |
 | 14.6 | "Gerenciar campeonatos" (pelo "Trocar" ou pelo menu "Campeonato"). | `#campeonatos`, nenhuma aba de etapa selecionada. Edições em cartões, em uso (a aberta destacada, com a etiqueta "aberto" e sem botão Abrir) e "Arquivados"; cada cartão com situação, nº de jogadores, data de criação, "Abrir" à vista e o menu ⋯. Espaço usado no rodapé, como barra de progresso com o texto. |
-| 14.7 | Duplicar uma edição com jogos. | Nova edição "Nome (2)" aberta na aba Jogadores, com os mesmos jogadores e configuração, sem calendário nem jogos, cadastro livre. Duplicar de novo: "(3)". |
+| 14.7 | Duplicar uma edição com jogos. | Nova edição "Nome (2)" aberta no passo Configuração, com os mesmos jogadores e configuração, sem calendário nem jogos, cadastro livre. Duplicar de novo: "(3)". |
 | 14.8 | Arquivar uma edição pelo menu ⋯ (e depois a aberta). | Sai do seletor e vai para "Arquivados", sem botão Abrir e com "Desarquivar" à vista (o menu ⋯ dela não tem "Arquivar"). Arquivar a aberta abre a última não arquivada. Desarquivar devolve ao seletor. |
 | 14.9 | Excluir uma edição. | Janela "Excluir o campeonato?" com botão vermelho e foco em "Cancelar". "⬇ Exportar backup antes" baixa o JSON dela e a janela continua aberta. "Excluir" apaga a chave dela; sem desfazer. Excluir a última cria uma edição vazia. |
 | 14.10 | Exportar uma edição que não está aberta (tela de Campeonatos). | Baixa o JSON daquela edição; o registro de backup é gravado nela; a aberta não muda. |
@@ -295,7 +307,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 15.7 | Modo telão com cor e logo; depois tirar a aparência com o telão aberto. | Fundo do telão escurecido a partir da cor e logo à esquerda do nome. Sem aparência: fundo e topo padrão, sem recarregar. |
 | 15.8 | Exportar backup, Resetar e Desfazer. | O JSON tem `aparencia`. Resetar volta ao padrão; Desfazer devolve a cor e o logo. |
 | 15.9 | Tela de Campeonatos → "⬇ Modelo" numa edição com jogos. | Baixa `<nome>-modelo-<data>.json` com `tipo: "modelo-copa-fifa-duplas"`, `versao`, `campeonato` (nome, config, jogadores) e `aparencia`; sem jogos, calendário nem desfazer. |
-| 15.10 | "Novo a partir de modelo" e escolher o modelo. Repetir pelo "Backup → Importar". | Abre o seletor de arquivo. Sem a janela de escolha: edição nova aberta na aba Jogadores, com os jogadores, a configuração, a cor e o logo do modelo, cadastro livre e aviso "Campeonato criado a partir do modelo: ...". O importar reconhece o modelo do mesmo jeito. |
+| 15.10 | "Novo a partir de modelo" e escolher o modelo. Repetir pelo "Campeonato → Importar backup". | Abre o seletor de arquivo. Sem a janela de escolha: edição nova aberta no passo Configuração, com os jogadores, a configuração, a cor e o logo do modelo, cadastro livre e aviso "Campeonato criado a partir do modelo: ...". O importar reconhece o modelo do mesmo jeito. |
 | 15.11 | Modelo com `versao: 99` (ou um JSON qualquer com `tipo` de modelo e sem `campeonato`). | Erro "Não foi possível usar o modelo: ..."; nenhuma edição criada, a aberta não muda. |
 | 15.12 | Duplicar uma edição com cor e logo. | A cópia tem a mesma cor e o mesmo logo. |
 | 15.13 | Aba Jogadores e cabeçalho com logo em ~400 px e no tema escuro. | O bloco "Aparência" quebra a linha sem rolagem horizontal; o logo não empurra os botões do cabeçalho para fora; legível no escuro. |
@@ -305,14 +317,14 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | # | Passos | Esperado |
 |---|---|---|
 | 16.1 | Adicionar 32 jogadores. | Cada um aparece com 5 estrelas vazias e o nome destacado em âmbar; o resumo diz "32 sem estrelas"; a legenda explica que as estrelas só servem ao sorteio e só o organizador vê. |
-| 16.2 | Com estrelas faltando, ver o diagnóstico e a aba Calendário. | Aviso "Defina as estrelas ... de N jogadores: ..." (até 5 nomes); sem "Combinação válida"; botão "Sortear calendário" desabilitado. |
+| 16.2 | Com estrelas faltando, ver o diagnóstico (passo Jogadores) e o passo Sorteio. | Aviso "Defina as estrelas ... de N jogadores: ..." (até 5 nomes); sem "Combinação válida"; botão "Sortear calendário" desabilitado. |
 | 16.3 | Clicar na 4ª estrela de um jogador; depois Desfazer. | 4 estrelas cheias, a 4ª com `aria-pressed="true"`; Desfazer volta ao estado anterior ("estrelas de X: 4"). |
 | 16.4 | Só com o teclado: Tab até as estrelas, Enter/Espaço. | Foco visível em cada estrela; Enter define o nível e o foco continua na estrela. |
 | 16.5 | Definir as estrelas de todos e sortear. | O botão mostra "Sorteando…" e sai do ar enquanto calcula (~1 s). Nomes com `★N` no calendário; jogos com diferença mostram "Δ N" (destaque a partir de 2, fora do aceitável). Linha "Equilíbrio por nível: X de Y jogo(s) aceitáveis (diferença de até 1 estrela; Z sem diferença)... Maior saldo de estrelas...". Regulamento respeitado. |
 | 16.5b | Trocar jogadores à mão até um jogo ficar com diferença 2 ou mais. | Δ desse jogo destacado; a linha de equilíbrio fica em alerta e passa a dizer "N fora do aceitável (maior diferença: ...)". |
 | 16.6 | Trocar um jogador à mão por outro de nível bem diferente. | O seletor mostra `★N` ao lado de cada nome. Depois da troca, o Δ do jogo e a linha de equilíbrio mudam na hora. |
 | 16.7 | Com o rascunho aberto, mudar as estrelas de alguém na aba Jogadores e voltar. | O rascunho continua (não é descartado); Δ e equilíbrio refletem o novo nível. |
-| 16.8 | Confirmar o calendário. | Na aba Jogadores, as estrelas ficam só para ver (sem botões); no Calendário, `★N` e Δ continuam. |
+| 16.8 | Confirmar o calendário. | Em Ajustes, nos Jogadores as estrelas ficam só para ver (sem botões); no Sorteio do calendário, `★N` e Δ continuam. |
 | 16.9 | Telão (todas as telas), PNG da classificação e do mata-mata, aba Rodadas e Classificação. | Nenhuma estrela nem Δ em lugar nenhum. |
 | 16.10 | Importar um backup de antes das estrelas (jogadores sem `estrelas`), com o calendário confirmado. | Abre normalmente; na aba Jogadores, estrelas vazias (só para ver) e nomes em âmbar. No Calendário, sem `★N` nem Δ, e a linha "Equilíbrio por nível: não avaliado (o calendário foi confirmado sem as estrelas...)". Sem calendário confirmado, o resumo diz "N sem estrelas" e o sorteio pede para defini-las. |
 | 16.11 | Aba Jogadores e Calendário em ~400 px e no tema escuro. | Estrelas legíveis (cheias em âmbar, vazias em cinza) e sem rolagem horizontal. |

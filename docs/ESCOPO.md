@@ -157,17 +157,24 @@ Nome e situação de cada edição ("cadastro", "semana 5 de 8", "fase final", "
 
 ## 4. Telas
 
-Uma aba por etapa (Alt+1 a Alt+5; a aba ativa fica no endereço, ex.: `index.html#rodadas`). Sem `#`, abre na aba da etapa do campeonato; depois a aba só muda por escolha do organizador (e ao confirmar o calendário, que leva a Rodadas).
+Uma aba por etapa (Alt+1, Alt+2...; a aba ativa fica no endereço, ex.: `index.html#rodadas`). Sem `#`, abre na aba da etapa do campeonato; depois a aba só muda por escolha do organizador (e ao confirmar o calendário, que leva a Rodadas). As abas dependem da fase (`js/abas.js`):
 
-1. **Jogadores**: nome, jogos por jogador, semanas, aparência (cor e logo), diagnóstico da combinação e cadastro (um nome por linha; renomear, remover e nível de 1 a 5 estrelas).
-2. **Calendário**: sortear, conferir as restrições e o equilíbrio por nível, trocar jogadores à mão e confirmar.
-3. **Rodadas**: navegação por semana, cartões dos jogos com placar, "W.O.", "Anular" e "Limpar"; quem descansa na semana; agenda do jogador; top 8 ao vivo ao lado.
-4. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual. Ao lado, **o que está em jogo**: Garantidos / Em disputa / Eliminados.
-5. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
+**Preparação** (calendário ainda não confirmado), em 3 passos numerados, cada um com o seu indicador de completo:
+
+1. **Configuração** (`#configuracao`): nome, jogos por jogador, semanas, aparência (cor e logo) e a conta "N jogadores × J jogos ÷ 4 = ...".
+2. **Jogadores** (`#jogadores`): diagnóstico do cadastro e cadastro (um nome por linha; renomear, remover e nível de 1 a 5 estrelas).
+3. **Sorteio** (`#sorteio`): sortear, conferir as restrições e o equilíbrio por nível, trocar jogadores à mão e confirmar.
+
+**Temporada** (calendário confirmado):
+
+4. **Rodadas**: navegação por semana, cartões dos jogos com placar, "W.O.", "Anular" e "Limpar"; quem descansa na semana; agenda do jogador; top 8 ao vivo ao lado.
+5. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual. Ao lado, **o que está em jogo**: Garantidos / Em disputa / Eliminados.
+6. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
+7. **Ajustes** (`#campeonato`): Configuração, Jogadores e o calendário completo, só para ver (o nome, a aparência e o renomear continuam editáveis), e a **zona de perigo** com "Reiniciar campeonato". Os endereços dos passos da preparação (e o antigo `#calendario`) levam para cá depois da confirmação.
 
 **Campeonatos** (`index.html#campeonatos`, fora das abas de etapa): edições em uso e arquivadas, em cartões com Abrir (ou Desarquivar) à vista e um menu ⋯ com Duplicar, Exportar backup, Exportar modelo, Arquivar e Excluir; a aberta fica destacada; "Novo campeonato" e "Novo a partir de modelo"; espaço usado, em barra.
 
-**Cabeçalho**: na cor do campeonato, com o logo ao lado do título. O botão "Trocar" abre o seletor de campeonatos (edições não arquivadas, "+ Novo campeonato" e "Gerenciar campeonatos"). Desfazer, Modo telão e o menu "Campeonato" (exportar e importar o backup em JSON, Gerenciar campeonatos). Lembrete de backup quando for a hora. Os PNGs e o Resetar saíram do cabeçalho na Fase 19 e voltam nas fases 21 e 20.
+**Cabeçalho**: na cor do campeonato, com o logo ao lado do título. O botão "Trocar" abre o seletor de campeonatos (edições não arquivadas, "+ Novo campeonato" e "Gerenciar campeonatos"). Desfazer, Modo telão e o menu "Campeonato" (exportar e importar o backup em JSON, Gerenciar campeonatos). Lembrete de backup quando for a hora. Os PNGs saíram do cabeçalho na Fase 19 e voltam na Fase 21. O Reiniciar campeonato está na zona de perigo da aba Ajustes (Fase 20).
 
 ## 5. Como o projeto foi construído
 
@@ -188,6 +195,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 17 | Cada tela monta o próprio conteúdo (sem mudança visível) e testes das telas (`testes-telas.html`) |
 | 18 | Base visual e acessível: ícones SVG no lugar dos emojis, tokens de espaçamento e fonte, botões de 28 px, contraste do tema escuro, avisos que se fecham, erro junto do campo, plurais, "Semana 3 · Jogo 2" no lugar do id e atalhos Alt+1…5 |
 | 19 | Cabeçalho novo (título simples, botão "Trocar", menu "Campeonato") e tela de Campeonatos com cartões e menu ⋯ por edição |
+| 20 | Preparação em 3 passos (Configuração, Jogadores e Sorteio) e, depois de confirmar o calendário, abas Rodadas, Classificação, Mata-mata e Ajustes (os 3 passos só para ver, mais a zona de perigo com o Reiniciar). Lógica das abas em `js/abas.js` |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -212,7 +220,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
 | U | Base da interface: `plural`, `numero` (formato brasileiro), `rotuloDoJogo`, `botaoIcone` (nome acessível), ícones decorativos e atributos do erro junto do campo |
 
-`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo) V5 (erro junto do campo) e V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu).
+`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu) e V7 (abas por fase, endereços antigos e Ajustes).
 
 ## 7. Pendências
 

@@ -1,4 +1,5 @@
-// Tela "Calendário": sortear, conferir as restrições, trocar jogadores à mão e confirmar.
+// Tela "Sorteio" (passo 3 da preparação; depois da confirmação, o calendário completo em Ajustes):
+// sortear, conferir as restrições, trocar jogadores à mão e confirmar.
 
 (function () {
   "use strict";
@@ -11,10 +12,10 @@
   function criar(app, raiz) {
     const { estado, nomePorId, avisar, renderizar, cadastroTravado } = app;
 
-    const resumo = el("span", { id: "resumo-calendario", class: "contador" });
-    const alvo = el("div", { id: "conteudo-calendario" });
-    raiz.append(el("section", { id: "tela-calendario", class: "tela" },
-      el("div", { class: "tela-cabecalho" }, el("h2", {}, "Calendário ", resumo)),
+    const resumo = el("span", { id: "resumo-sorteio", class: "contador" });
+    const alvo = el("div", { id: "conteudo-sorteio" });
+    raiz.append(el("section", { id: "tela-sorteio", class: "tela" },
+      el("div", { class: "tela-cabecalho" }, el("h2", {}, "Sorteio do calendário ", resumo)),
       alvo));
 
     let editandoSlot = null; // { indice, lado, pos } do jogador do rascunho em troca
@@ -183,7 +184,7 @@
         // Confirmado sem estrelas (campeonato de antes delas): o cadastro já travou, não dá mais para definir.
         return el("p", { class: "legenda", id: "equilibrio-calendario" }, confirmado
           ? "Equilíbrio por nível: não avaliado (o calendário foi confirmado sem as estrelas de todos os jogadores)."
-          : "Equilíbrio por nível: defina as estrelas de todos os jogadores na aba Jogadores para ver.");
+          : "Equilíbrio por nível: defina as estrelas de todos os jogadores no passo Jogadores para ver.");
       }
       const saldo = eq.maiorSaldo ? `${eq.maiorSaldo.saldo > 0 ? "+" : ""}${eq.maiorSaldo.saldo} (${eq.maiorSaldo.nome})` : "0";
       const total = eq.aceitaveis + eq.foraDoAceitavel;
@@ -246,5 +247,5 @@
     };
   }
 
-  globalThis.Telas = { ...globalThis.Telas, calendario: { criar } };
+  globalThis.Telas = { ...globalThis.Telas, sorteio: { criar } };
 })();

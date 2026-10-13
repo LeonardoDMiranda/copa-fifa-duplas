@@ -99,12 +99,14 @@
   // "O que está em jogo" dividem a mesma, nesta ordem).
   const raiz = (aba) => document.getElementById(`aba-${aba}`);
   const telas = {
+    configuracao: Telas.configuracao.criar(app, raiz("configuracao")),
     jogadores: Telas.jogadores.criar(app, raiz("jogadores")),
-    calendario: Telas.calendario.criar(app, raiz("calendario")),
+    sorteio: Telas.sorteio.criar(app, raiz("sorteio")),
     rodadas: Telas.rodadas.criar(app, raiz("rodadas")),
     classificacao: Telas.classificacao.criar(app, raiz("classificacao")),
     emJogo: Telas.emJogo.criar(app, raiz("classificacao")),
     mataMata: Telas.mataMata.criar(app, raiz("mata-mata")),
+    campeonato: Telas.campeonato.criar(app, raiz("campeonato")),
     campeonatos: Telas.campeonatos.criar(app, raiz("campeonatos")),
   };
 
@@ -120,36 +122,15 @@
 
   // ---------- abas ----------
 
-  // Cada aba mostra uma ou mais telas; só as telas da aba visível são redesenhadas. As de etapa
-  // têm botão na barra (Alt+1 a Alt+5); a de campeonatos se abre pelo seletor do cabeçalho.
-  const ABAS = [
-    { id: "jogadores", telas: ["jogadores"] },
-    { id: "calendario", telas: ["calendario"] },
-    { id: "rodadas", telas: ["rodadas"] },
-    { id: "classificacao", telas: ["classificacao", "emJogo"] },
-    { id: "mata-mata", telas: ["mataMata"] },
-    { id: "campeonatos", telas: ["campeonatos"], semBotao: true },
-  ];
-  const ABA_POR_ID = new Map(ABAS.map((a) => [a.id, a]));
-  const ABAS_DE_ETAPA = ABAS.filter((a) => !a.semBotao);
+  // As abas, as fases e o endereço que vale para cada etapa estão em js/abas.js (funções puras).
+  const { ABAS, POR_ID: ABA_POR_ID, TODAS_AS_SECOES, abasDaFase, abaDaEtapa } = Abas;
 
-  // A aba ativa fica no endereço (#rodadas...): voltar/avançar do navegador funciona.
-  function abaDaUrl() {
-    const id = decodeURIComponent(location.hash.slice(1));
-    return ABA_POR_ID.has(id) ? id : null;
-  }
-
-  // Aba que interessa na etapa atual do campeonato.
-  function abaDaEtapa(atual) {
-    if (atual.mataMata) return "mata-mata";
-    if (atual.jogos.length) return "rodadas";
-    const camp = atual.campeonato;
-    if (camp.sorteio || Regras.diagnosticarCampeonato(camp.jogadores, camp.config).pronto) return "calendario";
-    return "jogadores";
+  function abaDaUrl(atual) {
+    return Abas.abaDoEndereco(location.hash.slice(1), atual);
   }
 
   function abaAtiva(atual) {
-    return abaDaUrl() || abaDaEtapa(atual);
+    return abaDaUrl(atual) || abaDaEtapa(atual);
   }
 
   function irParaAba(id) {
@@ -166,26 +147,36 @@
   function renderizarAbas(atual, tabela, ativa) {
     const camp = atual.campeonato;
     const travado = Regras.cadastroTravado(camp, atual.jogos);
+    const diag = Regras.diagnosticarCampeonato(camp.jogadores, camp.config);
+    const n = camp.jogadores.length;
     const lancados = atual.jogos.filter((j) => j.resultado).length;
     const empatePendente = tabela.some((l) => l.empateTecnico && !l.empateTecnico.ordemManual);
     const campeoes = atual.mataMata && Regras.resolverMataMata(atual.mataMata, tabela, camp.config).podio.campeoes;
+    // Passo 1: jogos por jogador cabem nas semanas (o resto do diagnóstico depende dos jogadores).
+    const configCompleta = !Regras.validarConfig(camp.config) && camp.config.jogosPorJogador <= camp.config.semanas;
     // { texto ou icone que aparece, leitor: o mesmo por extenso (entra no nome da aba e na dica) }
     const indicadores = {
-      jogadores: camp.jogadores.length
-        ? { texto: String(camp.jogadores.length), leitor: Util.plural(camp.jogadores.length, "jogador", "jogadores") } : null,
-      calendario: travado ? { icone: "confirmar", leitor: "calendário confirmado" }
+      configuracao: configCompleta ? { icone: "confirmar", leitor: "configuração completa" } : { icone: "alerta", leitor: "configuração com problema" },
+      jogadores: diag.pronto ? { icone: "confirmar", leitor: `${Util.plural(n, "jogador", "jogadores")}, pronto para sortear` }
+        : n ? { texto: String(n), leitor: `${Util.plural(n, "jogador", "jogadores")}, falta acertar o cadastro` } : null,
+      sorteio: travado ? { icone: "confirmar", leitor: "calendário confirmado" }
         : camp.sorteio && camp.sorteio.rascunho ? { texto: "rascunho", leitor: "sorteio ainda não confirmado" } : null,
       rodadas: atual.jogos.length ? { texto: `${lancados}/${atual.jogos.length}`, leitor: `${lancados} de ${atual.jogos.length} jogos lançados` } : null,
       classificacao: empatePendente ? { icone: "empate", leitor: "empate técnico no top 8 sem ordem definida" } : null,
       "mata-mata": campeoes ? { icone: "trofeu", leitor: "campeões definidos" } : null,
     };
-    for (const { id, semBotao } of ABAS) {
-      const selecionada = id === ativa;
-      document.getElementById(`aba-${id}`).hidden = !selecionada;
-      if (semBotao) continue;
+    const visiveis = abasDaFase(atual);
+    for (const { id } of ABAS) {
       const botao = document.getElementById(`aba-btn-${id}`);
+      if (!botao) continue; // a de campeonatos não tem botão
+      const posicao = visiveis.findIndex((a) => a.id === id);
+      botao.hidden = posicao < 0;
+      if (posicao < 0) continue;
+      const selecionada = id === ativa;
       botao.setAttribute("aria-selected", String(selecionada));
       botao.tabIndex = selecionada ? 0 : -1;
+      botao.setAttribute("aria-keyshortcuts", `Alt+${posicao + 1}`);
+      botao.title = `Atalho: Alt+${posicao + 1}`;
       const indicador = document.getElementById(`indicador-${id}`);
       const ind = indicadores[id];
       if (ind) {
@@ -198,6 +189,8 @@
         indicador.title = "";
       }
     }
+    const secoesVisiveis = new Set(ABA_POR_ID.get(ativa).secoes);
+    for (const secao of TODAS_AS_SECOES) document.getElementById(`aba-${secao}`).hidden = !secoesVisiveis.has(secao);
   }
 
   // ---------- cabeçalho e lembrete de backup ----------
@@ -403,7 +396,7 @@
       avisar(`Não foi possível usar o modelo: ${erro.message}`, "erro");
       return;
     }
-    sincronizarEdicao("jogadores");
+    sincronizarEdicao("configuracao");
     avisar(`Campeonato criado a partir do modelo: ${arquivo.name}`);
   }
 
@@ -505,10 +498,10 @@
     avisar(`Campeonato aberto: ${estado.atual().campeonato.nome}`);
   }
 
-  // Edição vazia: abre na aba Jogadores com o nome selecionado, pronto para digitar.
+  // Edição vazia: abre na Configuração com o nome selecionado, pronto para digitar.
   function novoCampeonato() {
     campeonatos.novo();
-    sincronizarEdicao("jogadores");
+    sincronizarEdicao("configuracao");
     app.focarDepois("nome-campeonato", { selecionar: true });
     avisar("Campeonato novo criado. Dê um nome e cadastre os jogadores.");
   }
@@ -564,6 +557,8 @@
     const aba = abaAtiva(atual);
     renderizarCabecalho(atual, tabela);
     renderizarLembreteBackup(atual);
+    // Endereço antigo (#calendario) ou de outra fase (#rodadas sem calendário confirmado): acerta.
+    if (location.hash !== "#telao" && location.hash !== `#${aba}`) history.replaceState(null, "", `#${aba}`);
     renderizarAbas(atual, tabela, aba);
     for (const nome of ABA_POR_ID.get(aba).telas) telas[nome].renderizar(atual, tabela);
     renderizarBarra();
@@ -646,20 +641,22 @@
     document.getElementById("conteudo-principal").focus();
   });
 
-  // Abas: clique, setas ←→ dentro da lista e Alt+1 a Alt+5. Alt+número não digita nada, então
-  // vale também com o foco num campo (atalho de uma tecla só atrapalharia quem digita).
-  const botoesAba = ABAS_DE_ETAPA.map(({ id }) => document.getElementById(`aba-btn-${id}`));
+  // Abas: clique, setas ←→ dentro da lista e Alt+1... (as abas visíveis). Alt+número não digita nada,
+  // então vale também com o foco num campo (atalho de uma tecla só atrapalharia quem digita).
+  const botoesAba = [...document.querySelectorAll(".aba-btn")];
   for (const botao of botoesAba) botao.addEventListener("click", () => irParaAba(botao.dataset.aba));
   document.querySelector(".abas-lista").addEventListener("keydown", (ev) => {
     if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+    const visiveis = botoesAba.filter((b) => !b.hidden);
+    const i = visiveis.indexOf(document.activeElement);
+    if (i < 0) return;
     ev.preventDefault();
-    const i = botoesAba.indexOf(document.activeElement);
-    const proximo = botoesAba[(i + (ev.key === "ArrowRight" ? 1 : botoesAba.length - 1)) % botoesAba.length];
+    const proximo = visiveis[(i + (ev.key === "ArrowRight" ? 1 : visiveis.length - 1)) % visiveis.length];
     proximo.focus();
     irParaAba(proximo.dataset.aba);
   });
   window.addEventListener("hashchange", () => {
-    if (abaDaUrl()) renderizar();
+    if (abaDaUrl(estado.atual())) renderizar();
   });
 
   document.addEventListener("keydown", (ev) => {
@@ -675,9 +672,10 @@
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z" && !digitando) {
       ev.preventDefault();
       desfazer();
-    } else if (ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && /^Digit[1-5]$/.test(ev.code)) {
+    } else if (ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && /^Digit[1-9]$/.test(ev.code)) {
       ev.preventDefault();
-      irParaAba(ABAS_DE_ETAPA[Number(ev.code.slice(-1)) - 1].id);
+      const aba = abasDaFase(estado.atual())[Number(ev.code.slice(-1)) - 1];
+      if (aba) irParaAba(aba.id);
     }
   });
 
@@ -686,7 +684,7 @@
   if (stCampeonatos.aviso) avisar(stCampeonatos.aviso, "erro");
   if (st.aviso) avisar(st.aviso, "erro");
   // st.erro (falha ao salvar) vira aviso no primeiro desenho da barra (renderizarBarra).
-  if (!abaDaUrl()) fixarAbaDaEtapa();
+  if (!abaDaUrl(estado.atual())) fixarAbaDaEtapa();
   renderizarAgora();
   // index.html#telao: janela separada para a TV. Tela cheia exige um clique (botão ⛶).
   if (location.hash === "#telao") telao.abrir({ telaCheia: false });

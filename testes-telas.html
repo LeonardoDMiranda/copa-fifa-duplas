@@ -29,15 +29,18 @@
   <script src="testes/dados-exemplo.js"></script>
   <script src="js/regras.js"></script>
   <script src="js/estado.js"></script>
+  <script src="js/abas.js"></script>
   <script src="js/campeonatos.js"></script>
   <script src="js/icones.js"></script>
   <script src="js/util.js"></script>
+  <script src="js/telas/configuracao.js"></script>
   <script src="js/telas/jogadores.js"></script>
-  <script src="js/telas/calendario.js"></script>
+  <script src="js/telas/sorteio.js"></script>
   <script src="js/telas/rodadas.js"></script>
   <script src="js/telas/classificacao.js"></script>
   <script src="js/telas/em-jogo.js"></script>
   <script src="js/telas/mata-mata.js"></script>
+  <script src="js/telas/campeonato.js"></script>
   <script src="js/telas/campeonatos.js"></script>
   <script>
     "use strict";
@@ -222,13 +225,13 @@
       t.igual(texto(raiz, "resumo-jogadores"), "0 jogadores", "resumo no título");
     });
 
-    caso("V1.2 Calendário com o app vazio: sorteio bloqueado e caminho para Jogadores", (t) => {
+    caso("V1.2 Sorteio com o app vazio: sorteio bloqueado e caminho para Jogadores", (t) => {
       const { montar } = criarAppFalso();
-      const raiz = montar("calendario");
-      verificarLimpeza(t, raiz, "calendário");
+      const raiz = montar("sorteio");
+      verificarLimpeza(t, raiz, "sorteio");
       t.verdadeiro(buscar(raiz, "btn-sortear").disabled, "\"Sortear calendário\" desabilitado");
       t.igual(botoesProximoPasso(raiz), ["jogadores"], "botão \"Ir para Jogadores\"");
-      t.igual(texto(raiz, "resumo-calendario"), "", "resumo vazio");
+      t.igual(texto(raiz, "resumo-sorteio"), "", "resumo vazio");
     });
 
     caso("V1.3 Rodadas com o app vazio: próximo passo leva a Jogadores", (t) => {
@@ -279,22 +282,57 @@
 
     // ---------- V2: fixture (32 jogadores, calendário confirmado, semana 1 lançada) ----------
 
+    caso("V1.8 Configuração com o app vazio: campos, aparência e próximo passo", (t) => {
+      const { montar } = criarAppFalso();
+      const raiz = montar("configuracao");
+      verificarLimpeza(t, raiz, "configuração");
+      t.verdadeiro(buscar(raiz, "tela-configuracao"), "a tela monta o próprio esqueleto (#tela-configuracao)");
+      t.igual(buscar(raiz, "nome-campeonato").value, "Copa FIFA em Duplas", "nome padrão no campo");
+      t.igual(buscar(raiz, "config-jogos").value, "6", "jogos por jogador");
+      t.igual(buscar(raiz, "config-semanas").value, "8", "semanas");
+      t.verdadeiro(buscar(raiz, "aparencia-cor"), "cor");
+      t.verdadeiro(texto(raiz, "diagnostico").startsWith("0 jogadores × 6 jogos"), "diagnóstico com zero jogadores");
+      t.igual(botoesProximoPasso(raiz), ["jogadores"], "botão \"Próximo: jogadores\"");
+    });
+
     caso("V2.1 Jogadores com a fixture: 32 jogadores e cadastro travado", (t) => {
       const { montar } = criarAppFalso(dadosComCalendario());
       const raiz = montar("jogadores");
       verificarLimpeza(t, raiz, "jogadores");
       t.igual(buscar(raiz, "lista-jogadores").children.length, 32, "32 jogadores na lista");
       t.igual(texto(raiz, "resumo-jogadores"), "32 jogadores · calendário confirmado", "resumo no título");
-      t.verdadeiro(buscar(raiz, "btn-reiniciar"), "botão \"Reiniciar campeonato\"");
+      t.verdadeiro(!buscar(raiz, "btn-reiniciar"), "o Reiniciar não fica mais aqui (zona de perigo, em Ajustes)");
+      t.verdadeiro(raiz.textContent.includes("Ajustes"), "diz onde está o Reiniciar");
       t.verdadeiro(!buscar(raiz, "novos-nomes"), "sem campo para adicionar nomes");
     });
 
-    caso("V2.2 Calendário com a fixture: 8 semanas confirmadas", (t) => {
+    caso("V2.1b Configuração com a fixture: jogos e semanas travados, sem próximo passo", (t) => {
       const { montar } = criarAppFalso(dadosComCalendario());
-      const raiz = montar("calendario");
-      verificarLimpeza(t, raiz, "calendário");
+      const raiz = montar("configuracao");
+      verificarLimpeza(t, raiz, "configuração");
+      t.verdadeiro(buscar(raiz, "config-jogos").disabled && buscar(raiz, "config-semanas").disabled, "jogos e semanas desabilitados");
+      t.verdadeiro(!buscar(raiz, "nome-campeonato").disabled, "o nome continua editável");
+      t.igual(botoesProximoPasso(raiz), [], "sem botão de próximo passo");
+      t.verdadeiro(texto(raiz, "diagnostico").startsWith("32 jogadores × 6 jogos"), "diagnóstico da fixture");
+    });
+
+    caso("V2.1c Zona de perigo: o Reiniciar chama o app", (t) => {
+      const ctx = criarAppFalso(dadosComCalendario());
+      let chamadas = 0;
+      ctx.app.resetar = () => { chamadas++; };
+      const raiz = ctx.montar("campeonato");
+      verificarLimpeza(t, raiz, "campeonato");
+      t.igual(raiz.querySelector("h2").textContent, "Zona de perigo", "título");
+      buscar(raiz, "btn-reiniciar").click();
+      t.igual(chamadas, 1, "o clique chama app.resetar");
+    });
+
+    caso("V2.2 Sorteio com a fixture: 8 semanas confirmadas", (t) => {
+      const { montar } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("sorteio");
+      verificarLimpeza(t, raiz, "sorteio");
       t.igual(raiz.querySelectorAll(".semana-calendario").length, 8, "8 semanas");
-      t.igual(texto(raiz, "resumo-calendario"), "confirmado · 48 jogos", "resumo no título");
+      t.igual(texto(raiz, "resumo-sorteio"), "confirmado · 48 jogos", "resumo no título");
       t.verdadeiro(!buscar(raiz, "btn-sortear"), "sem botão de sortear");
     });
 
@@ -448,7 +486,7 @@
       t.igual(raiz.textContent.match(new RegExp(EMOJI.source, "gu")), null, `${nome}: nenhum emoji no texto`);
     }
 
-    const TELAS = ["jogadores", "calendario", "rodadas", "classificacao", "emJogo", "mataMata", "campeonatos"];
+    const TELAS = ["configuracao", "jogadores", "sorteio", "rodadas", "classificacao", "emJogo", "mataMata", "campeonato", "campeonatos"];
 
     // Cadastro pronto (32 jogadores com estrelas), sem calendário: telas editáveis.
     function dadosCadastro({ rascunho = false } = {}) {
@@ -474,8 +512,9 @@
       buscar(jogadores, `renomear-${JOGADORES[0].id}`).click();
       t.verdadeiro(buscar(jogadores, `nome-${JOGADORES[0].id}`), "campo de renomear aberto");
       verificarAcessibilidade(t, jogadores, "jogadores (renomeando)");
+      verificarAcessibilidade(t, cadastro.montar("configuracao"), "configuração (cadastro aberto)");
       const comRascunho = criarAppFalso(dadosCadastro({ rascunho: true }));
-      const calendario = comRascunho.montar("calendario");
+      const calendario = comRascunho.montar("sorteio");
       t.verdadeiro(calendario.querySelector("button.nome-slot"), "nomes do rascunho viram botões de troca");
       verificarAcessibilidade(t, calendario, "calendário (sorteio em análise)");
       calendario.querySelector("button.nome-slot").click();
@@ -559,9 +598,9 @@
       t.igual(avisos, [], "nenhum aviso no canto");
     });
 
-    caso("V5.4 Jogadores: nome do campeonato vazio, número fora do limite e cor clara", (t) => {
+    caso("V5.4 Configuração: nome do campeonato vazio, número fora do limite e cor clara", (t) => {
       const { montar, estado, avisos } = criarAppFalso(dadosCadastro());
-      const raiz = montar("jogadores");
+      const raiz = montar("configuracao");
       mudarCampo(buscar(raiz, "nome-campeonato"), "   ");
       const nome = buscar(raiz, "nome-campeonato");
       t.igual(erroDoCampo(raiz, nome), "O nome do campeonato não pode ficar vazio.", "nome vazio: mensagem ligada ao campo");
@@ -688,6 +727,82 @@
       menuB.open = true;
       document.body.click();
       t.verdadeiro(!menuB.open, "clicar fora fecha o menu");
+    });
+
+    // ---------- V7: abas por fase (js/abas.js) e Ajustes ----------
+
+    const ids = (abas) => abas.map((a) => a.id);
+    // Cadastro sem estrelas: o diagnóstico não fica pronto (cai no passo Jogadores).
+    function dadosSemEstrelas() {
+      const dados = dadosCadastro();
+      dados.campeonato.jogadores = dados.campeonato.jogadores.map((j) => ({ ...j, estrelas: null }));
+      return dados;
+    }
+
+    caso("V7.1 Sem calendário confirmado, as abas são os 3 passos da preparação", (t) => {
+      for (const [rotulo, dados] of [["vazio", null], ["cadastro pronto", dadosCadastro()], ["sorteio em análise", dadosCadastro({ rascunho: true })]]) {
+        const { estado } = criarAppFalso(dados);
+        t.igual(Abas.faseDe(estado.atual()), "preparacao", `${rotulo}: fase de preparação`);
+        t.igual(ids(Abas.abasDaFase(estado.atual())), ["configuracao", "jogadores", "sorteio"], `${rotulo}: Configuração, Jogadores e Sorteio`);
+      }
+    });
+
+    caso("V7.2 Com o calendário confirmado, as abas são a temporada mais Ajustes", (t) => {
+      const { estado } = criarAppFalso(dadosComCalendario());
+      t.igual(Abas.faseDe(estado.atual()), "temporada", "fase da temporada");
+      t.igual(ids(Abas.abasDaFase(estado.atual())), ["rodadas", "classificacao", "mata-mata", "campeonato"], "Rodadas, Classificação, Mata-mata e Ajustes");
+    });
+
+    caso("V7.3 Endereços: o antigo #calendario e os de outra fase são acertados", (t) => {
+      const prep = criarAppFalso(dadosCadastro()).estado.atual();
+      const temp = criarAppFalso(dadosComCalendario()).estado.atual();
+      t.igual(Abas.abaDoEndereco("calendario", prep), "sorteio", "#calendario na preparação vale #sorteio");
+      t.igual(Abas.abaDoEndereco("calendario", temp), "campeonato", "#calendario depois de confirmar cai em Ajustes");
+      for (const passo of ["configuracao", "jogadores", "sorteio"]) {
+        t.igual(Abas.abaDoEndereco(passo, prep), passo, `#${passo} vale na preparação`);
+        t.igual(Abas.abaDoEndereco(passo, temp), "campeonato", `#${passo} depois de confirmar cai em Ajustes`);
+      }
+      for (const aba of ["rodadas", "classificacao", "mata-mata", "campeonato"]) {
+        t.igual(Abas.abaDoEndereco(aba, temp), aba, `#${aba} vale na temporada`);
+        t.igual(Abas.abaDoEndereco(aba, prep), null, `#${aba} não vale antes de confirmar (cai na etapa)`);
+      }
+      t.igual(Abas.abaDoEndereco("campeonatos", prep), "campeonatos", "a tela de Campeonatos vale em qualquer fase");
+      t.igual(Abas.abaDoEndereco("campeonatos", temp), "campeonatos", "a tela de Campeonatos vale na temporada");
+      t.igual(Abas.abaDoEndereco("", prep), null, "sem endereço: nenhuma");
+      t.igual(Abas.abaDoEndereco("qualquer-coisa", prep), null, "endereço desconhecido: nenhuma");
+      t.igual(Abas.abaDoEndereco("%E0%A4%A", prep), null, "endereço malformado: nenhuma, sem erro");
+    });
+
+    caso("V7.4 Aba da etapa: Configuração, Jogadores, Sorteio, Rodadas e Mata-mata", (t) => {
+      const etapa = (dados) => Abas.abaDaEtapa(criarAppFalso(dados).estado.atual());
+      t.igual(etapa(null), "configuracao", "app vazio: Configuração");
+      t.igual(etapa(dadosSemEstrelas()), "jogadores", "jogadores sem estrelas: Jogadores");
+      t.igual(etapa(dadosCadastro()), "sorteio", "cadastro pronto: Sorteio");
+      t.igual(etapa(dadosCadastro({ rascunho: true })), "sorteio", "sorteio em análise: Sorteio");
+      t.igual(etapa(dadosComCalendario()), "rodadas", "calendário confirmado: Rodadas");
+      t.igual(etapa(dadosComCalendario({ mataMata: true })), "mata-mata", "chaveamento gerado: Mata-mata");
+    });
+
+    caso("V7.5 Toda aba aponta para telas que existem e para seções sem repetição", (t) => {
+      for (const aba of Abas.ABAS) {
+        const faltam = aba.telas.filter((nome) => !Telas[nome]);
+        t.igual(faltam, [], `${aba.id}: todas as telas existem em Telas`);
+      }
+      const ajustes = Abas.POR_ID.get("campeonato");
+      t.igual(ajustes.secoes, ["configuracao", "jogadores", "sorteio", "campeonato"], "Ajustes empilha Configuração, Jogadores, Sorteio e a zona de perigo");
+      t.igual(Abas.TODAS_AS_SECOES.length, new Set(Abas.TODAS_AS_SECOES).size, "a lista de seções não repete");
+    });
+
+    caso("V7.6 Ajustes: as quatro telas juntas desenham sem ids repetidos, em modo só leitura", (t) => {
+      const ctx = criarAppFalso(dadosComCalendario());
+      const raizes = ["configuracao", "jogadores", "sorteio", "campeonato"].map((nome) => ctx.montar(nome));
+      const todos = [...raizes.flatMap((r) => [...r.querySelectorAll("[id]")].map((e) => e.id))];
+      t.igual(todos.filter((id, i) => todos.indexOf(id) !== i), [], "nenhum id repetido entre as telas de Ajustes");
+      t.verdadeiro(buscar(raizes[0], "config-jogos").disabled, "configuração: jogos desabilitados");
+      t.verdadeiro(!buscar(raizes[1], "novos-nomes"), "jogadores: sem adicionar nomes");
+      t.verdadeiro(!buscar(raizes[2], "btn-sortear"), "sorteio: sem sortear");
+      t.verdadeiro(buscar(raizes[3], "btn-reiniciar"), "zona de perigo: Reiniciar");
+      for (const r of raizes) verificarAcessibilidade(t, r, r.querySelector("section").id);
     });
 
     // ---------- execução e relatório ----------
