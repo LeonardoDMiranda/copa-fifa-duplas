@@ -42,10 +42,13 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
   (`#menu-campeonato > summary`) antes de clicar no item. Para importar, dá para mandar o arquivo
   direto em `#arquivo-importar` (`setInputFiles`); depois escolher na janela `#importar-novo` ou
   `#importar-substituir`.
-- **Fase 19:** os PNGs saíram do cabeçalho e ainda não têm botão na tela (voltam na Fase 21). Os casos
-  1b.10, 10.x e 15.6 a 15.8 que dependem deles ficam suspensos até lá; o código (`exportarPNG` em
-  `ui.js`) continua e dá para chamar pelo console. O Resetar voltou na Fase 20, como "Reiniciar
-  campeonato" na zona de perigo da aba Ajustes (`#btn-reiniciar`).
+- **PNGs:** desde a Fase 21, ficam no botão "Baixar imagem" da Classificação (`#btn-png-classificacao`) e do
+  Mata-mata (`#btn-png-mata-mata`, só com o chaveamento gerado). O Resetar é o "Reiniciar campeonato" da zona
+  de perigo da aba Ajustes (`#btn-reiniciar`).
+- **Fase 21:** as semanas das Rodadas são botões `#chip-semana-N` (a escolhida tem `aria-current="true"`),
+  com `#semana-anterior`, `#semana-proxima` e `#semana-atual`; não há mais `<select>` de semana. A coluna
+  Situação da Classificação é `td.col-situacao` (classe `garantido`, `disputa` ou `eliminado`), em linhas
+  `#linha-<id do jogador>`; o resumo dela fica em `#resumo-situacao`.
 - **Fase 20:** antes de confirmar o calendário as abas são os 3 passos Configuração (`#configuracao`),
   Jogadores (`#jogadores`) e Sorteio (`#sorteio`); depois, Rodadas, Classificação, Mata-mata e Ajustes
   (`#campeonato`), que mostra Configuração, Jogadores, Sorteio e a zona de perigo juntos, em modo só
@@ -95,7 +98,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 1b.12 | Depois de confirmar, abrir `#jogadores`, `#sorteio` e `#calendario` à mão. | Os três caem em Ajustes (`#campeonato`). |
 | 1b.13 | Aba Ajustes. | Mostra, em ordem, Configuração (jogos e semanas desabilitados; nome e aparência editáveis), Jogadores (só renomear, estrelas fixas, sem "Combinação válida"), "Sorteio do calendário" confirmado com as 8 semanas e "Zona de perigo" com "Reiniciar campeonato". |
 | 1b.14 | "Reiniciar campeonato" na zona de perigo. | Janela "Resetar o campeonato?" (botão vermelho, foco em "Cancelar"); aceitando, volta ao cadastro vazio, as abas voltam a ser os 3 passos, no passo Configuração; Desfazer devolve o campeonato e as abas da temporada. |
-| 1b.10 | "PNG da classificação" com "após a semana N" escolhido. | Na aba Classificação, exporta a semana N (`...-classificacao-semana-N-...png`); em outra aba, exporta ao vivo. |
+| 1b.10 | "Baixar imagem" na Classificação, ao vivo e com "após a semana N" escolhido. | Ao vivo: `...-classificacao-<data>.png`. Com a semana N: `...-classificacao-semana-N-...png`. |
 
 ## 2. Configuração e jogadores
 
@@ -139,20 +142,21 @@ Tela do passo **Sorteio** (`#sorteio`); depois da confirmação, o calendário c
 
 | # | Passos | Esperado |
 |---|---|---|
-| 4.1 | Abrir a tela de jogos depois de confirmar. | Mostra a semana em andamento, contador "0/48 lançados", chips S1 a S8 e "Descansam na semana 1 (8): ...". |
-| 4.2 | Navegar com ◀ ▶, pelos chips e pelo seletor de semana. | Mostra os jogos da semana escolhida. ◀ desabilitado na semana 1, ▶ na 8. |
-| 4.3 **(R)** | Escolher uma semana no seletor com o mouse. | A lista muda logo após escolher, sem precisar clicar em outro lugar. |
+| 4.1 | Abrir a tela de jogos depois de confirmar. | Mostra a semana em andamento, contador "0/48 lançados", a navegação ◀ S1 … S8 ▶ e "Semana atual", e "Descansam na semana 1 (8): ...". Não há seletor de semana. |
+| 4.2 | Navegar com ◀ ▶ e pelos botões S1…S8. | Mostra os jogos da semana escolhida (botão contornado). ◀ desabilitado na semana 1, ▶ na 8. A semana em andamento tem um ponto embaixo do número. |
+| 4.3 | "Semana atual". | Desabilitado na semana em andamento; em outra semana, volta para ela. O leitor de tela ouve cada botão por extenso ("Semana 2, 0 de 6 jogos resolvidos, em andamento"; "Semana 1, completa"). |
 | 4.4 | Digitar o placar: 1º campo, Enter, 2º campo, Enter. | Enter no 1º pula para o 2º; Enter no 2º lança. Cartão vira "lançado", contador "1/48 lançados". |
 | 4.5 | Lançar usando Tab entre os campos. | Lança ao sair do 2º campo; o foco segue para o botão "W.O." do mesmo jogo, sem se perder no redesenho. |
 | 4.6 | Digitar um placar e clicar direto num botão de outro jogo (ex.: "W.O."). | O clique funciona na primeira tentativa (o redesenho espera soltar o mouse). |
 | 4.7 | Digitar "abc", "-1" ou "100". | Erro "Placar inválido: use números de 0 a 99." embaixo do placar, no cartão do jogo, e o campo fica marcado. |
 | 4.8 | Apagar um lado de um placar já lançado. | O jogo volta a ficar pendente. |
-| 4.9 | W.O. → "Dupla 1". | Resultado W.O.: dupla 1 com 3×0, 3 pontos e +3 de saldo; dupla 2 com −3. "Cancelar" fecha a escolha sem lançar. |
+| 4.9 | W.O. → botão com os nomes da dupla 1. | A pergunta "W.O.: qual dupla estava presente?" vem com um botão por dupla, com os nomes ("Jogador 19 + Jogador 10"). Resultado W.O.: dupla 1 com 3×0, 3 pontos e +3 de saldo; dupla 2 com −3. "Cancelar" fecha a escolha sem lançar. |
 | 4.10 | "Anular". | Jogo resolvido, mas ninguém ganha ponto, V/E/D, gol nem jogo disputado. |
 | 4.11 | "Limpar" num jogo lançado. | Volta a ficar pendente. |
 | 4.12 | Lançar 0×0 e 1×1. | 0×0: E+1 e 0 ponto para os 4. 1×1: E+1 e 1 ponto. |
-| 4.13 | Completar uma semana. | O chip dela fica "completa"; "Ir para a semana em andamento (N)" aparece quando se olha outra semana. |
-| 4.14 **(R)** | Agenda do jogador: escolher um jogador no seletor. | Aparece na hora o resumo (posição, pontos, V/E/D, SG) e os 6 jogos dele. A posição bate com a tabela de classificação. |
+| 4.13 | Completar uma semana. | O botão dela fica verde (completa) e o ponto da semana em andamento passa para a seguinte. |
+| 4.14 **(R)** | Agenda do jogador: escolher um jogador no seletor. | Aparece na hora o resumo (posição, pontos, V/E/D, SG) e os 6 jogos dele. A posição bate com a tabela de classificação. (Vai para a ficha do jogador na Fase 22.) |
+| 4.15 | Leitor de tela nos cartões. | Cada cartão tem um título (`h3`) "Semana N · Jogo M"; na tela aparece só "Jogo M". |
 
 ## 5. Classificação
 
@@ -166,19 +170,24 @@ Tela do passo **Sorteio** (`#sorteio`); depois da confirmação, o calendário c
 | 5.6 | Empate técnico (iguais em pontos, V, SG e GP) começando no top 8. | Balança no grupo, botões "Subir"/"Descer" (setas) e "Confirmar a ordem atual" no primeiro do grupo. |
 | 5.7 | Usar ↑↓ no grupo empatado. | A ordem muda e fica guardada; recarregar mantém. |
 | 5.8 | Lançar algo que desfaz o empate do grupo. | A ordem manual daquele grupo é descartada. |
+| 5.9 | Tela inteira. | A tabela ocupa a largura toda (sem painel ao lado). Legenda curta "Top 8 vai para a fase final" e, fechado, "Como ler" com ▲▼, empate técnico e a explicação da Situação. |
+| 5.10 | "Baixar imagem". | Igual ao 1b.10 e ao 10.1. |
 
-## 6. O que está em jogo
+## 6. Situação (o que está em jogo)
+
+Coluna "Situação" da Classificação, só ao vivo (no lugar do antigo painel "O que está em jogo").
 
 | # | Passos | Esperado |
 |---|---|---|
-| 6.1 | Sem jogos. | "Ainda não há jogos." |
-| 6.2 | Com mais de 8 jogos pendentes. | "Disponível quando faltarem até 8 jogos (faltam N)." |
-| 6.3 **(R)** | Com 5 jogos pendentes. | "5 jogo(s) pendente(s) · 1.024 cenários" (4⁵: o anulado conta junto do 0×0). |
-| 6.4 | Conferir as colunas. | Garantidos + Em disputa + Eliminados = 32. Cada jogador em uma só coluna. |
+| 6.1 | Sem jogos. | Sem a coluna e sem a linha de resumo. |
+| 6.2 | Com mais de 8 jogos pendentes. | Linha "Situação disponível quando faltarem até 8 jogos (faltam N)." e sem a coluna. |
+| 6.3 **(R)** | Com 5 jogos pendentes. | Linha "Situação: 5 jogos pendentes, 1.024 cenários." (4⁵: o anulado conta junto do 0×0). |
+| 6.4 | Conferir a coluna. | Cada jogador com um só ícone e texto: Garantido, Em disputa ou Eliminado. |
 | 6.5 | Jogador garantido. | Em nenhum cenário fica fora do top 8 (conferir um caso à mão). |
-| 6.6 | Jogador em disputa que depende do saldo. | Mostra "depende do saldo". |
-| 6.7 | Todos os jogos lançados. | "todos os jogos lançados"; só garantidos e eliminados (ou "depende do desempate" para empate técnico sem ordem manual). |
+| 6.6 | Jogador em disputa. | Embaixo, "Próximo: Semana N · Jogo M" (com "+N" se joga mais depois) ou "Não joga mais, só pode cair", e "depende do saldo" quando for o caso. Cabe numa linha em tela larga. |
+| 6.7 | Todos os jogos lançados. | "Situação: todos os jogos lançados."; só garantidos e eliminados (ou "depende do desempate" para empate técnico sem ordem manual). |
 | 6.8 | Medir o tempo com 8 pendentes. | A tela responde em menos de 1 s. |
+| 6.9 | Escolher "após a semana N". | A coluna e a linha de resumo somem; voltar para "Atual (ao vivo)" traz as duas de volta. |
 
 ## 7. Mata-mata
 
@@ -199,6 +208,8 @@ Tela do passo **Sorteio** (`#sorteio`); depois da confirmação, o calendário c
 | 7.13 **(R)** | No caso 7.12, clicar em "Usar duplas que saem das semis". | Janela "Trocar as duplas mesmo assim?" ("... já tem placar lançado. Os placares continuam e passam a valer para as novas duplas."). Aceitando, troca as duplas e mantém os placares; o alerta some. "Desfazer" volta ao estado anterior. |
 | 7.14 | Resultados do mata-mata. | A classificação não muda. |
 | 7.15 | "Apagar chaveamento". | Janela "Apagar o chaveamento?"; aceitando, apaga tudo do mata-mata; "Desfazer" traz de volta. |
+| 7.16 | Com o chaveamento gerado, "Baixar imagem" (à esquerda; "Apagar chaveamento" à direita). Sem chaveamento. | Baixa `...-mata-mata-<data>.png`. Sem chaveamento, o botão não aparece. |
+| 7.17 | Leitor de tela no editor de dupla e no pódio. | Os seletores dizem o confronto ("Final, dupla 1, jogador 2"); as medalhas do pódio não são lidas. |
 
 ## 8. Desfazer
 
@@ -231,12 +242,14 @@ Tela do passo **Sorteio** (`#sorteio`); depois da confirmação, o calendário c
 
 ## 10. Imagens (PNG)
 
+Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
+
 | # | Passos | Esperado |
 |---|---|---|
-| 10.1 | "PNG da classificação". | Baixa a imagem; aviso "Imagem baixada: ...". Imagem legível, top 8 destacado, todos os jogadores. |
-| 10.2 | PNG da classificação com 8 e com 40 jogadores. | As linhas cabem; nomes de 30 caracteres não cortam. |
-| 10.3 | "PNG do mata-mata" sem chaveamento. | Aviso "Gere o chaveamento antes de exportar o mata-mata." |
-| 10.4 | "PNG do mata-mata" com prorrogação, pênaltis e final MD3. | Mostra os placares extras e o pódio. |
+| 10.1 | "Baixar imagem" na Classificação. | Baixa a imagem; aviso "Imagem baixada: ...". Imagem legível, top 8 destacado, todos os jogadores (sem a coluna Situação). |
+| 10.2 | Imagem da classificação com 8 e com 40 jogadores. | As linhas cabem; nomes de 30 caracteres não cortam. |
+| 10.3 | Mata-mata sem chaveamento. | Não há "Baixar imagem" (ver 7.16). |
+| 10.4 | "Baixar imagem" no Mata-mata com prorrogação, pênaltis e final MD3. | Mostra os placares extras e o pódio. |
 
 ## 11. Modo telão
 
@@ -332,6 +345,24 @@ Tela do passo **Sorteio** (`#sorteio`); depois da confirmação, o calendário c
 ---
 
 ## Última execução
+
+**Fase 21 (Rodadas, Classificação e Mata-mata enxutas), 2026-10-13**, Playwright (Chromium) e Lighthouse
+(Chrome DevTools) via servidor local, antes do commit da fase. Massa: 32 jogadores fictícios com calendário
+confirmado e 7 semanas lançadas (6 pendentes).
+
+- `testes.html`: 101 passaram, 0 falharam. `testes-telas.html`: 45 passaram, 0 falharam (V8.1 a V8.7 novos;
+  V1.5, V2.5 e V4.4 passaram a olhar a coluna Situação).
+- **Lighthouse (acessibilidade, modo snapshot):** 100 em Rodadas, Classificação (com a coluna Situação) e
+  Mata-mata (chaveamento gerado), nos temas claro e escuro.
+- **Passaram:** 1b.10 (ao vivo e "após a semana 3", com `-semana-3` no nome), 4.1 a 4.3 e 4.9 (W.O. com os
+  nomes; status "W.O. – dupla 1 presente (3×0)"), 6.4, 6.6 e 6.9 (com 6 pendentes: "Situação: 6 jogos
+  pendentes, 4.096 cenários.", 3 garantidos, 16 em disputa e 13 eliminados, igual a `Regras.calcularSituacoes`),
+  7.16 (chaveamento ainda sem placares) e 7.17, 10.1 (download interceptado), 13.1 (sem
+  rolagem horizontal em 400 e 1920 px nas três abas). Console sem erros do app (só o `favicon.ico` que o
+  servidor do Python não tem).
+- **Ajustado antes do commit:** o ponto da semana em andamento encostava no "S1"; na coluna Situação, o
+  próximo jogo e "depende do saldo" ficavam em três linhas e passaram a dividir uma linha.
+- **Falta:** o caso 1.1 (duplo clique, `file://`), o passeio só com o teclado (13.2) e o roteiro completo.
 
 **Fase 18 (base visual e acessível), 2026-10-13**, Playwright (Chromium) e Lighthouse (Chrome DevTools)
 via servidor local, antes do commit da fase. Massa: 32 jogadores fictícios com calendário confirmado e 3 (ou 7)

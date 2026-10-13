@@ -117,7 +117,10 @@
               modificarMataMata("atualizar duplas da final e do 3º lugar", (m) => Regras.atualizarDuplasDasFinais(m, tabelaAtual(), app.config()));
             },
           }, "Usar duplas que saem das semis")),
-        el("button", { type: "button", id: "btn-apagar-chave", class: "perigo discreto", onclick: apagarChaveamento }, "Apagar chaveamento"));
+        el("div", { class: "barra-tela" },
+          el("button", { type: "button", id: "btn-png-mata-mata", onclick: () => app.exportarPNG("mata-mata") },
+            Icones.svg("imagem"), "Baixar imagem"),
+          el("button", { type: "button", id: "btn-apagar-chave", class: "perigo discreto acao-direita", onclick: apagarChaveamento }, "Apagar chaveamento")));
     }
 
     function editorDupla(c, lado, tabela) {
@@ -127,7 +130,7 @@
       const idErro = `${chaveErro}-erro`;
       const erro = errosCampo.get(chaveErro);
       const seletor = (n) => el("select", {
-        id: `sel-${c.chave}-${lado}-${n}`, "aria-label": `Jogador ${n} da dupla ${lado}`, ...Util.atributosDeErro(idErro, erro),
+        id: `sel-${c.chave}-${lado}-${n}`, "aria-label": `${ROTULOS[c.chave]}, dupla ${lado}, jogador ${n}`, ...Util.atributosDeErro(idErro, erro),
       },
         el("option", { value: "" }, "Jogador"),
         tabela.map((l) => el("option", { value: l.id, selected: l.id === atual[n - 1] }, `${l.posicao}º ${l.nome}`)));
@@ -280,7 +283,7 @@
 
     function podio(p) {
       const degrau = (classe, icone, titulo, dupla) => el("div", { class: `degrau ${classe}${dupla ? "" : " vazio"}` },
-        el("span", { class: "medalha" }, Icones.svg(icone)),
+        el("span", { class: "medalha", "aria-hidden": "true" }, Icones.svg(icone)),
         el("div", {},
           el("div", { class: "titulo-degrau" }, titulo),
           dupla

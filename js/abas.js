@@ -16,7 +16,7 @@
     { id: "jogadores", fase: "preparacao", telas: ["jogadores"], secoes: ["jogadores"] },
     { id: "sorteio", fase: "preparacao", telas: ["sorteio"], secoes: ["sorteio"] },
     { id: "rodadas", fase: "temporada", telas: ["rodadas"], secoes: ["rodadas"] },
-    { id: "classificacao", fase: "temporada", telas: ["classificacao", "emJogo"], secoes: ["classificacao"] },
+    { id: "classificacao", fase: "temporada", telas: ["classificacao"], secoes: ["classificacao"] },
     { id: "mata-mata", fase: "temporada", telas: ["mataMata"], secoes: ["mata-mata"] },
     {
       id: "campeonato", fase: "temporada", telas: ["configuracao", "jogadores", "sorteio", "campeonato"],

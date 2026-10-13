@@ -38,7 +38,6 @@
   <script src="js/telas/sorteio.js"></script>
   <script src="js/telas/rodadas.js"></script>
   <script src="js/telas/classificacao.js"></script>
-  <script src="js/telas/em-jogo.js"></script>
   <script src="js/telas/mata-mata.js"></script>
   <script src="js/telas/campeonato.js"></script>
   <script src="js/telas/campeonatos.js"></script>
@@ -130,6 +129,7 @@
       const nomePorId = new Map();
       const avisos = [];
       const abasPedidas = [];
+      const imagens = []; // tipos pedidos a app.exportarPNG
       const telas = [];
 
       const base = () => Regras.baseDosJogadores(estado.atual().campeonato.jogadores);
@@ -172,6 +172,7 @@
         novoCampeonato() {},
         exportarEdicao() {},
         exportarModelo() {},
+        exportarPNG: (tipo) => { imagens.push(tipo); },
         escolherArquivoParaImportar() {},
       };
       sincronizarJogadores();
@@ -187,7 +188,7 @@
         return raiz;
       }
 
-      return { app, estado, avisos, abasPedidas, montar, tabelaAtual };
+      return { app, estado, avisos, abasPedidas, imagens, montar, tabelaAtual };
     }
 
     // ---------- verificações comuns ----------
@@ -254,11 +255,11 @@
       t.igual(botoesProximoPasso(raiz), ["jogadores"], "botão \"Ir para Jogadores\"");
     });
 
-    caso("V1.5 O que está em jogo com o app vazio", (t) => {
+    caso("V1.5 Classificação com o app vazio: sem a coluna Situação nem o resumo dela", (t) => {
       const { montar } = criarAppFalso();
-      const raiz = montar("emJogo");
-      verificarLimpeza(t, raiz, "em jogo");
-      t.igual(texto(raiz, "conteudo-em-jogo"), "Ainda não há jogos.", "avisa que não há jogos");
+      const raiz = montar("classificacao");
+      t.verdadeiro(buscar(raiz, "resumo-situacao").hidden, "resumo da Situação escondido");
+      t.verdadeiro(!raiz.querySelector("th.col-situacao"), "sem a coluna Situação");
     });
 
     caso("V1.6 Mata-mata com o app vazio: precisa de jogadores", (t) => {
@@ -344,7 +345,8 @@
       const semana = Regras.semanaAtual(dados.jogos, dados.campeonato.config);
       t.igual(semana, 2, "semana em andamento = 2 (a 1 está completa)");
       t.igual(texto(raiz, "contador-jogos"), "6/48 lançados", "contador no título");
-      t.igual(raiz.querySelector(".chip-semana.selecionada").textContent, `S${semana}`, "chip da semana em andamento selecionado");
+      const selecionadas = [...raiz.querySelectorAll('.chip-semana[aria-current="true"]')].map((b) => b.id);
+      t.igual(selecionadas, [`chip-semana-${semana}`], "botão da semana em andamento marcado como atual");
       t.igual(buscar(raiz, "lista-jogos").querySelectorAll(".jogo").length, 6, "6 cartões de jogo");
       const painel = buscar(raiz, "painel-top");
       t.verdadeiro(!painel.hidden, "top 8 ao vivo visível");
@@ -362,13 +364,13 @@
       t.verdadeiro(buscar(raiz, "select-semana-classificacao"), "escolha de semana disponível");
     });
 
-    caso("V2.5 O que está em jogo com a fixture: pendentes demais", (t) => {
+    caso("V2.5 Classificação com a fixture: pendentes demais para a Situação", (t) => {
       const dados = dadosComCalendario();
       const { montar } = criarAppFalso(dados);
-      const raiz = montar("emJogo");
-      verificarLimpeza(t, raiz, "em jogo");
+      const raiz = montar("classificacao");
       const limite = Regras.limitePendentesSituacoes(dados.campeonato.config);
-      t.igual(texto(raiz, "conteudo-em-jogo"), `Disponível quando faltarem até ${limite} jogos (faltam 42).`, "explica quando fica disponível");
+      t.igual(texto(raiz, "resumo-situacao"), `Situação disponível quando faltarem até ${limite} jogos (faltam 42).`, "explica quando fica disponível");
+      t.verdadeiro(!raiz.querySelector("th.col-situacao"), "sem a coluna Situação");
     });
 
     caso("V2.6 Mata-mata com a fixture: prévia do chaveamento", (t) => {
@@ -486,7 +488,7 @@
       t.igual(raiz.textContent.match(new RegExp(EMOJI.source, "gu")), null, `${nome}: nenhum emoji no texto`);
     }
 
-    const TELAS = ["configuracao", "jogadores", "sorteio", "rodadas", "classificacao", "emJogo", "mataMata", "campeonato", "campeonatos"];
+    const TELAS = ["configuracao", "jogadores", "sorteio", "rodadas", "classificacao", "mataMata", "campeonato", "campeonatos"];
 
     // Cadastro pronto (32 jogadores com estrelas), sem calendário: telas editáveis.
     function dadosCadastro({ rascunho = false } = {}) {
@@ -522,11 +524,11 @@
       verificarAcessibilidade(t, calendario, "calendário (trocando um jogador)");
     });
 
-    caso("V4.4 Acessibilidade no fim da temporada: em jogo, empates e mata-mata", (t) => {
+    caso("V4.4 Acessibilidade no fim da temporada: situação, empates e mata-mata", (t) => {
       const fim = criarAppFalso(dadosComCalendario({ semanasLancadas: 7 }));
-      const emJogo = fim.montar("emJogo");
-      t.verdadeiro(buscar(emJogo, "coluna-disputa"), "colunas de situação calculadas");
-      verificarAcessibilidade(t, emJogo, "em jogo (situações)");
+      const comSituacao = fim.montar("classificacao");
+      t.verdadeiro(comSituacao.querySelector("td.col-situacao"), "coluna Situação calculada");
+      verificarAcessibilidade(t, comSituacao, "classificação (situações)");
       const comEmpate = criarAppFalso(dadosComCalendario()); // semana 1: 8 jogadores em empate técnico
       const classificacao = comEmpate.montar("classificacao");
       t.verdadeiro(classificacao.querySelector(".controle-desempate button"), "botões de desempate");
@@ -803,6 +805,115 @@
       t.verdadeiro(!buscar(raizes[2], "btn-sortear"), "sorteio: sem sortear");
       t.verdadeiro(buscar(raizes[3], "btn-reiniciar"), "zona de perigo: Reiniciar");
       for (const r of raizes) verificarAcessibilidade(t, r, r.querySelector("section").id);
+    });
+
+    // ---------- V8: Rodadas, Classificação e Mata-mata enxutas ----------
+
+    // Clica no botão de id `id` (a tela é redesenhada na hora: buscar de novo depois).
+    const clicar = (raiz, id) => buscar(raiz, id).click();
+    const semanaMarcada = (raiz) => [...raiz.querySelectorAll('.chip-semana[aria-current="true"]')].map((b) => b.id);
+
+    caso("V8.1 Rodadas: um botão por semana, ◀▶ desabilitados nas pontas e \"Semana atual\"", (t) => {
+      const { montar } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      t.verdadeiro(!buscar(raiz, "select-semana"), "sem o seletor de semana (<select>)");
+      t.igual([...raiz.querySelectorAll(".chip-semana")].map((b) => b.id), [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `chip-semana-${n}`), "um botão por semana, S1 a S8");
+      t.igual(nomeAcessivel(buscar(raiz, "chip-semana-1")), "Semana 1, completa", "semana completa: o progresso por extenso");
+      t.igual(nomeAcessivel(buscar(raiz, "chip-semana-2")), "Semana 2, 0 de 6 jogos resolvidos, em andamento", "semana em andamento: o progresso por extenso");
+      t.verdadeiro(buscar(raiz, "chip-semana-1").classList.contains("completa"), "semana completa marcada pela cor");
+      t.verdadeiro(buscar(raiz, "semana-atual").disabled, "na semana em andamento, \"Semana atual\" desabilitado");
+      clicar(raiz, "chip-semana-1");
+      t.igual(semanaMarcada(raiz), ["chip-semana-1"], "clicar em S1 mostra a semana 1");
+      t.verdadeiro(buscar(raiz, "semana-anterior").disabled && !buscar(raiz, "semana-proxima").disabled, "na semana 1, só ◀ desabilitado");
+      t.verdadeiro(!buscar(raiz, "semana-atual").disabled, "fora da semana em andamento, \"Semana atual\" habilitado");
+      clicar(raiz, "semana-atual");
+      t.igual(semanaMarcada(raiz), ["chip-semana-2"], "\"Semana atual\" volta para a semana em andamento");
+      clicar(raiz, "chip-semana-8");
+      t.verdadeiro(buscar(raiz, "semana-proxima").disabled && !buscar(raiz, "semana-anterior").disabled, "na semana 8, só ▶ desabilitado");
+      clicar(raiz, "semana-anterior");
+      t.igual(semanaMarcada(raiz), ["chip-semana-7"], "◀ volta uma semana");
+    });
+
+    caso("V8.2 Rodadas: os botões do W.O. têm os nomes das duplas", (t) => {
+      const { montar, estado, app } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      const jogo = estado.atual().jogos.find((j) => j.semana === 2);
+      clicar(raiz, `wo-${jogo.id}`);
+      t.igual(texto(raiz, `wo-${jogo.id}-1`), app.nomesDupla(jogo.dupla1), "dupla 1 pelo nome");
+      t.igual(texto(raiz, `wo-${jogo.id}-2`), app.nomesDupla(jogo.dupla2), "dupla 2 pelo nome");
+      const grupo = buscar(raiz, `wo-${jogo.id}-1`).parentElement;
+      t.igual(nomeAcessivel(grupo), "W.O.: qual dupla estava presente?", "o grupo diz a pergunta");
+      clicar(raiz, `wo-${jogo.id}-1`);
+      t.igual(estado.atual().jogos.find((j) => j.id === jogo.id).resultado, { tipo: "wo", vencedor: 1 }, "o clique lança o W.O.");
+    });
+
+    caso("V8.3 Rodadas: cada cartão tem um título com a semana e o número do jogo", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      const jogos = estado.atual().jogos;
+      const numeros = Util.numerosNaSemana(jogos);
+      const esperados = jogos.filter((j) => j.semana === 2).map((j) => Util.rotuloDoJogo(j, numeros));
+      t.igual([...raiz.querySelectorAll(".jogo h3")].map((h) => h.textContent), esperados, "títulos \"Semana 2 · Jogo N\"");
+    });
+
+    caso("V8.4 Classificação: a coluna Situação bate com Regras.calcularSituacoes", (t) => {
+      const { montar, estado, app } = criarAppFalso(dadosComCalendario({ semanasLancadas: 7 }));
+      const raiz = montar("classificacao");
+      const atual = estado.atual();
+      const situacoes = Regras.calcularSituacoes(app.base(), atual.jogos, atual.desempatesManuais, atual.campeonato.config);
+      t.verdadeiro(raiz.querySelector("th.col-situacao"), "cabeçalho da coluna Situação");
+      t.igual(texto(raiz, "resumo-situacao"), "Situação: 6 jogos pendentes, 4.096 cenários.", "resumo com pendentes e cenários");
+      const textos = { garantido: "Garantido", disputa: "Em disputa", eliminado: "Eliminado" };
+      const errados = situacoes.filter((s) => {
+        const celula = buscar(raiz, `linha-${s.id}`).querySelector("td.col-situacao");
+        return !celula.classList.contains(s.situacao) || !celula.querySelector(".marca-situacao").textContent.includes(textos[s.situacao]);
+      }).map((s) => s.nome);
+      t.igual(errados, [], "cada jogador com a situação calculada pelas regras");
+      const numeros = Util.numerosNaSemana(atual.jogos);
+      const proximos = situacoes.filter((s) => s.situacao === "disputa" && s.jogosPendentes.length);
+      t.verdadeiro(proximos.length, `há jogadores em disputa que ainda jogam (${proximos.length})`);
+      const semProximo = proximos.filter((s) => {
+        const jogo = atual.jogos.find((j) => j.id === s.jogosPendentes[0]);
+        const linha = buscar(raiz, `linha-${s.id}`).querySelector(".proximo-jogo");
+        return !linha || !linha.textContent.startsWith(`Próximo: ${Util.rotuloDoJogo(jogo, numeros)}`);
+      }).map((s) => s.nome);
+      t.igual(semProximo, [], "quem está em disputa e ainda joga mostra o próximo jogo");
+      t.igual(raiz.querySelectorAll("td.garantido .proximo-jogo, td.eliminado .proximo-jogo").length, 0, "garantidos e eliminados sem próximo jogo");
+      verificarLimpeza(t, raiz, "classificação com situação");
+
+      const seletor = buscar(raiz, "select-semana-classificacao");
+      seletor.value = "3";
+      seletor.dispatchEvent(new Event("change", { bubbles: true }));
+      t.verdadeiro(!raiz.querySelector(".col-situacao"), "após a semana 3: sem a coluna Situação");
+      t.verdadeiro(buscar(raiz, "resumo-situacao").hidden, "após a semana 3: sem o resumo");
+    });
+
+    caso("V8.5 Classificação com todos os jogos lançados: ninguém com próximo jogo", (t) => {
+      const { montar } = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const raiz = montar("classificacao");
+      t.igual(texto(raiz, "resumo-situacao"), "Situação: todos os jogos lançados.", "resumo");
+      t.igual(raiz.querySelectorAll("td.col-situacao").length, 32, "32 situações");
+      t.igual(raiz.querySelectorAll(".proximo-jogo").length, 0, "ninguém com próximo jogo");
+    });
+
+    caso("V8.6 \"Baixar imagem\" na Classificação e no Mata-mata", (t) => {
+      const classificacao = criarAppFalso(dadosComCalendario());
+      clicar(classificacao.montar("classificacao"), "btn-png-classificacao");
+      t.igual(classificacao.imagens, ["classificacao"], "Classificação pede a imagem da classificação");
+      const semChave = criarAppFalso(dadosComCalendario()).montar("mataMata");
+      t.verdadeiro(!buscar(semChave, "btn-png-mata-mata"), "sem chaveamento, o Mata-mata não tem o botão");
+      const comChave = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      clicar(comChave.montar("mataMata"), "btn-png-mata-mata");
+      t.igual(comChave.imagens, ["mata-mata"], "Mata-mata pede a imagem do mata-mata");
+    });
+
+    caso("V8.7 Mata-mata: os seletores da troca dizem o confronto e as medalhas ficam fora do leitor", (t) => {
+      const { montar } = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const raiz = montar("mataMata");
+      clicar(raiz, "editar-final-1");
+      t.igual(buscar(raiz, "sel-final-1-2").getAttribute("aria-label"), "Final, dupla 1, jogador 2", "seletor com o confronto, a dupla e o jogador");
+      const medalhas = [...raiz.querySelectorAll(".podio .medalha")];
+      t.verdadeiro(medalhas.length === 3 && medalhas.every((m) => m.getAttribute("aria-hidden") === "true"), "as 3 medalhas com aria-hidden");
     });
 
     // ---------- execução e relatório ----------

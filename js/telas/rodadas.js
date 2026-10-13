@@ -78,11 +78,12 @@
       else if (anulado) status = "Anulado – sem efeito na classificação";
       else if (r) status = "Lançado";
 
+      const idPergunta = `wo-${jogo.id}-pergunta`;
       const acoes = woAberto.has(jogo.id)
-        ? el("div", { class: "jogo-acoes" },
-            el("span", { class: "pergunta" }, "Qual dupla estava presente?"),
-            el("button", { type: "button", id: `wo-${jogo.id}-1`, onclick: () => lancarWO(jogo.id, 1) }, "Dupla 1"),
-            el("button", { type: "button", id: `wo-${jogo.id}-2`, onclick: () => lancarWO(jogo.id, 2) }, "Dupla 2"),
+        ? el("div", { class: "jogo-acoes", role: "group", "aria-labelledby": idPergunta },
+            el("span", { class: "pergunta", id: idPergunta }, "W.O.: qual dupla estava presente?"),
+            el("button", { type: "button", id: `wo-${jogo.id}-1`, onclick: () => lancarWO(jogo.id, 1) }, nomesDupla(jogo.dupla1)),
+            el("button", { type: "button", id: `wo-${jogo.id}-2`, onclick: () => lancarWO(jogo.id, 2) }, nomesDupla(jogo.dupla2)),
             el("button", {
               type: "button", id: `wo-${jogo.id}-cancelar`, class: "discreto",
               onclick: () => { woAberto.delete(jogo.id); renderizar(); },
@@ -100,10 +101,10 @@
               onclick: () => limparJogo(jogo.id),
             }, "Limpar"));
 
+      // A semana já está na navegação: no título do cartão, só o leitor de tela a ouve.
       return el("article", { class: `jogo ${r ? "lancado" : "pendente"}`, id: `jogo-${jogo.id}` },
         el("div", { class: "jogo-topo" },
-          el("span", { class: "jogo-numero" }, `Jogo ${numero}`),
-          el("span", { class: "origem" }, `Semana ${jogo.semana}`),
+          el("h3", { class: "jogo-numero" }, el("span", { class: "so-leitor" }, `Semana ${Regras.semanaDoJogo(jogo)} · `), `Jogo ${numero}`),
           el("span", { class: "status" }, status)),
         el("div", { class: "jogo-placar" },
           el("div", { class: "dupla d1" + classeDoLado(r, 1) },
@@ -130,32 +131,39 @@
       return semanaEscolhida;
     }
 
+    // ◀ S1 … Sn ▶ e "Semana atual". O progresso de cada semana vai na cor do botão e, por extenso,
+    // no texto para o leitor de tela (e na dica).
     function navegacaoSemanas(atual, semana) {
       const cfg = atual.campeonato.config;
       const progresso = Regras.progressoPorSemana(atual.jogos, cfg.semanas, cfg);
       const emAndamento = Regras.semanaAtual(atual.jogos, cfg);
-      const rotulo = (p) => `Semana ${p.semana} (${p.resolvidos}/${p.total})`;
 
       const jogam = new Set(atual.jogos.filter((j) => Regras.semanaDoJogo(j) === semana).flatMap((j) => [...j.dupla1, ...j.dupla2]));
       const descansam = [...nomePorId].filter(([id]) => !jogam.has(id)).map(([, nome]) => nome);
 
+      const botaoSemana = (p) => {
+        let classe = "chip-semana";
+        let situacao = `${p.resolvidos} de ${Util.plural(p.total, "jogo resolvido", "jogos resolvidos")}`;
+        if (p.total && p.resolvidos === p.total) { classe += " completa"; situacao = "completa"; }
+        else if (p.resolvidos) classe += " parcial";
+        if (p.semana === emAndamento) { classe += " em-andamento"; situacao += ", em andamento"; }
+        if (p.semana === semana) classe += " selecionada";
+        const descricao = `Semana ${p.semana}, ${situacao}`;
+        return el("button", {
+          type: "button", id: `chip-semana-${p.semana}`, class: classe, title: descricao,
+          "aria-current": p.semana === semana ? "true" : null, onclick: () => irParaSemana(p.semana),
+        }, el("span", { "aria-hidden": "true" }, `S${p.semana}`), el("span", { class: "so-leitor" }, descricao));
+      };
+
       return el("div", { class: "navegacao-semanas" },
-        el("div", { class: "seletor-semana" },
+        el("div", { class: "seletor-semana", role: "group", "aria-label": "Semanas" },
           botaoIcone({ icone: "anterior", rotulo: "Semana anterior", id: "semana-anterior", disabled: semana <= 1, onclick: () => irParaSemana(semana - 1) }),
-          el("select", { id: "select-semana", "aria-label": "Semana", onchange: (ev) => irParaSemana(Number(ev.target.value)) },
-            progresso.map((p) => el("option", { value: String(p.semana), selected: p.semana === semana }, rotulo(p)))),
+          progresso.map(botaoSemana),
           botaoIcone({ icone: "proximo", rotulo: "Próxima semana", id: "semana-proxima", disabled: semana >= cfg.semanas, onclick: () => irParaSemana(semana + 1) }),
-          semana !== emAndamento && el("button", {
-            type: "button", id: "semana-em-andamento", class: "discreto", onclick: () => irParaSemana(emAndamento),
-          }, `Ir para a semana em andamento (${emAndamento})`)),
-        el("div", { class: "chips-semanas" }, progresso.map((p) => {
-          let classe = "chip-semana";
-          if (p.total && p.resolvidos === p.total) classe += " completa";
-          else if (p.resolvidos) classe += " parcial";
-          if (p.semana === semana) classe += " selecionada";
-          return el("button", { type: "button", id: `chip-semana-${p.semana}`, class: classe, title: rotulo(p), onclick: () => irParaSemana(p.semana) },
-            `S${p.semana}`);
-        })),
+          el("button", {
+            type: "button", id: "semana-atual", class: "discreto", disabled: semana === emAndamento,
+            title: `Ir para a semana em andamento (semana ${emAndamento})`, onclick: () => irParaSemana(emAndamento),
+          }, "Semana atual")),
         descansam.length
           ? el("p", { class: "descansam" }, `Descansam na semana ${semana} (${descansam.length}): ${descansam.join(", ")}`)
           : null);

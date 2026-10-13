@@ -93,10 +93,10 @@
     novoCampeonato,
     exportarEdicao: exportar,
     exportarModelo,
+    exportarPNG,
     escolherArquivoParaImportar,
   };
-  // Cada tela monta o próprio conteúdo dentro da <section> da sua aba (a Classificação e o
-  // "O que está em jogo" dividem a mesma, nesta ordem).
+  // Cada tela monta o próprio conteúdo dentro da <section> da sua aba.
   const raiz = (aba) => document.getElementById(`aba-${aba}`);
   const telas = {
     configuracao: Telas.configuracao.criar(app, raiz("configuracao")),
@@ -104,7 +104,6 @@
     sorteio: Telas.sorteio.criar(app, raiz("sorteio")),
     rodadas: Telas.rodadas.criar(app, raiz("rodadas")),
     classificacao: Telas.classificacao.criar(app, raiz("classificacao")),
-    emJogo: Telas.emJogo.criar(app, raiz("classificacao")),
     mataMata: Telas.mataMata.criar(app, raiz("mata-mata")),
     campeonato: Telas.campeonato.criar(app, raiz("campeonato")),
     campeonatos: Telas.campeonatos.criar(app, raiz("campeonatos")),

@@ -59,10 +59,6 @@
   --manual-fundo: #e8defc;
   --manual-texto: #4b2a8f;
   --lancado-fundo: #fafdfb;
-  --garantido-fundo: #eef9f1;
-  --disputa-fundo: #fffaeb;
-  --disputa-borda: #f0e2b0;
-  --eliminado-fundo: #f6f7f9;
   --ouro-fundo: #fff6d1;
   --ouro-borda: #e6c34a;
   --ouro-texto: #8a6a00;
@@ -108,10 +104,6 @@
     --manual-fundo: #30264f;
     --manual-texto: #cfbcff;
     --lancado-fundo: #16261c;
-    --garantido-fundo: #15281c;
-    --disputa-fundo: #2a2513;
-    --disputa-borda: #5a4c1c;
-    --eliminado-fundo: #1b222c;
     --ouro-fundo: #3a3112;
     --ouro-borda: #c9a227;
     --ouro-texto: #e3bd45;
@@ -249,9 +241,6 @@ button.aba-btn:focus-visible { outline: 2px solid var(--destaque); outline-offse
   .aba-rodadas { grid-template-columns: minmax(0, 1fr) 300px; }
   .painel-top { position: sticky; top: 64px; }
 }
-@media (min-width: 1200px) {
-  .aba-classificacao { grid-template-columns: minmax(420px, 5fr) minmax(0, 6fr); }
-}
 
 .painel-top h3 { margin: 0 0 var(--esp-2); font-size: var(--fonte-base); }
 .painel-top[hidden] { display: none; }
@@ -279,6 +268,15 @@ abbr[title] { text-decoration: none; cursor: help; }
 .zona-perigo { border: 1px solid var(--desce); }
 .zona-perigo h2 { color: var(--desce); }
 .legenda { margin: 0 0 var(--esp-3); font-size: var(--fonte-sm); color: var(--texto-suave); }
+.legenda[hidden] { display: none; }
+/* Linha de controles da tela (ex.: semana da classificação e "Baixar imagem"); .acao-direita vai para a ponta. */
+.barra-tela { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--esp-2) var(--esp-3); margin: 6px 0 10px; }
+.barra-tela .acao-direita { margin-left: auto; }
+/* Explicação longa, fechada por padrão. */
+.como-ler { margin: 0 0 var(--esp-3); font-size: var(--fonte-sm); color: var(--texto-suave); }
+.como-ler summary { cursor: pointer; font-weight: 600; color: var(--texto); width: fit-content; }
+.como-ler ul { margin: var(--esp-1) 0 0; padding-left: 1.4em; }
+.como-ler li { margin: 2px 0; }
 .amostra-classificado {
   display: inline-block;
   width: 12px; height: 12px;
@@ -314,6 +312,13 @@ table.classificacao {
 .classificacao .sobe { color: var(--sobe); }
 .classificacao .desce { color: var(--desce); }
 .classificacao td.celula-vazia { padding: var(--esp-3) 0; white-space: normal; }
+/* Coluna "Situação" (ao vivo, com poucos jogos pendentes). */
+.classificacao .col-situacao { text-align: left; }
+.classificacao td.col-situacao { min-width: 20em; }
+.marca-situacao { display: inline-flex; align-items: center; gap: var(--esp-1); font-weight: 600; }
+.col-situacao.garantido .marca-situacao .icone { color: var(--sobe); }
+.col-situacao.disputa .marca-situacao .icone { color: var(--ambar-texto); }
+.col-situacao.eliminado .marca-situacao { font-weight: 400; color: var(--texto-suave); }
 
 .classificacao tr.classificado td { background: var(--classificado); }
 .classificacao tr.classificado td:first-child { box-shadow: inset 3px 0 0 var(--classificado-borda); }
@@ -484,6 +489,7 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
 
 .jogo-topo { display: flex; gap: 10px; align-items: baseline; font-size: var(--fonte-sm); color: var(--texto-suave); }
 .jogo-numero { font-weight: 700; color: var(--texto); }
+h3.jogo-numero { position: relative; margin: 0; font-size: inherit; }
 .jogo-topo .status { margin-left: auto; font-weight: 600; color: var(--ambar-texto); }
 .jogo.lancado .jogo-topo .status { color: var(--sobe); }
 
@@ -539,40 +545,16 @@ input.gols:disabled { background: var(--superficie-2); color: var(--texto-suave)
 .controle-desempate button.confirmar { color: var(--sobe); }
 .classificacao tr.em-empate td.col-jogador { font-style: italic; }
 
-/* ---------- o que está em jogo ---------- */
+/* ---------- situação de quem está em disputa (coluna da classificação) ---------- */
 
-.colunas-em-jogo {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
-  gap: var(--esp-4);
-  align-items: start;
-}
-@media (max-width: 900px) {
-  .colunas-em-jogo { grid-template-columns: minmax(0, 1fr); }
-}
-.coluna-em-jogo { border-radius: var(--raio); padding: 10px var(--esp-3); border-top: 4px solid; }
-.coluna-em-jogo.garantido { background: var(--garantido-fundo); border-color: var(--classificado-borda); }
-.coluna-em-jogo.disputa { background: var(--disputa-fundo); border-color: var(--ambar); }
-.coluna-em-jogo.eliminado { background: var(--eliminado-fundo); border-color: var(--borda-forte); }
-.coluna-em-jogo h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 var(--esp-2); font-size: var(--fonte-base); }
-.coluna-em-jogo.garantido h3 .icone { color: var(--sobe); }
-.coluna-em-jogo.disputa h3 .icone { color: var(--ambar-texto); }
-.coluna-em-jogo.eliminado h3 .icone { color: var(--texto-suave); }
-.coluna-em-jogo .contagem { color: var(--texto-suave); font-weight: 400; }
-.coluna-em-jogo ul { list-style: none; margin: 0; padding: 0; }
-.coluna-em-jogo.disputa ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
-
-.item-em-jogo { padding: var(--esp-1) 0; }
-.coluna-em-jogo.disputa .item-em-jogo { background: var(--superficie); border: 1px solid var(--disputa-borda); border-radius: var(--raio); padding: 6px var(--esp-2); }
-.linha-item { display: flex; align-items: baseline; gap: 6px; }
-.pos-item { font-size: var(--fonte-xs); color: var(--texto-suave); min-width: 26px; }
-.nome-item { font-weight: 600; }
-.pts-item { margin-left: auto; font-size: var(--fonte-sm); color: var(--texto-suave); white-space: nowrap; }
-.item-em-jogo.eliminado .nome-item { font-weight: 400; color: var(--texto-suave); }
-.proximo-jogo, .nao-joga { font-size: var(--fonte-sm); margin: 2px 0 0 var(--esp-7); }
+.proximo-jogo, .nao-joga { font-size: var(--fonte-xs); margin: 2px 0 0; }
 .proximo-jogo .tag-repete { margin-left: var(--esp-1); }
 .nao-joga { color: var(--desce); font-weight: 600; }
-.marcas { margin: 3px 0 0 var(--esp-7); display: flex; flex-wrap: wrap; gap: var(--esp-1); }
+.marcas { margin: 3px 0 0; display: flex; flex-wrap: wrap; gap: var(--esp-1); }
+/* Na coluna, próximo jogo e marcas dividem a linha embaixo da situação (quebram se faltar espaço). */
+.classificacao td.col-situacao { white-space: normal; }
+.col-situacao .proximo-jogo, .col-situacao .nao-joga, .col-situacao .marcas { display: inline-flex; align-items: center; margin-right: var(--esp-2); white-space: nowrap; }
+.col-situacao .marca-situacao { display: flex; }
 .tag-saldo {
   display: inline-flex;
   align-items: center;
@@ -583,7 +565,6 @@ input.gols:disabled { background: var(--superficie-2); color: var(--texto-suave)
   color: var(--info-texto);
   font-size: var(--fonte-xs);
   font-weight: 700;
-  cursor: help;
 }
 
 /* ---------- botões principais e de perigo ---------- */
@@ -702,6 +683,7 @@ dialog.dialogo::backdrop { background: var(--veu); }
 
 .barra-mata-mata { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--esp-2); margin-bottom: var(--esp-3); }
 .barra-mata-mata .alerta { flex: 1 1 400px; }
+.barra-mata-mata .barra-tela { flex: 1 1 100%; align-items: center; margin: 0; }
 
 .chave {
   display: grid;
@@ -1106,10 +1088,14 @@ button.nome-slot:hover { background: var(--superficie-hover); border-color: var(
 /* ---------- rodadas ---------- */
 
 .navegacao-semanas { margin-bottom: var(--esp-3); }
-.seletor-semana { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.seletor-semana select { font: inherit; padding: var(--esp-1) var(--esp-2); }
-.chips-semanas { display: flex; flex-wrap: wrap; gap: var(--esp-1); margin: var(--esp-2) 0 var(--esp-1); }
-button.chip-semana { padding: 2px 10px; font-size: var(--fonte-sm); border-radius: var(--raio-pilula); color: var(--texto-suave); }
+/* ◀ S1 … Sn ▶ e "Semana atual": a cor diz o progresso; o ponto embaixo marca a semana em andamento. */
+.seletor-semana { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-1); }
+button.chip-semana { position: relative; padding: 2px 10px 4px; font-size: var(--fonte-sm); border-radius: var(--raio-pilula); color: var(--texto-suave); }
+button.chip-semana.em-andamento::after {
+  content: ""; position: absolute; left: 50%; bottom: 1px;
+  width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor;
+}
+#semana-atual { margin-left: var(--esp-2); }
 button.chip-semana.parcial { background: var(--alerta-fundo); border-color: var(--ouro-borda); color: var(--alerta-texto); }
 button.chip-semana.completa { background: var(--classificado); border-color: var(--classificado-borda); color: var(--completa-texto); }
 button.chip-semana.selecionada { outline: 2px solid var(--destaque); outline-offset: 1px; font-weight: 700; }

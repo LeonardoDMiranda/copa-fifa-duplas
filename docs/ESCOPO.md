@@ -7,7 +7,7 @@ Aplicação local (HTML + CSS + JavaScript puro) para o organizador conduzir um 
 1. Cadastrar os jogadores e configurar o campeonato (pontos, jogos por jogador, semanas).
 2. Sortear o calendário inteiro de uma vez, ajustar à mão se precisar e confirmar.
 3. Lançar os placares (ou W.O., ou anular) semana a semana.
-4. Ver a classificação individual ao vivo ou ao fim de cada semana, e **o que está em jogo** (garantidos, em disputa, eliminados).
+4. Ver a classificação individual ao vivo ou ao fim de cada semana, e **o que está em jogo** (coluna "Situação": garantidos, em disputa, eliminados).
 5. Gerar e conduzir o mata-mata: semifinais, 3º lugar e final MD3.
 6. Exportar imagens (PNG) para mandar no grupo e exibir tudo num **modo telão**.
 
@@ -69,6 +69,7 @@ Para os jogos ainda sem resultado, o app enumera todos os desfechos possíveis p
 - **Em disputa**: o resto. Se a vaga depender de saldo ou gols pró, mostra "depende do saldo".
 - Se dois jogadores empatam em pontos e V e **nenhum dos dois joga mais**, o saldo e os gols pró deles já são definitivos e decidem o empate (depois, a ordem manual). Empatados em tudo e sem ordem manual: "depende do desempate".
 - A ordem manual entre esses dois só vale no cenário em que ninguém que ainda joga empata com eles em pontos e V. Se alguém empata, o grupo pode mudar e a ordem manual ser descartada: "depende do saldo".
+- Aparece na aba Classificação como a coluna **Situação**, só na classificação ao vivo. Quem está em disputa mostra também o próximo jogo ("Próximo: Semana 8 · Jogo 3", com "+N" se ainda joga mais) ou "Não joga mais, só pode cair".
 
 ### 2.5 Sorteio do calendário
 
@@ -167,14 +168,14 @@ Uma aba por etapa (Alt+1, Alt+2...; a aba ativa fica no endereço, ex.: `index.h
 
 **Temporada** (calendário confirmado):
 
-4. **Rodadas**: navegação por semana, cartões dos jogos com placar, "W.O.", "Anular" e "Limpar"; quem descansa na semana; agenda do jogador; top 8 ao vivo ao lado.
-5. **Classificação**: ao vivo ou ao fim de uma semana; top 8 em verde, ▲▼ em relação à semana anterior, ⚖️ com controle de ordem manual. Ao lado, **o que está em jogo**: Garantidos / Em disputa / Eliminados.
-6. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
+4. **Rodadas**: navegação por semana (◀ S1…Sn ▶, com o progresso na cor de cada botão, e "Semana atual"), cartões dos jogos com placar, "W.O." (escolhendo a dupla presente pelos nomes), "Anular" e "Limpar"; quem descansa na semana; agenda do jogador (vai para a ficha do jogador na Fase 22); top 8 ao vivo ao lado.
+5. **Classificação**: ao vivo ou ao fim de uma semana, na largura toda; top 8 em verde, ▲▼ em relação à semana anterior, empate técnico com controle de ordem manual; explicação em "Como ler". Ao vivo, com até 8 jogos pendentes (pontuação padrão), a coluna **Situação** (ver 2.4); antes disso, uma linha diz quando ela aparece. "Baixar imagem" gera o PNG da classificação vista (ao vivo ou da semana escolhida).
+6. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio. Com o chaveamento gerado, "Baixar imagem" gera o PNG do mata-mata.
 7. **Ajustes** (`#campeonato`): Configuração, Jogadores e o calendário completo, só para ver (o nome, a aparência e o renomear continuam editáveis), e a **zona de perigo** com "Reiniciar campeonato". Os endereços dos passos da preparação (e o antigo `#calendario`) levam para cá depois da confirmação.
 
 **Campeonatos** (`index.html#campeonatos`, fora das abas de etapa): edições em uso e arquivadas, em cartões com Abrir (ou Desarquivar) à vista e um menu ⋯ com Duplicar, Exportar backup, Exportar modelo, Arquivar e Excluir; a aberta fica destacada; "Novo campeonato" e "Novo a partir de modelo"; espaço usado, em barra.
 
-**Cabeçalho**: na cor do campeonato, com o logo ao lado do título. O botão "Trocar" abre o seletor de campeonatos (edições não arquivadas, "+ Novo campeonato" e "Gerenciar campeonatos"). Desfazer, Modo telão e o menu "Campeonato" (exportar e importar o backup em JSON, Gerenciar campeonatos). Lembrete de backup quando for a hora. Os PNGs saíram do cabeçalho na Fase 19 e voltam na Fase 21. O Reiniciar campeonato está na zona de perigo da aba Ajustes (Fase 20).
+**Cabeçalho**: na cor do campeonato, com o logo ao lado do título. O botão "Trocar" abre o seletor de campeonatos (edições não arquivadas, "+ Novo campeonato" e "Gerenciar campeonatos"). Desfazer, Modo telão e o menu "Campeonato" (exportar e importar o backup em JSON, Gerenciar campeonatos). Lembrete de backup quando for a hora. Os PNGs saíram do cabeçalho na Fase 19 e ficam, desde a Fase 21, no botão "Baixar imagem" da Classificação e do Mata-mata. O Reiniciar campeonato está na zona de perigo da aba Ajustes (Fase 20).
 
 ## 5. Como o projeto foi construído
 
@@ -196,6 +197,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 18 | Base visual e acessível: ícones SVG no lugar dos emojis, tokens de espaçamento e fonte, botões de 28 px, contraste do tema escuro, avisos que se fecham, erro junto do campo, plurais, "Semana 3 · Jogo 2" no lugar do id e atalhos Alt+1…5 |
 | 19 | Cabeçalho novo (título simples, botão "Trocar", menu "Campeonato") e tela de Campeonatos com cartões e menu ⋯ por edição |
 | 20 | Preparação em 3 passos (Configuração, Jogadores e Sorteio) e, depois de confirmar o calendário, abas Rodadas, Classificação, Mata-mata e Ajustes (os 3 passos só para ver, mais a zona de perigo com o Reiniciar). Lógica das abas em `js/abas.js` |
+| 21 | Rodadas com a navegação ◀ S1…Sn ▶ e "Semana atual" (sai o seletor de semana), W.O. com os nomes das duplas e título em cada cartão; Classificação na largura toda, com a coluna "Situação" no lugar do painel "O que está em jogo" e "Como ler"; "Baixar imagem" na Classificação e no Mata-mata |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -220,7 +222,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
 | U | Base da interface: `plural`, `numero` (formato brasileiro), `rotuloDoJogo`, `botaoIcone` (nome acessível), ícones decorativos e atributos do erro junto do campo |
 
-`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu) e V7 (abas por fase, endereços antigos e Ajustes).
+`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata).
 
 ## 7. Pendências
 
