@@ -3,10 +3,10 @@
 (function () {
   "use strict";
 
-  const { el, buscar, MAX_GOLS, lerGols, formatarSaldo, classeDoLado } = Util;
+  const { el, buscar, MAX_GOLS, lerGols, formatarSaldo, classeDoLado, botaoIcone } = Util;
 
   function criar(app, raiz) {
-    const { estado, nomePorId, avisar, renderizar, numerosNaSemana, nomesDupla } = app;
+    const { estado, nomePorId, renderizar, numerosNaSemana, nomesDupla } = app;
 
     const contador = el("span", { id: "contador-jogos", class: "contador" });
     const navegacao = el("div", { id: "navegacao-semanas" });
@@ -27,8 +27,15 @@
     // ou em edição). Não vai para o estado; tem prioridade sobre o estado ao redesenhar.
     const rascunhos = new Map(); // id do jogo -> { 1: texto, 2: texto }
     const woAberto = new Set(); // ids de jogos com a escolha de W.O. aberta
+    const errosCampo = new Map(); // id do jogo -> mensagem de placar inválido, mostrada embaixo do placar
     let semanaEscolhida = null; // semana exibida; começa na semana em andamento e depois só muda por escolha
     let agendaJogador = null; // jogador escolhido na agenda
+
+    // "Semana 3 · Jogo 2": usado nas mensagens e nas descrições do "Desfazer".
+    function rotuloDe(id) {
+      const jogos = estado.atual().jogos;
+      return Util.rotuloDoJogo(jogos.find((j) => j.id === id), numerosNaSemana(jogos));
+    }
 
     // ---------- cartões de jogo ----------
 
@@ -37,6 +44,8 @@
       const ehWO = r && r.tipo === "wo";
       const anulado = r && r.tipo === "anulado";
       const rascunho = rascunhos.get(jogo.id);
+      const erro = errosCampo.get(jogo.id);
+      const idErro = `erro-jogo-${jogo.id}`;
 
       let valor1 = "", valor2 = "";
       if (ehWO) { valor1 = r.vencedor === 1 ? "3" : "0"; valor2 = r.vencedor === 2 ? "3" : "0"; }
@@ -44,6 +53,7 @@
       else if (rascunho) { valor1 = rascunho[1]; valor2 = rascunho[2]; }
       else if (r) { valor1 = String(r.gols1); valor2 = String(r.gols2); }
 
+      // Com erro, os dois campos apontam para a mensagem; só o inválido fica marcado.
       const entrada = (lado, valor) => el("input", {
         id: `gols-${jogo.id}-${lado}`,
         class: "gols" + (!anulado && lerGols(valor).invalido ? " invalido" : ""),
@@ -54,6 +64,8 @@
         value: valor,
         disabled: ehWO || anulado,
         "aria-label": `Gols da dupla ${lado} no jogo ${numero}`,
+        "aria-invalid": erro && lerGols(valor).invalido ? "true" : null,
+        "aria-describedby": erro ? idErro : null,
         dataset: { jogo: jogo.id, lado: String(lado) },
         oninput: guardarRascunho,
         onchange: aoMudarPlacar,
@@ -99,6 +111,7 @@
           el("div", { class: "placar" }, entrada(1, valor1), el("span", { class: "x" }, "×"), entrada(2, valor2)),
           el("div", { class: "dupla d2" + classeDoLado(r, 2) },
             jogo.dupla2.map((id) => el("span", { class: "nome" }, nomePorId.get(id))))),
+        Util.mensagemDeErro(idErro, erro),
         acoes);
     }
 
@@ -128,10 +141,10 @@
 
       return el("div", { class: "navegacao-semanas" },
         el("div", { class: "seletor-semana" },
-          el("button", { type: "button", id: "semana-anterior", title: "Semana anterior", disabled: semana <= 1, onclick: () => irParaSemana(semana - 1) }, "◀"),
+          botaoIcone({ icone: "anterior", rotulo: "Semana anterior", id: "semana-anterior", disabled: semana <= 1, onclick: () => irParaSemana(semana - 1) }),
           el("select", { id: "select-semana", "aria-label": "Semana", onchange: (ev) => irParaSemana(Number(ev.target.value)) },
             progresso.map((p) => el("option", { value: String(p.semana), selected: p.semana === semana }, rotulo(p)))),
-          el("button", { type: "button", id: "semana-proxima", title: "Próxima semana", disabled: semana >= cfg.semanas, onclick: () => irParaSemana(semana + 1) }, "▶"),
+          botaoIcone({ icone: "proximo", rotulo: "Próxima semana", id: "semana-proxima", disabled: semana >= cfg.semanas, onclick: () => irParaSemana(semana + 1) }),
           semana !== emAndamento && el("button", {
             type: "button", id: "semana-em-andamento", class: "discreto", onclick: () => irParaSemana(emAndamento),
           }, `Ir para a semana em andamento (${emAndamento})`)),
@@ -169,7 +182,7 @@
         id: "select-agenda", "aria-label": "Jogador da agenda",
         onchange: (ev) => { agendaJogador = ev.target.value || null; renderizar(); },
       },
-        el("option", { value: "" }, "— escolha um jogador —"),
+        el("option", { value: "" }, "Escolha um jogador"),
         ordenados.map(([id, nome]) => el("option", { value: id, selected: id === agendaJogador }, nome)));
 
       let corpo = null;
@@ -189,7 +202,7 @@
             return el("li", {},
               el("button", {
                 type: "button", class: "nome-slot", title: "Ver esta semana", onclick: () => irParaSemana(Regras.semanaDoJogo(j)),
-              }, `Semana ${Regras.semanaDoJogo(j)} · Jogo ${numeros.get(j.id)}`),
+              }, Util.rotuloDoJogo(j, numeros)),
               ` com ${parceiro} × ${nomesDupla(outra)} `,
               el("span", { class: `resultado-agenda ${r.classe}` }, r.texto));
           })));
@@ -208,20 +221,24 @@
         el("h3", {}, "Top 8 ao vivo"),
         el("table", { class: "tabela-top" },
           el("thead", {}, el("tr", {},
-            el("th", { class: "col-pos" }, "Pos"), el("th", { class: "col-jogador" }, "Jogador"),
-            el("th", { title: "Pontos" }, "Pts"), el("th", { title: "Vitórias" }, "V"), el("th", { title: "Saldo de gols" }, "SG"))),
+            el("th", { scope: "col", class: "col-pos" }, el("abbr", { title: "Posição" }, "Pos")),
+            el("th", { scope: "col", class: "col-jogador" }, "Jogador"),
+            el("th", { scope: "col" }, el("abbr", { title: "Pontos" }, "Pts")),
+            el("th", { scope: "col" }, el("abbr", { title: "Vitórias" }, "V")),
+            el("th", { scope: "col" }, el("abbr", { title: "Saldo de gols" }, "SG")))),
           el("tbody", {}, tabela.slice(0, vagas + PERSEGUIDORES).map((l) => {
             let classe = l.posicao <= vagas ? "classificado" : "perseguidor";
             if (l.posicao === vagas) classe += " linha-corte";
             return el("tr", { class: classe },
               el("td", { class: "col-pos" }, `${l.posicao}º`),
-              el("td", { class: "col-jogador" }, l.nome, l.empateTecnico && el("span", { class: "empate", title: "Empate técnico" }, "⚖️")),
+              el("td", { class: "col-jogador" }, l.nome, l.empateTecnico && el("span", { class: "empate", title: "Empate técnico" },
+                Icones.svg("empate"), el("span", { class: "so-leitor" }, "empate técnico"))),
               el("td", { class: "col-pts" }, String(l.pontos)),
               el("td", {}, String(l.v)),
               el("td", {}, formatarSaldo(l.sg)));
           }))),
         el("button", { type: "button", id: "btn-ver-classificacao", class: "discreto mini", onclick: () => app.irParaAba("classificacao") },
-          "Ver classificação completa →"));
+          "Ver classificação completa", Icones.svg("seguir")));
     }
 
     function renderizarJogos(atual, tabela) {
@@ -277,14 +294,15 @@
 
       const g1 = lerGols(rascunho[1]), g2 = lerGols(rascunho[2]);
       if (g1.invalido || g2.invalido) {
-        avisar(`Placar inválido no jogo ${id}: use números de 0 a ${MAX_GOLS}.`, "erro");
+        errosCampo.set(id, `Placar inválido: use números de 0 a ${MAX_GOLS}.`);
         renderizar();
         return;
       }
+      errosCampo.delete(id);
 
       if (g1.vazio || g2.vazio) {
         // Apagou um lado de um placar já lançado: o jogo volta a ficar pendente.
-        if (!estado.modificar(`apagar placar do ${id}`, (s) => { s.jogos.find((j) => j.id === id).resultado = null; })) {
+        if (!estado.modificar(`apagar placar (${rotuloDe(id)})`, (s) => { s.jogos.find((j) => j.id === id).resultado = null; })) {
           renderizar();
         }
         return;
@@ -292,7 +310,7 @@
 
       rascunhos.delete(id);
       const resultado = { tipo: "placar", gols1: g1.valor, gols2: g2.valor };
-      if (!estado.modificar(`placar do ${id}: ${g1.valor}×${g2.valor}`, (s) => {
+      if (!estado.modificar(`placar ${g1.valor}×${g2.valor} (${rotuloDe(id)})`, (s) => {
         s.jogos.find((j) => j.id === id).resultado = resultado;
       })) {
         renderizar();
@@ -302,7 +320,8 @@
     function lancarWO(id, vencedor) {
       woAberto.delete(id);
       rascunhos.delete(id);
-      if (!estado.modificar(`W.O. no ${id} (dupla ${vencedor} presente)`, (s) => {
+      errosCampo.delete(id);
+      if (!estado.modificar(`W.O., dupla ${vencedor} presente (${rotuloDe(id)})`, (s) => {
         s.jogos.find((j) => j.id === id).resultado = { tipo: "wo", vencedor };
       })) {
         renderizar();
@@ -311,14 +330,16 @@
 
     function anularJogo(id) {
       rascunhos.delete(id);
-      if (!estado.modificar(`anular ${id}`, (s) => { s.jogos.find((j) => j.id === id).resultado = { tipo: "anulado" }; })) {
+      errosCampo.delete(id);
+      if (!estado.modificar(`anular (${rotuloDe(id)})`, (s) => { s.jogos.find((j) => j.id === id).resultado = { tipo: "anulado" }; })) {
         renderizar();
       }
     }
 
     function limparJogo(id) {
       rascunhos.delete(id);
-      if (!estado.modificar(`limpar ${id}`, (s) => { s.jogos.find((j) => j.id === id).resultado = null; })) {
+      errosCampo.delete(id);
+      if (!estado.modificar(`limpar (${rotuloDe(id)})`, (s) => { s.jogos.find((j) => j.id === id).resultado = null; })) {
         renderizar();
       }
     }
@@ -328,6 +349,7 @@
       limparRascunhos() {
         rascunhos.clear();
         woAberto.clear();
+        errosCampo.clear();
       },
       reiniciarVisao() {
         semanaEscolhida = null;

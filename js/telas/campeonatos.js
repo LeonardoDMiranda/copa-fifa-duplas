@@ -5,14 +5,14 @@
 (function () {
   "use strict";
 
-  const { el } = Util;
+  const { el, plural } = Util;
 
   function formatarData(iso) {
     return iso ? new Date(iso).toLocaleDateString("pt-BR") : "data desconhecida";
   }
 
   function formatarTamanho(bytes) {
-    return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB` : `${Math.ceil(bytes / 1024)} KB`;
+    return bytes >= 1024 * 1024 ? `${Util.numero(bytes / (1024 * 1024), 1)} MB` : `${Util.numero(Math.ceil(bytes / 1024))} KB`;
   }
 
   function criar(app, raiz) {
@@ -68,7 +68,7 @@
         + "Não dá para desfazer. Se quiser guardar os dados, exporte um backup antes.",
         {
           titulo: "Excluir o campeonato?", acao: "Excluir", perigo: true,
-          extras: [{ id: "dialogo-exportar-antes", rotulo: "⬇ Exportar backup antes", aoClicar: () => app.exportarEdicao(c.id) }],
+          extras: [{ id: "dialogo-exportar-antes", rotulo: [Icones.svg("baixar"), "Exportar backup antes"], aoClicar: () => app.exportarEdicao(c.id) }],
         }
       );
       if (!ok) return;
@@ -85,13 +85,13 @@
         el("div", { class: "item-campeonato-texto" },
           el("span", { class: "titulo-edicao" }, c.nome, c.ativo && el("span", { class: "tag-ativo" }, "aberto")),
           el("span", { class: `situacao etapa-${c.situacao.etapa}` },
-            `${c.situacao.texto} · ${c.jogadores} jogador(es) · criado em ${formatarData(c.criadoEm)}`)),
+            `${c.situacao.texto} · ${plural(c.jogadores, "jogador", "jogadores")} · criado em ${formatarData(c.criadoEm)}`)),
         el("div", { class: "item-campeonato-acoes" },
           !c.arquivado && !c.ativo && botao(`campeonato-abrir-${c.id}`, "Abrir", `Trabalhar em "${c.nome}"`, () => abrir(c), { classe: "primario" }),
           botao(`campeonato-duplicar-${c.id}`, "Duplicar", "Nova edição com o mesmo nome (2), configuração e jogadores; sem calendário nem jogos",
             () => duplicar(c), { disabled: invalido }),
-          botao(`campeonato-exportar-${c.id}`, "⬇ Exportar", "Baixar o backup em JSON desta edição", () => app.exportarEdicao(c.id), { disabled: invalido }),
-          botao(`campeonato-modelo-${c.id}`, "⬇ Modelo", "Baixar um modelo (nome, configuração, jogadores, cor e logo) para outro organizador ou outra edição",
+          botao(`campeonato-exportar-${c.id}`, [Icones.svg("baixar"), "Exportar"], "Baixar o backup em JSON desta edição", () => app.exportarEdicao(c.id), { disabled: invalido }),
+          botao(`campeonato-modelo-${c.id}`, [Icones.svg("baixar"), "Modelo"], "Baixar um modelo (nome, configuração, jogadores, cor e logo) para outro organizador ou outra edição",
             () => app.exportarModelo(c.id), { disabled: invalido }),
           c.arquivado
             ? botao(`campeonato-desarquivar-${c.id}`, "Desarquivar", "Volta para a lista do seletor", () => desarquivar(c))
@@ -106,15 +106,15 @@
       const espaco = campeonatos.espacoUsado();
       const pct = Math.round((espaco.bytes / espaco.limite) * 100);
       resumo.textContent =
-        `${ativos.length} em uso${arquivados.length ? ` · ${arquivados.length} arquivado(s)` : ""}`;
+        `${ativos.length} em uso${arquivados.length ? ` · ${plural(arquivados.length, "arquivado", "arquivados")}` : ""}`;
       // replaceChildren não descarta os false (como el() faz): filtra antes.
       conteudo.replaceChildren(...[
         el("div", { class: "acoes-campeonatos" },
-          el("button", { type: "button", id: "btn-campeonato-novo", class: "primario", onclick: app.novoCampeonato }, "+ Novo campeonato"),
+          el("button", { type: "button", id: "btn-campeonato-novo", class: "primario", onclick: app.novoCampeonato }, Icones.svg("novo"), "Novo campeonato"),
           el("button", {
             type: "button", id: "btn-campeonato-de-modelo", title: "Escolher um arquivo de modelo (…-modelo.json)",
             onclick: app.escolherArquivoParaImportar,
-          }, "+ Novo a partir de modelo")),
+          }, Icones.svg("novo"), "Novo a partir de modelo")),
         el("ul", { class: "lista-campeonatos", id: "lista-campeonatos" }, ativos.map(itemCampeonato)),
         arquivados.length > 0 && el("h3", { class: "titulo-arquivados" }, "Arquivados"),
         arquivados.length > 0 && el("ul", { class: "lista-campeonatos arquivados", id: "lista-arquivados" }, arquivados.map(itemCampeonato)),

@@ -374,7 +374,7 @@
     const semEstrelas = jogadoresSemEstrelas(jogadores);
     if (semEstrelas.length) {
       const nomes = semEstrelas.slice(0, 5).map((j) => j.nome).join(", ") + (semEstrelas.length > 5 ? ` e mais ${semEstrelas.length - 5}` : "");
-      problemas.push(`Defina as estrelas (nível de ${ESTRELAS_MIN} a ${ESTRELAS_MAX}) de ${semEstrelas.length} jogador(es): ${nomes}.`);
+      problemas.push(`Defina as estrelas (nível de ${ESTRELAS_MIN} a ${ESTRELAS_MAX}) de ${semEstrelas.length} ${semEstrelas.length === 1 ? "jogador" : "jogadores"}: ${nomes}.`);
     }
     return {
       jogadores: n,
@@ -636,7 +636,7 @@
     const lista = jogadores.map((j) => ({ id: j.id, nome: j.nome, jogos: jogosDe.get(j.id) }));
     for (const j of lista) {
       if (j.jogos !== config.jogosPorJogador) {
-        violacoes.push(`${j.nome} tem ${j.jogos} jogo(s) (o esperado é ${config.jogosPorJogador}).`);
+        violacoes.push(`${j.nome} tem ${j.jogos} ${j.jogos === 1 ? "jogo" : "jogos"} (o esperado é ${config.jogosPorJogador}).`);
       }
     }
     for (const j of jogadores) {
@@ -762,14 +762,14 @@
     const avisos = [];
     const pendentes = jogos.filter((j) => !efeitosDoResultado(j.resultado, config));
     if (pendentes.length) {
-      // Com muitos jogos, resume por semana; com poucos, lista os ids.
+      // Por semana: com muitos jogos, só a quantidade; com poucos, o número de cada jogo na semana.
+      const numeros = numerosNaSemana(jogos);
       const porSemana = new Map();
-      for (const j of pendentes) porSemana.set(semanaDoJogo(j), (porSemana.get(semanaDoJogo(j)) || []).concat(j.id));
+      for (const j of pendentes) porSemana.set(semanaDoJogo(j), (porSemana.get(semanaDoJogo(j)) || []).concat(numeros.get(j.id)));
       const semanas = [...porSemana].sort((a, b) => a[0] - b[0]);
-      const detalhe = pendentes.length > 12
-        ? semanas.map(([semana, ids]) => `semana ${semana}: ${ids.length}`).join("; ")
-        : pendentes.map((j) => j.id).join(", ");
-      avisos.push(`${pendentes.length} jogo(s) de classificação sem resultado (${detalhe}).`);
+      const listar = (ns) => (ns.length > 1 ? `jogos ${ns.slice(0, -1).join(", ")} e ${ns[ns.length - 1]}` : `jogo ${ns[0]}`);
+      const detalhe = semanas.map(([semana, ns]) => `semana ${semana}: ${pendentes.length > 12 ? ns.length : listar(ns)}`).join("; ");
+      avisos.push(`${pendentes.length} ${pendentes.length === 1 ? "jogo" : "jogos"} de classificação sem resultado (${detalhe}).`);
     }
     const nome = (id) => classificacao.find((l) => l.id === id).nome;
     const vistos = new Set();
@@ -1009,6 +1009,19 @@
   // Jogos sem semana (dados antigos de teste) contam como semana 1.
   function semanaDoJogo(jogo) {
     return Number.isInteger(jogo.semana) ? jogo.semana : 1;
+  }
+
+  // id do jogo -> número do jogo dentro da sua semana (1, 2...), na ordem da lista. É assim que o
+  // organizador chama um jogo ("Semana 3 · Jogo 2"); o id interno não aparece na tela.
+  function numerosNaSemana(jogos) {
+    const contagem = new Map();
+    const mapa = new Map();
+    for (const j of jogos) {
+      const semana = semanaDoJogo(j);
+      contagem.set(semana, (contagem.get(semana) || 0) + 1);
+      mapa.set(j.id, contagem.get(semana));
+    }
+    return mapa;
   }
 
   // [{ semana, total, resolvidos }] para as semanas 1..semanas. "Resolvido" = tem resultado
@@ -1308,6 +1321,7 @@
     cadastroTravado,
     diagnosticarCampeonato,
     semanaDoJogo,
+    numerosNaSemana,
     progressoPorSemana,
     contarSemanasCompletas,
     precisaDeBackup,

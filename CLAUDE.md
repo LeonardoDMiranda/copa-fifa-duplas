@@ -46,7 +46,8 @@ testes/dados-exemplo.js  # fixture de teste: dados fictícios (não é carregado
 js/regras.js        # FUNÇÕES PURAS: pontuação, classificação, desempate, mata-mata, "o que está em jogo"
 js/estado.js        # estado v2 de uma edição (campeonato, jogadores, jogos): carregar/salvar localStorage, desfazer, exportar/importar JSON
 js/campeonatos.js   # várias edições: índice (ativa, arquivadas), migração, novo/duplicar/arquivar/excluir, importar como novo
-js/util.js          # helpers de apresentação compartilhados (el, lerGols, formatarSaldo, carimbo, classeDoLado)
+js/icones.js        # ícones SVG da interface (Tabler Icons, MIT): Icones.svg(nome), sempre aria-hidden
+js/util.js          # helpers de apresentação compartilhados (el, plural, numero, rotuloDoJogo, botaoIcone, erro junto do campo...)
 js/telas/*.js       # uma tela cada (jogadores, calendario, rodadas, classificacao, em-jogo, mata-mata, campeonatos): Telas.<nome>.criar(app, raiz), que monta o próprio conteúdo na raiz
 js/ui.js            # orquestração: cria o estado e as telas, redesenho, foco, cabeçalho (seletor de edições) e barra de ações
 js/exportar.js      # geração de PNG via Canvas API

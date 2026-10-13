@@ -29,6 +29,7 @@
   <script src="js/regras.js"></script>
   <script src="js/estado.js"></script>
   <script src="js/campeonatos.js"></script>
+  <script src="js/icones.js"></script>
   <script src="js/util.js"></script>
   <script src="js/exportar.js"></script>
   <script src="js/telao.js"></script>
@@ -1141,11 +1142,13 @@
       const poucos = jogosEmSemanas();
       const tabela = Regras.calcularClassificacao(baseZerada(), poucos);
       const aviso = Regras.avisosParaGerarChaveamento(poucos, tabela).find((a) => a.includes("sem resultado"));
-      t.verdadeiro(aviso.includes("j1") && aviso.includes("j7"), `poucos pendentes: lista os ids (${aviso})`);
+      t.verdadeiro(aviso.startsWith("7 jogos") && aviso.includes("semana 1: jogos 1 e 2") && aviso.includes("semana 3: jogos 1, 2 e 3"),
+        `poucos pendentes: lista o número de cada jogo na semana (${aviso})`);
+      t.verdadeiro(!/\bj\d/.test(aviso), "sem o id interno dos jogos");
       const jogadores = comEstrelas(classificacaoBase.map((l) => ({ id: l.id, nome: l.nome })));
       const jogos = Regras.calendarioParaJogos(Regras.gerarCalendario(jogadores, { jogosPorJogador: 6, semanas: 8, semente: 5 }).calendario);
       const muitos = Regras.avisosParaGerarChaveamento(jogos, Regras.calcularClassificacao(baseZerada(), jogos)).find((a) => a.includes("sem resultado"));
-      t.verdadeiro(muitos.startsWith("48 jogo(s)") && muitos.includes("semana 1: 6") && muitos.includes("semana 8: 6"), `muitos pendentes: resume por semana (${muitos})`);
+      t.verdadeiro(muitos.startsWith("48 jogos") && muitos.includes("semana 1: 6") && muitos.includes("semana 8: 6"), `muitos pendentes: resume por semana (${muitos})`);
     });
 
     // ---------- Telão, PNG e backup (Fase 11) ----------
@@ -1676,7 +1679,7 @@
       t.verdadeiro(Regras.diagnosticarCampeonato(jogadores).pronto, "todos com estrelas: pronto");
       const faltando = jogadores.map((j, i) => (i < 2 ? { ...j, estrelas: null } : j));
       const diag = Regras.diagnosticarCampeonato(faltando);
-      t.verdadeiro(!diag.pronto && diag.problemas.some((p) => p.includes("2 jogador(es): J0, J1")), `faltando: ${diag.problemas.join(" ")}`);
+      t.verdadeiro(!diag.pronto && diag.problemas.some((p) => p.includes("2 jogadores: J0, J1")), `faltando: ${diag.problemas.join(" ")}`);
       const r = Regras.gerarCalendario(faltando, { jogosPorJogador: 6, semanas: 8, semente: 1 });
       t.verdadeiro(r.erro && r.erro.includes("estrelas") && !r.calendario, "gerarCalendario recusa");
       t.igual(Regras.avaliarCalendario(faltando, [], configDe(6, 8)).equilibrio, null, "sem estrelas de todos, o equilíbrio não é avaliado");
@@ -1741,6 +1744,76 @@
       est.trocarChave(camps.chaveAtiva());
       est.desfazer();
       t.igual(est.atual().campeonato.jogadores[0].estrelas, 1, "desfazer volta ao valor anterior");
+    });
+
+    // ---------- Base visual e acessível (Fase 18) ----------
+
+    caso("U1 plural: singular só com 1", (t) => {
+      t.igual(Util.plural(0, "jogador", "jogadores"), "0 jogadores", "0 usa o plural");
+      t.igual(Util.plural(1, "jogador", "jogadores"), "1 jogador", "1 usa o singular");
+      t.igual(Util.plural(3, "jogo pendente", "jogos pendentes"), "3 jogos pendentes", "3 usa o plural (expressão inteira)");
+      t.igual(Util.plural(1250, "cenário", "cenários"), "1.250 cenários", "número com separador de milhar");
+    });
+
+    caso("U2 numero: formato brasileiro", (t) => {
+      t.igual(Util.numero(4.5, 1), "4,5", "vírgula decimal");
+      t.igual(Util.numero(4.46, 1), "4,5", "arredonda para as casas pedidas");
+      t.igual(Util.numero(3, 1), "3,0", "casas fixas");
+      t.igual(Util.numero(1234567), "1.234.567", "ponto no milhar, sem casas por padrão");
+    });
+
+    caso("U3 rotuloDoJogo: semana e número do jogo na semana, nunca o id", (t) => {
+      const jogos = [
+        { id: "s1-j1", semana: 1 }, { id: "s1-j2", semana: 1 },
+        { id: "s3-j1", semana: 3 }, { id: "s3-j2", semana: 3 }, { id: "x", semana: 3 },
+      ];
+      const numeros = Regras.numerosNaSemana(jogos);
+      t.igual(Util.rotuloDoJogo(jogos[1], numeros), "Semana 1 · Jogo 2", "2º jogo da semana 1");
+      t.igual(Util.rotuloDoJogo(jogos[4], numeros), "Semana 3 · Jogo 3", "o número vem da ordem na semana, não do id");
+      t.igual([...Regras.numerosNaSemana(jogosEmSemanas()).values()], [1, 2, 1, 2, 1, 2, 3], "fixture: números reiniciam a cada semana");
+      t.verdadeiro(Util.numerosNaSemana(jogos) === Util.numerosNaSemana(jogos), "Util guarda o resultado enquanto a lista não muda");
+    });
+
+    caso("U4 botaoIcone: nome acessível e ícone decorativo", (t) => {
+      let clicou = false;
+      const b = Util.botaoIcone({ icone: "editar", rotulo: "Renomear Jogador 01", id: "b1", class: "mini", onclick: () => { clicou = true; } });
+      t.igual(b.tagName, "BUTTON", "é um botão");
+      t.igual(b.type, "button", "type=button (não envia formulário)");
+      t.igual(b.getAttribute("aria-label"), "Renomear Jogador 01", "aria-label com o rótulo");
+      t.igual(b.title, "Renomear Jogador 01", "title igual ao aria-label");
+      t.igual(b.className, "botao-icone mini", "classe própria mais as pedidas");
+      t.igual(b.textContent.trim(), "", "sem texto visível (só o ícone)");
+      t.igual(b.querySelector("svg").getAttribute("aria-hidden"), "true", "ícone escondido do leitor de tela");
+      b.click();
+      t.verdadeiro(clicou, "onclick funciona");
+      t.verdadeiro(Util.botaoIcone({ icone: "fechar", rotulo: "Fechar", disabled: true }).disabled, "aceita disabled");
+    });
+
+    caso("U5 Icones.svg: todos decorativos, na cor do texto", (t) => {
+      const nomes = Icones.nomes();
+      t.verdadeiro(nomes.length >= 16, `${nomes.length} ícones`);
+      for (const nome of ["desfazer", "backup", "telao", "imagem", "editar", "remover", "subir", "descer", "confirmar",
+        "anterior", "proximo", "alerta", "ok", "trofeu", "empate", "ajuda"]) {
+        t.verdadeiro(nomes.includes(nome), `tem o ícone "${nome}" do plano`);
+      }
+      const ruins = nomes.filter((nome) => {
+        const s = Icones.svg(nome);
+        return s.namespaceURI !== "http://www.w3.org/2000/svg" || s.getAttribute("aria-hidden") !== "true"
+          || s.getAttribute("focusable") !== "false" || s.getAttribute("stroke") !== "currentColor" || !s.childElementCount;
+      });
+      t.igual(ruins, [], "todos são SVG com aria-hidden, focusable=false, currentColor e desenho");
+      t.verdadeiro(Icones.svg("ok", "extra").classList.contains("extra"), "aceita classe extra");
+      let erro = null;
+      try { Icones.svg("nao-existe"); } catch (e) { erro = e; }
+      t.verdadeiro(erro, "ícone desconhecido lança erro (em vez de um botão vazio)");
+    });
+
+    caso("U6 Erro junto do campo: atributos e mensagem", (t) => {
+      t.igual(Util.atributosDeErro("x-erro", null), {}, "sem erro: nenhum atributo");
+      t.igual(Util.atributosDeErro("x-erro", "Use números."), { "aria-invalid": "true", "aria-describedby": "x-erro" }, "com erro: aria-invalid e aria-describedby");
+      t.igual(Util.mensagemDeErro("x-erro", null), null, "sem erro: nada para desenhar");
+      const p = Util.mensagemDeErro("x-erro", "Use números.");
+      t.igual([p.id, p.className, p.textContent], ["x-erro", "erro-campo", "Use números."], "com erro: <p> com o id ligado ao campo");
     });
 
     // Execução e relatório

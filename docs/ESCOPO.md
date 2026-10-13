@@ -157,7 +157,7 @@ Nome e situação de cada edição ("cadastro", "semana 5 de 8", "fase final", "
 
 ## 4. Telas
 
-Uma aba por etapa (teclas 1 a 5; a aba ativa fica no endereço, ex.: `index.html#rodadas`). Sem `#`, abre na aba da etapa do campeonato; depois a aba só muda por escolha do organizador (e ao confirmar o calendário, que leva a Rodadas).
+Uma aba por etapa (Alt+1 a Alt+5; a aba ativa fica no endereço, ex.: `index.html#rodadas`). Sem `#`, abre na aba da etapa do campeonato; depois a aba só muda por escolha do organizador (e ao confirmar o calendário, que leva a Rodadas).
 
 1. **Jogadores**: nome, jogos por jogador, semanas, aparência (cor e logo), diagnóstico da combinação e cadastro (um nome por linha; renomear, remover e nível de 1 a 5 estrelas).
 2. **Calendário**: sortear, conferir as restrições e o equilíbrio por nível, trocar jogadores à mão e confirmar.
@@ -185,6 +185,8 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 12 | Várias edições: seletor no cabeçalho, tela de Campeonatos (novo, duplicar, arquivar, excluir), importar como novo e migração automática |
 | 15 (parte 1) | Aparência por edição (cor e logo no cabeçalho, telão e PNGs) e modelo de campeonato (exportar e criar edição a partir dele) |
 | 16 | Nível dos jogadores (1 a 5 estrelas) e sorteio equilibrado por nível |
+| 17 | Cada tela monta o próprio conteúdo (sem mudança visível) e testes das telas (`testes-telas.html`) |
+| 18 | Base visual e acessível: ícones SVG no lugar dos emojis, tokens de espaçamento e fonte, botões de 28 px, contraste do tema escuro, avisos que se fecham, erro junto do campo, plurais, "Semana 3 · Jogo 2" no lugar do id e atalhos Alt+1…5 |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -207,6 +209,9 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | E | Várias edições: migração, índice corrompido, criar/duplicar/arquivar/excluir, trocar a ativa, importar como novo ou substituindo |
 | A | Aparência (contraste, validação, fora do desfazer, backup/reset/importar), modelo de campeonato, duplicar com aparência, cor no PNG e no telão |
 | L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
+| U | Base da interface: `plural`, `numero` (formato brasileiro), `rotuloDoJogo`, `botaoIcone` (nome acessível), ícones decorativos e atributos do erro junto do campo |
+
+`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo) e V5 (erro junto do campo).
 
 ## 7. Pendências
 

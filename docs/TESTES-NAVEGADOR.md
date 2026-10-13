@@ -38,7 +38,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
   direto, não por um observador instalado depois.
 - Cada tela fica numa aba: abrir a aba certa antes de usar a tela (`#aba-btn-rodadas` etc. ou
   navegar para `index.html#rodadas`). Só a aba visível é redesenhada.
-- Exportar/importar ficam no menu "💾 Backup" e os PNGs e o Resetar no menu "⋯": abrir o menu
+- Exportar/importar ficam no menu "Backup" e os PNGs e o Resetar no menu "Mais ações" (botão de três pontos): abrir o menu
   (`#menu-backup > summary`, `#menu-mais > summary`) antes de clicar no item. Para importar, dá para
   mandar o arquivo direto em `#arquivo-importar` (`setInputFiles`); depois escolher na janela
   `#importar-novo` ou `#importar-substituir`.
@@ -75,11 +75,11 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 1b.1 | Abrir sem `#` no endereço, em cada etapa. | Abre na aba da etapa e o endereço passa a ter o `#` dela: sem cadastro pronto → Jogadores; cadastro pronto ou sorteio em rascunho → Calendário; calendário confirmado → Rodadas; chaveamento gerado → Mata-mata. |
 | 1b.2 | Na aba Jogadores, cadastrar o 8º jogador (a etapa muda). | Continua na aba Jogadores: a aba só muda por escolha. |
 | 1b.3 | Confirmar o calendário. | Vai sozinho para a aba Rodadas. |
-| 1b.4 | Clicar nas abas; usar ← → com o foco numa aba; teclas 1 a 5 fora de campos de texto. | Troca a aba e o endereço (`#jogadores`, `#calendario`, `#rodadas`, `#classificacao`, `#mata-mata`). Digitando num campo, 1–5 não trocam de aba. Com o telão aberto também não. |
+| 1b.4 | Clicar nas abas; usar ← → com o foco numa aba; Alt+1 a Alt+5 (também com o foco num campo). | Troca a aba e o endereço (`#jogadores`, `#calendario`, `#rodadas`, `#classificacao`, `#mata-mata`). As teclas 1 a 5 sozinhas não trocam de aba (digitam normalmente). Com o telão aberto, Alt+número não faz nada. |
 | 1b.5 | Voltar e avançar do navegador; F5. | Volta/avança entre as abas visitadas; F5 mantém a aba. |
-| 1b.6 | Indicadores das abas. | Jogadores: nº de jogadores. Calendário: "rascunho" ou ✔. Rodadas: "lançados/total". Classificação: ⚖️ com empate técnico sem ordem no top 8. Mata-mata: 🏆 com campeões. |
+| 1b.6 | Indicadores das abas. | Jogadores: nº de jogadores. Calendário: "rascunho" ou ícone de confirmado. Rodadas: "lançados/total". Classificação: ícone de balança com empate técnico sem ordem no top 8. Mata-mata: troféu com campeões. O leitor de tela ouve o indicador por extenso (ex.: "Rodadas, 18 de 48 jogos lançados"). |
 | 1b.7 | Rodadas em tela larga (≥ 1100 px). | Jogos da semana em duas colunas e, ao lado, "Top 8 ao vivo" (até o 10º, com a linha de corte no 8º) atualizando a cada placar. "Ver classificação completa" abre a aba Classificação. |
-| 1b.8 | Menus "💾 Backup" e "⋯". | Abrem por cima do conteúdo; abrir um fecha o outro; fecham ao escolher um item, ao clicar fora e com Esc (o foco volta para o botão do menu). Em ~400 px a lista ocupa a largura do cabeçalho, sem sair da tela. |
+| 1b.8 | Menus "Backup" e "Mais ações". | Abrem por cima do conteúdo; abrir um fecha o outro; fecham ao escolher um item, ao clicar fora e com Esc (o foco volta para o botão do menu). Em ~400 px a lista ocupa a largura do cabeçalho, sem sair da tela. |
 | 1b.9 | Resetar ou importar um backup. | Vai para a aba da etapa do campeonato resultante. |
 | 1b.10 | "PNG da classificação" com "após a semana N" escolhido. | Na aba Classificação, exporta a semana N (`...-classificacao-semana-N-...png`); em outra aba, exporta ao vivo. |
 
@@ -87,31 +87,31 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 
 | # | Passos | Esperado |
 |---|---|---|
-| 2.1 | Colar 32 nomes no campo (um por linha) e clicar em "Adicionar". | Aviso "32 jogador(es) adicionado(s).", lista com 32, diagnóstico "✔ Combinação válida para sortear o calendário." |
+| 2.1 | Colar 32 nomes no campo (um por linha) e clicar em "Adicionar". | Aviso "32 jogadores adicionados.", lista com 32, diagnóstico "Combinação válida para sortear o calendário." |
 | 2.2 | Digitar nomes e apertar Ctrl+Enter. | Adiciona igual ao botão. |
-| 2.3 | Clicar em "Adicionar" com o campo vazio. | Erro "Digite ao menos um nome (um por linha)." |
+| 2.3 | Clicar em "Adicionar" com o campo vazio. | Erro "Digite ao menos um nome (um por linha)." embaixo do campo (ver 13.8). |
 | 2.4 | Adicionar um nome que já existe (inclusive com maiúsculas/minúsculas diferentes). | Erro "... não foi adicionado: Já existe um jogador chamado ..."; o nome com problema fica no campo; os outros da lista entram. |
 | 2.5 | Adicionar um nome com mais de 30 caracteres. | Erro "Nome muito longo (máximo 30 caracteres)." |
 | 2.6 | Renomear um jogador e salvar. | Nome muda na lista, nos jogos, na classificação e na agenda. |
 | 2.7 | Renomear para um nome vazio ou repetido. | Erro e o campo continua em edição com o texto digitado. |
 | 2.8 | Remover um jogador antes do sorteio. | Some da lista; o sorteio em rascunho (se houver) é descartado. |
-| 2.9 | Mudar o nome do campeonato. Depois tentar deixar vazio. | O título muda. Vazio: erro "O nome do campeonato não pode ficar vazio." e volta o nome anterior. |
+| 2.9 | Mudar o nome do campeonato. Depois tentar deixar vazio. | O título muda. Vazio: erro "O nome do campeonato não pode ficar vazio." embaixo do campo, que continua vazio até ser corrigido; o nome guardado (título) não muda. |
 | 2.10 | Com 7 jogadores. | Diagnóstico "Cadastre pelo menos 8 jogadores (hoje: 7)." e "Sortear" desabilitado. |
 | 2.11 | Com 31 jogadores e 6 jogos. | Diagnóstico "31 jogadores × 6 jogos = 186 vagas, e cada jogo ocupa 4: não fecha. ..." |
 | 2.12 | Jogos por jogador = 9 com 8 semanas. | Diagnóstico "... 9 jogos pedem pelo menos 9 semanas (há 8)." |
 | 2.13 | 8 jogadores e 8 jogos por jogador (com 8+ semanas). | Diagnóstico "Sem repetir parceiro, 8 jogadores permitem no máximo 7 jogos por jogador." |
-| 2.14 | Digitar 0 ou "ab" em jogos por jogador ou semanas. | Erro "...: use um número de 1 a 99" e o valor anterior volta. O campo aceita no máximo 2 dígitos. |
+| 2.14 | Digitar 0 ou "ab" em jogos por jogador ou semanas. | Erro "Use um número de 1 a 99." embaixo do campo, com o valor digitado; a configuração guardada não muda. O campo aceita no máximo 2 dígitos. |
 | 2.15 **(R)** | Digitar no campo de nomes e apertar Ctrl+Z dentro dele. | Desfaz só o texto digitado. A lista de jogadores não muda e não aparece "Desfeito: ...". |
 
 ## 3. Sorteio e calendário
 
 | # | Passos | Esperado |
 |---|---|---|
-| 3.1 | Com 32 jogadores, clicar em "🎲 Sortear calendário". | Rascunho com 8 semanas e 6 jogos por semana; botões "Sortear de novo", "Confirmar calendário" e "Descartar". |
+| 3.1 | Com 32 jogadores, clicar em "Sortear calendário". | Rascunho com 8 semanas e 6 jogos por semana; botões "Sortear de novo", "Confirmar calendário" e "Descartar". |
 | 3.2 | Conferir o rascunho. | Cada jogador em 6 jogos, no máximo 1 por semana, nenhum parceiro repetido. 8 jogadores descansando por semana. |
 | 3.3 | "Sortear de novo". | Janela "Sortear de novo?"; aceitando, gera outro calendário; cancelando, nada muda. |
 | 3.4 | Trocar um jogador num jogo do rascunho pelo seletor. | As opções dizem "(atual)", "— joga no jogo N (trocam de lugar)" ou "— descansa nesta semana". Escolhendo, o rascunho muda na hora. |
-| 3.5 | Trocar um jogador por alguém que descansa na semana. | O painel mostra "⚠️ ... tem 5 jogo(s) (o esperado é 6).", "⚠️ ... tem 7 jogo(s) ..." e, se for o caso, "... são parceiros 2 vezes.". "Confirmar" abre "Confirmar o calendário?" começando com "Atenção, o calendário não respeita o regulamento: ..." e o botão de ação em vermelho. |
+| 3.5 | Trocar um jogador por alguém que descansa na semana. | O painel mostra "... tem 5 jogos (o esperado é 6).", "... tem 7 jogos ..." (cada um com o ícone de alerta) e, se for o caso, "... são parceiros 2 vezes.". "Confirmar" abre "Confirmar o calendário?" começando com "Atenção, o calendário não respeita o regulamento: ..." e o botão de ação em vermelho. |
 | 3.6 | "Descartar". | Volta para antes do sorteio. |
 | 3.7 | "Confirmar calendário". | Janela "Confirmar o calendário?"; aceitando, cria os 48 jogos (`s1-j1` ...), o cadastro trava (só renomear), aparece "Reiniciar campeonato" e o app vai para a aba Rodadas. |
 | 3.8 | Depois de confirmado, tentar adicionar ou remover jogador. | Campo de nomes e botões de remover não aparecem; só "Renomear". |
@@ -127,7 +127,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 4.4 | Digitar o placar: 1º campo, Enter, 2º campo, Enter. | Enter no 1º pula para o 2º; Enter no 2º lança. Cartão vira "lançado", contador "1/48 lançados". |
 | 4.5 | Lançar usando Tab entre os campos. | Lança ao sair do 2º campo; o foco segue para o botão "W.O." do mesmo jogo, sem se perder no redesenho. |
 | 4.6 | Digitar um placar e clicar direto num botão de outro jogo (ex.: "W.O."). | O clique funciona na primeira tentativa (o redesenho espera soltar o mouse). |
-| 4.7 | Digitar "abc", "-1" ou "100". | Erro "Placar inválido no jogo ...: use números de 0 a 99." e o campo fica marcado. |
+| 4.7 | Digitar "abc", "-1" ou "100". | Erro "Placar inválido: use números de 0 a 99." embaixo do placar, no cartão do jogo, e o campo fica marcado. |
 | 4.8 | Apagar um lado de um placar já lançado. | O jogo volta a ficar pendente. |
 | 4.9 | W.O. → "Dupla 1". | Resultado W.O.: dupla 1 com 3×0, 3 pontos e +3 de saldo; dupla 2 com −3. "Cancelar" fecha a escolha sem lançar. |
 | 4.10 | "Anular". | Jogo resolvido, mas ninguém ganha ponto, V/E/D, gol nem jogo disputado. |
@@ -140,12 +140,12 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 
 | # | Passos | Esperado |
 |---|---|---|
-| 5.1 | Sem jogos lançados. | Todos com 0 ponto, em ordem alfabética (com acentos no lugar certo: "Érica" depois de "Davi"), sem ⚖️ porque ninguém jogou. |
+| 5.1 | Sem jogos lançados. | Todos com 0 ponto, em ordem alfabética (com acentos no lugar certo: "Érica" depois de "Davi"), sem a balança de empate técnico porque ninguém jogou. |
 | 5.2 | Lançar um jogo e conferir as linhas dos 4 jogadores. | Pontos, V/E/D, GP, GC e SG conforme a tabela de `docs/ESCOPO.md` (2.1). |
 | 5.3 | Montar empates em pontos e conferir a ordem. | Pontos → vitórias → saldo → gols pró. |
 | 5.4 | Top 8. | Os 8 primeiros destacados em verde. |
 | 5.5 | Escolher "após a semana N" no seletor. | Mostra a tabela só com os jogos até a semana N, com o rótulo "após a semana N", sem as setas de desempate (só leitura) e ▲▼ em relação à semana anterior. Na semana 1 não há ▲▼ (não existe semana anterior). |
-| 5.6 | Empate técnico (iguais em pontos, V, SG e GP) começando no top 8. | ⚖️ no grupo, setas ↑↓ e ✔ no primeiro do grupo para confirmar a ordem atual. |
+| 5.6 | Empate técnico (iguais em pontos, V, SG e GP) começando no top 8. | Balança no grupo, botões "Subir"/"Descer" (setas) e "Confirmar a ordem atual" no primeiro do grupo. |
 | 5.7 | Usar ↑↓ no grupo empatado. | A ordem muda e fica guardada; recarregar mantém. |
 | 5.8 | Lançar algo que desfaz o empate do grupo. | A ordem manual daquele grupo é descartada. |
 
@@ -167,13 +167,13 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | # | Passos | Esperado |
 |---|---|---|
 | 7.1 | Antes de lançar todos os jogos. | "Prévia pela classificação atual" e avisos do que falta. "Gerar chaveamento" abre "Gerar o chaveamento mesmo assim?" com a lista dos avisos. |
-| 7.2 | Com tudo lançado, gerar. | Semi 1 = 1º+8º × 2º+7º; Semi 2 = 3º+6º × 4º+5º. "✔ Todos os jogos lançados e nenhum empate técnico pendente no top 8." antes de gerar. |
-| 7.3 | Lançar placar com vencedor numa semi. | "✔ Dupla N vence", status "Decidido". |
+| 7.2 | Com tudo lançado, gerar. | Semi 1 = 1º+8º × 2º+7º; Semi 2 = 3º+6º × 4º+5º. "Todos os jogos lançados e nenhum empate técnico pendente no top 8." antes de gerar. |
+| 7.3 | Lançar placar com vencedor numa semi. | "Dupla N vence", status "Decidido". |
 | 7.4 | Lançar empate numa semi. | Aparece a prorrogação; empatando nela, aparecem os pênaltis. |
 | 7.5 | Pênaltis empatados. | Erro "Pênaltis não podem terminar empatados." |
 | 7.6 | Final MD3. | Começa só com o jogo 1; cada jogo aparece depois do resultado do anterior; o 3º só aparece com 1×1 na série; termina com 2 vitórias ("Série: 2 × 1"). |
-| 7.7 | Pódio. | 🥇 campeões e 🥈 vice saem da final; 🥉 do 3º lugar. |
-| 7.8 | Trocar uma dupla à mão ("✎"), salvar e depois voltar à automática. | A dupla manual aparece; voltar restaura a dupla da classificação/semi. |
+| 7.7 | Pódio. | Campeões (troféu) e vice (medalha) saem da final; o 3º lugar (medalha) da disputa de 3º. |
+| 7.8 | Trocar uma dupla à mão (botão de lápis "Trocar a dupla N"), salvar e depois voltar à automática. | A dupla manual aparece; voltar restaura a dupla da classificação/semi. |
 | 7.9 | Trocar uma dupla com jogador repetido ou o mesmo jogador nas duas duplas. | Erros "Os dois jogadores da dupla precisam ser diferentes." / "Um jogador não pode estar nas duas duplas do mesmo jogo." |
 | 7.10 | Mudar um placar da fase de classificação depois de gerar, alterando o top 8. | Alerta "A classificação mudou depois de gerar o chaveamento ..." com "Usar duplas da classificação atual". As semis continuam com as duplas antigas até clicar. Se as semis já têm placar, abre "Trocar as duplas mesmo assim?"; ao trocar, se final/3º lugar já têm placar, aparece em seguida o alerta do 7.12. |
 | 7.11 **(R)** | Final sem placar: trocar o resultado de uma semi. | A final passa a mostrar o novo vencedor sozinha, sem alerta. |
@@ -196,7 +196,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 
 | # | Passos | Esperado |
 |---|---|---|
-| 9.1 | Com jogos e sem backup. | Lembrete "💾 Você ainda não exportou nenhum backup deste campeonato." com "Exportar backup agora" e "Dispensar". |
+| 9.1 | Com jogos e sem backup. | Lembrete "Você ainda não exportou nenhum backup deste campeonato." com "Exportar backup agora" e "Dispensar". |
 | 9.2 | Exportar. | Baixa `<nome-do-campeonato>-backup-<data-hora>.json`; o lembrete some; o arquivo tem `ultimoBackup` com a data e as semanas completas. |
 | 9.3 | Concluir mais uma semana depois do backup. | Lembrete "... semanas já foram concluídas, mais do que no último backup." |
 | 9.4 | Backup com 7 dias ou mais (ajustar a data de `ultimoBackup` no `localStorage`). | Lembrete "Faz N dias desde o último backup." |
@@ -247,17 +247,21 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 13.1 | Janela estreita (~400 px) e larga (1920 px). | Sem rolagem horizontal; nada sobreposto. |
 | 13.2 | Navegar só com o teclado (Tab, Enter, Espaço). | Todos os botões e campos alcançáveis, com foco visível. |
 | 13.3 | Campos de placar. | Têm `aria-label` dizendo o jogo e a dupla. |
-| 13.4 | Avisos de erro. | Aparecem com `role="alert"` e somem sozinhos (erros em 8 s, os outros em 3,5 s). |
-| 13.5 | Janelas de confirmação (sortear de novo, confirmar calendário, gerar/apagar chaveamento, trocar duplas com placar, resetar). | Título com a pergunta e botão com o nome da ação. Ações perigosas: botão vermelho e foco em "Cancelar" (Enter cancela). Esc cancela. Com a janela aberta, Ctrl+Z e as teclas 1–5 não fazem nada. |
+| 13.4 | Avisos no canto (ex.: exportar o backup; importar um arquivo que não é JSON). | Ficam na área `#avisos` (`aria-live="polite"`, sem `role` em cada aviso), com o botão "Fechar aviso". O de sucesso some em 5 s; o de erro fica até ser fechado. O mesmo aviso repetido não empilha. A linha "Salvo no navegador às..." não é anunciada. |
+| 13.5 | Janelas de confirmação (sortear de novo, confirmar calendário, gerar/apagar chaveamento, trocar duplas com placar, resetar). | Título com a pergunta e botão com o nome da ação. Ações perigosas: botão vermelho e foco em "Cancelar" (Enter cancela). Esc cancela. Com a janela aberta, Ctrl+Z e Alt+1…5 não fazem nada. |
 | 13.6 | Tema escuro do sistema (Windows: Configurações → Personalização → Cores → escuro). | O app inteiro fica escuro, legível, sem fundo branco sobrando (campos, menus, janelas). O telão não muda. |
 | 13.7 | Telas vazias (app zerado), em cada aba. | Cada uma diz o que falta e tem um botão para a aba onde se resolve ("Ir para Jogadores", "Ir para o Calendário"). Nenhum "null" ou "undefined" na tela. Com o cadastro pronto, Jogadores mostra "Próximo: sortear o calendário →". |
+| 13.8 | Erro junto do campo: placar "x" (Rodadas e Mata-mata), nome do campeonato vazio, jogos por jogador = 0, cor branca, renomear para um nome que já existe, "Adicionar" sem nomes, trocar uma dupla do mata-mata pelo mesmo jogador duas vezes. | A mensagem aparece logo abaixo do campo, em vermelho com ícone de alerta; o campo fica com borda vermelha e `aria-invalid="true"`, ligado à mensagem por `aria-describedby`. Nenhum aviso no canto. O texto recusado continua no campo; ao corrigir, a mensagem some. Sair do campo com Tab não puxa o foco de volta. |
+| 13.9 | Primeiro Tab ao abrir o app; Enter. | Aparece "Pular para o conteúdo"; o Enter leva o foco para o conteúdo da aba sem mudar o endereço (`#aba` continua). |
+| 13.10 | Botões e ícones em todas as abas. | Nenhum emoji na interface (o telão e os PNGs continuam como estão). Botões só com ícone (lápis, lixeira, setas, fechar) dizem o que fazem na dica e para o leitor de tela. Botões pequenos com pelo menos 28 px. Plurais certos ("1 jogador", "2 jogadores"); nenhum "(es)". Mensagens e "Desfazer" falam "Semana 3 · Jogo 2", nunca "s3-j2". |
+| 13.11 | Lighthouse (acessibilidade), modo snapshot, em cada aba e na tela de Campeonatos, nos temas claro e escuro. | Nota ≥ 95, sem falhas de contraste nem de nome acessível. |
 
 ## 14. Várias edições
 
 | # | Passos | Esperado |
 |---|---|---|
 | 14.1 | `localStorage` só com a chave antiga `copa-fifa-duplas-campeonato` (um campeonato com jogos) e abrir o app. | Abre esse campeonato, na aba da etapa. Existem `copa-fifa-duplas-indice` e `copa-fifa-duplas-campeonato-<id>`; a chave antiga continua igual. Recarregar não cria outra edição. |
-| 14.2 | Clicar no título do cabeçalho. | Abre a lista "Campeonatos" com as edições não arquivadas (a aberta com ✔ e a situação embaixo de cada nome), "+ Novo campeonato" e "⚙ Gerenciar campeonatos". Fecha ao escolher, ao clicar fora e com Esc. Nome longo não empurra os botões do cabeçalho. |
+| 14.2 | Clicar no título do cabeçalho. | Abre a lista "Campeonatos" com as edições não arquivadas (a aberta com o ícone de confirmado e a situação embaixo de cada nome), "Novo campeonato" e "Gerenciar campeonatos". Fecha ao escolher, ao clicar fora e com Esc. Nome longo não empurra os botões do cabeçalho. |
 | 14.3 | "+ Novo campeonato". | Vai para a aba Jogadores com o nome "Copa FIFA em Duplas" selecionado: digitar substitui. Desfazer fica desabilitado (edição nova). |
 | 14.4 | Escolher outra edição no seletor. | Carrega a edição, vai para a aba da etapa dela, aviso "Campeonato aberto: ...". O desfazer é o daquela edição. O lembrete de backup é o dela. |
 | 14.5 | Telão em outra janela (`index.html#telao`) e trocar de edição na primeira. | O telão passa a mostrar a nova edição sozinho (nome no topo e rodízio de telas). |
@@ -276,7 +280,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | # | Passos | Esperado |
 |---|---|---|
 | 15.1 | Aba Jogadores → "Aparência" → escolher uma cor escura (ex.: `#8b0000`). | O cabeçalho muda na hora, aviso "Cor do campeonato atualizada.", aparece o botão "Padrão". O Desfazer continua como estava (a cor não entra no desfazer). |
-| 15.2 | Escolher uma cor clara (ex.: `#ffff00`). | Erro "Cor clara demais... (contraste 1,1:1; o mínimo é 4,5:1)". O cabeçalho não muda e o seletor volta para a cor anterior. |
+| 15.2 | Escolher uma cor clara (ex.: `#ffff00`). | Erro "Cor clara demais... (contraste 1,1:1; o mínimo é 4,5:1)" embaixo da aparência. O cabeçalho não muda; o seletor mostra a cor recusada até escolher outra. |
 | 15.3 | "Escolher imagem" com um PNG grande (ex.: 600×300); depois um arquivo que não é imagem. | O logo aparece ao lado do título e na prévia, reduzido para caber em 256×128. Arquivo que não é imagem: erro "use uma imagem PNG, JPG ou WebP." e nada muda. |
 | 15.4 | "Remover" o logo e "Padrão" na cor. | Volta ao cabeçalho azul sem logo, com aviso a cada ação. |
 | 15.5 | Com cor e logo numa edição, trocar para outra sem aparência pelo seletor, e voltar. | Cada edição mostra a sua: a outra fica com o azul padrão e sem logo. |
@@ -284,7 +288,7 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | 15.7 | Modo telão com cor e logo; depois tirar a aparência com o telão aberto. | Fundo do telão escurecido a partir da cor e logo à esquerda do nome. Sem aparência: fundo e topo padrão, sem recarregar. |
 | 15.8 | Exportar backup, Resetar e Desfazer. | O JSON tem `aparencia`. Resetar volta ao padrão; Desfazer devolve a cor e o logo. |
 | 15.9 | Tela de Campeonatos → "⬇ Modelo" numa edição com jogos. | Baixa `<nome>-modelo-<data>.json` com `tipo: "modelo-copa-fifa-duplas"`, `versao`, `campeonato` (nome, config, jogadores) e `aparencia`; sem jogos, calendário nem desfazer. |
-| 15.10 | "+ Novo a partir de modelo" e escolher o modelo. Repetir pelo "💾 Backup → Importar". | Abre o seletor de arquivo. Sem a janela de escolha: edição nova aberta na aba Jogadores, com os jogadores, a configuração, a cor e o logo do modelo, cadastro livre e aviso "Campeonato criado a partir do modelo: ...". O importar reconhece o modelo do mesmo jeito. |
+| 15.10 | "Novo a partir de modelo" e escolher o modelo. Repetir pelo "Backup → Importar". | Abre o seletor de arquivo. Sem a janela de escolha: edição nova aberta na aba Jogadores, com os jogadores, a configuração, a cor e o logo do modelo, cadastro livre e aviso "Campeonato criado a partir do modelo: ...". O importar reconhece o modelo do mesmo jeito. |
 | 15.11 | Modelo com `versao: 99` (ou um JSON qualquer com `tipo` de modelo e sem `campeonato`). | Erro "Não foi possível usar o modelo: ..."; nenhuma edição criada, a aberta não muda. |
 | 15.12 | Duplicar uma edição com cor e logo. | A cópia tem a mesma cor e o mesmo logo. |
 | 15.13 | Aba Jogadores e cabeçalho com logo em ~400 px e no tema escuro. | O bloco "Aparência" quebra a linha sem rolagem horizontal; o logo não empurra os botões do cabeçalho para fora; legível no escuro. |
@@ -294,10 +298,10 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 | # | Passos | Esperado |
 |---|---|---|
 | 16.1 | Adicionar 32 jogadores. | Cada um aparece com 5 estrelas vazias e o nome destacado em âmbar; o resumo diz "32 sem estrelas"; a legenda explica que as estrelas só servem ao sorteio e só o organizador vê. |
-| 16.2 | Com estrelas faltando, ver o diagnóstico e a aba Calendário. | Aviso "Defina as estrelas ... de N jogador(es): ..." (até 5 nomes); sem "Combinação válida"; botão "Sortear calendário" desabilitado. |
+| 16.2 | Com estrelas faltando, ver o diagnóstico e a aba Calendário. | Aviso "Defina as estrelas ... de N jogadores: ..." (até 5 nomes); sem "Combinação válida"; botão "Sortear calendário" desabilitado. |
 | 16.3 | Clicar na 4ª estrela de um jogador; depois Desfazer. | 4 estrelas cheias, a 4ª com `aria-pressed="true"`; Desfazer volta ao estado anterior ("estrelas de X: 4"). |
 | 16.4 | Só com o teclado: Tab até as estrelas, Enter/Espaço. | Foco visível em cada estrela; Enter define o nível e o foco continua na estrela. |
-| 16.5 | Definir as estrelas de todos e sortear. | O botão mostra "🎲 Sorteando…" e sai do ar enquanto calcula (~1 s). Nomes com `★N` no calendário; jogos com diferença mostram "Δ N" (destaque a partir de 2, fora do aceitável). Linha "Equilíbrio por nível: X de Y jogo(s) aceitáveis (diferença de até 1 estrela; Z sem diferença)... Maior saldo de estrelas...". Regulamento respeitado. |
+| 16.5 | Definir as estrelas de todos e sortear. | O botão mostra "Sorteando…" e sai do ar enquanto calcula (~1 s). Nomes com `★N` no calendário; jogos com diferença mostram "Δ N" (destaque a partir de 2, fora do aceitável). Linha "Equilíbrio por nível: X de Y jogo(s) aceitáveis (diferença de até 1 estrela; Z sem diferença)... Maior saldo de estrelas...". Regulamento respeitado. |
 | 16.5b | Trocar jogadores à mão até um jogo ficar com diferença 2 ou mais. | Δ desse jogo destacado; a linha de equilíbrio fica em alerta e passa a dizer "N fora do aceitável (maior diferença: ...)". |
 | 16.6 | Trocar um jogador à mão por outro de nível bem diferente. | O seletor mostra `★N` ao lado de cada nome. Depois da troca, o Δ do jogo e a linha de equilíbrio mudam na hora. |
 | 16.7 | Com o rascunho aberto, mudar as estrelas de alguém na aba Jogadores e voltar. | O rascunho continua (não é descartado); Δ e equilíbrio refletem o novo nível. |
@@ -309,6 +313,26 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 ---
 
 ## Última execução
+
+**Fase 18 (base visual e acessível), 2026-10-13**, Playwright (Chromium) e Lighthouse (Chrome DevTools)
+via servidor local, antes do commit da fase. Massa: 32 jogadores fictícios com calendário confirmado e 3 (ou 7)
+semanas lançadas.
+
+- `testes.html`: 101 passaram, 0 falharam (casos U1 a U6 novos). `testes-telas.html`: 26 passaram, 0 falharam
+  (V3.3, V4.1 a V4.4 e V5.1 a V5.5 novos).
+- **Lighthouse (acessibilidade, modo snapshot):** 100 nas abas Jogadores, Calendário, Rodadas, Classificação
+  (com "O que está em jogo"), Mata-mata (prévia) e na tela de Campeonatos, nos temas claro e escuro. A
+  primeira passada deu 97 em Jogadores: o verde `--sobe` do tema claro tinha contraste 4,41 com o branco; foi
+  escurecido para `#187a33` (5,4).
+- **Passaram:** 1b.4 (Alt+4 troca de aba; a tecla 1 sozinha não troca mais), 4.7 e 13.8 (placar "x": mensagem
+  embaixo do placar, nenhum aviso), 13.1 (sem rolagem horizontal em 400 e 1920 px em todas as abas), 13.4
+  (sucesso some em 5 s; erro de importação continua depois de 6 s, não empilha e fecha no botão), 13.6 (tema
+  escuro), 13.9 (primeiro Tab = "Pular para o conteúdo"; Enter foca o conteúdo e o endereço continua `#jogadores`),
+  telão sem mudança.
+- **Problema achado e corrigido:** em 400 px todas as abas rolavam ~158 px para o lado. O texto escondido para
+  o leitor de tela (`.so-leitor`, `position: absolute`) dos indicadores das abas escapava da lista rolável;
+  o botão da aba e a tabela rolável passaram a ser `position: relative`.
+- **Falta à mão:** o caso 1.1 (duplo clique, `file://`) e um passeio só com o teclado pelas telas (13.2).
 
 **Fase 17 (telas testáveis, sem mudança visível), 2026-10-13**, Playwright (Chromium) via servidor local, antes
 do commit da fase.

@@ -38,7 +38,7 @@
       const minha = jogo.dupla1.includes(jogadorId) ? jogo.dupla1 : jogo.dupla2;
       const outra = minha === jogo.dupla1 ? jogo.dupla2 : jogo.dupla1;
       const parceiro = nomePorId.get(minha.find((id) => id !== jogadorId));
-      return `Semana ${Regras.semanaDoJogo(jogo)} · Jogo ${numerosNaSemana(jogos).get(jogoId)}: com ${parceiro} × ${nomesDupla(outra)}`;
+      return `${Util.rotuloDoJogo(jogo, numerosNaSemana(jogos))}: com ${parceiro} × ${nomesDupla(outra)}`;
     }
 
     function itemEmJogo(s, linha, jogos) {
@@ -54,7 +54,10 @@
         }
         const marcas = [];
         if (s.dependeDoSaldo) marcas.push(el("span", { class: "tag-saldo", title: "Pode empatar em pontos e vitórias na briga pela 8ª vaga" }, "depende do saldo"));
-        if (s.dependeDoDesempate) marcas.push(el("span", { class: "tag-saldo", title: "Empate total com quem já terminou: defina a ordem na classificação (⚖️)" }, "⚖️ depende do desempate"));
+        if (s.dependeDoDesempate) {
+          marcas.push(el("span", { class: "tag-saldo", title: "Empate total com quem já terminou: defina a ordem do empate técnico na classificação" },
+            Icones.svg("empate"), "depende do desempate"));
+        }
         if (marcas.length) detalhes.push(el("div", { class: "marcas" }, marcas));
       }
       return el("li", { class: `item-em-jogo ${s.situacao}`, id: `em-jogo-${s.id}` },
@@ -83,18 +86,18 @@
         colunas[s.situacao].push(itemEmJogo(s, linha, atual.jogos));
       }
       resumo.textContent = pendentes
-        ? `${pendentes} jogo(s) pendente(s) · ${Regras.contarCenarios(pendentes, atual.campeonato.config).toLocaleString("pt-BR")} cenários`
+        ? `${Util.plural(pendentes, "jogo pendente", "jogos pendentes")} · ${Util.plural(Regras.contarCenarios(pendentes, atual.campeonato.config), "cenário", "cenários")}`
         : "todos os jogos lançados";
 
-      const coluna = (tipo, titulo) => el("div", { class: `coluna-em-jogo ${tipo}`, id: `coluna-${tipo}` },
-        el("h3", {}, `${titulo} `, el("span", { class: "contagem" }, `(${colunas[tipo].length})`)),
+      const coluna = (tipo, icone, titulo) => el("div", { class: `coluna-em-jogo ${tipo}`, id: `coluna-${tipo}` },
+        el("h3", {}, Icones.svg(icone), `${titulo} `, el("span", { class: "contagem" }, `(${colunas[tipo].length})`)),
         colunas[tipo].length
           ? el("ul", {}, colunas[tipo])
           : el("p", { class: "legenda" }, "Ninguém."));
       conteudo.replaceChildren(
-        coluna("garantido", "✅ Garantidos no top 8"),
-        coluna("disputa", "⚔️ Em disputa"),
-        coluna("eliminado", "❌ Eliminados"));
+        coluna("garantido", "ok", "Garantidos no top 8"),
+        coluna("disputa", "disputa", "Em disputa"),
+        coluna("eliminado", "eliminado", "Eliminados"));
     }
 
     return { renderizar: renderizarEmJogo };

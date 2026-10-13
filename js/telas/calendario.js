@@ -3,7 +3,10 @@
 (function () {
   "use strict";
 
-  const { el, confirmar, buscar } = Util;
+  const { el, confirmar, buscar, plural } = Util;
+
+  // Lista de pendências com um ícone de alerta em cada item.
+  const itemAlerta = (texto) => el("li", {}, Icones.svg("alerta"), el("span", {}, texto));
 
   function criar(app, raiz) {
     const { estado, nomePorId, avisar, renderizar, cadastroTravado } = app;
@@ -24,7 +27,8 @@
     }
     function marcaNivel(id) {
       const e = nivel(id);
-      return e ? el("small", { class: "nivel" }, `★${e}`) : null;
+      return e ? el("small", { class: "nivel" },
+        Icones.svg("estrela"), el("span", { "aria-hidden": "true" }, String(e)), el("span", { class: "so-leitor" }, plural(e, "estrela", "estrelas"))) : null;
     }
 
     async function sortear() {
@@ -38,7 +42,7 @@
       }
       // O sorteio leva cerca de 1 s: mostra que está trabalhando antes de começar a conta.
       const botao = buscar(raiz, "btn-sortear");
-      if (botao) { botao.disabled = true; botao.textContent = "🎲 Sorteando…"; }
+      if (botao) { botao.disabled = true; botao.replaceChildren(Icones.svg("sortear"), "Sorteando…"); }
       await new Promise((resolver) => setTimeout(resolver, 30));
       if (cadastroTravado()) return;
       const { jogadores, config: cfg } = estado.atual().campeonato;
@@ -109,10 +113,10 @@
       },
         jogadores.map(([id, nome]) => {
           const onde = doJogo.get(id);
-          let rotulo = nivel(id) ? `${nome} ★${nivel(id)}` : nome;
-          if (id === atualId) rotulo += " (atual)";
-          else if (onde) rotulo += ` — joga no jogo ${onde.numero} (trocam de lugar)`;
-          else rotulo += " — descansa nesta semana";
+          let rotulo = nivel(id) ? `${nome} (${plural(nivel(id), "estrela", "estrelas")})` : nome;
+          if (id === atualId) rotulo += ", atual";
+          else if (onde) rotulo += `, joga no jogo ${onde.numero} (trocam de lugar)`;
+          else rotulo += ", descansa nesta semana";
           return el("option", { value: id, selected: id === atualId }, rotulo);
         }));
     }
@@ -138,7 +142,7 @@
       const fora = diferenca > Regras.DIFERENCA_ACEITAVEL;
       return el("span", {
         class: `diferenca${fora ? " alta" : ""}`,
-        title: `Diferença de nível entre as duplas: ${diferenca} estrela(s), comparando o mais forte com o mais forte e o mais fraco com o mais fraco`
+        title: `Diferença de nível entre as duplas: ${plural(diferenca, "estrela", "estrelas")}, comparando o mais forte com o mais forte e o mais fraco com o mais fraco`
           + (fora ? ". Fora do aceitável (máximo de 1)." : ""),
       }, `Δ ${diferenca}`);
     }
@@ -148,7 +152,7 @@
       const jogam = new Set(doJogo.flatMap(({ j }) => [...j.dupla1, ...j.dupla2]));
       const descansam = [...nomePorId].filter(([id]) => !jogam.has(id)).map(([, nome]) => nome);
       return el("section", { class: "semana-calendario", id: `semana-${semana}` },
-        el("h3", {}, `Semana ${semana} `, el("span", { class: "contagem" }, `(${doJogo.length} jogos)`)),
+        el("h3", {}, `Semana ${semana} `, el("span", { class: "contagem" }, `(${plural(doJogo.length, "jogo", "jogos")})`)),
         el("ol", {}, doJogo.map(({ j, i }) => el("li", {},
           nomeNoCalendario(calendario, i, 1, 0, editavel), " + ", nomeNoCalendario(calendario, i, 1, 1, editavel),
           el("span", { class: "x" }, " × "),
@@ -163,12 +167,12 @@
       const porSemana = aval.jogosPorSemana.join(" · ");
       return el("div", { class: "qualidade", id: "qualidade-calendario" },
         aval.pronto
-          ? el("p", { class: "tudo-certo" },
-              `✔ Regulamento respeitado: todos com ${cfg.jogosPorJogador} jogos, no máximo um por semana e nenhum parceiro repetido.`)
-          : el("ul", { class: "avisos-chave" }, aval.violacoes.map((v) => el("li", {}, `⚠️ ${v}`))),
+          ? el("p", { class: "tudo-certo" }, Icones.svg("ok"),
+              `Regulamento respeitado: todos com ${plural(cfg.jogosPorJogador, "jogo", "jogos")}, no máximo um por semana e nenhum parceiro repetido.`)
+          : el("ul", { class: "avisos-chave" }, aval.violacoes.map(itemAlerta)),
         el("p", { class: "legenda" },
           aval.adversariosRepetidos.pares
-            ? `Adversários repetidos: ${aval.adversariosRepetidos.pares} par(es), no máximo ${aval.adversariosRepetidos.maxVezes} vezes (o sorteio evita, mas pode acontecer).`
+            ? `Adversários repetidos: ${plural(aval.adversariosRepetidos.pares, "par", "pares")}, no máximo ${plural(aval.adversariosRepetidos.maxVezes, "vez", "vezes")} (o sorteio evita, mas pode acontecer).`
             : "Adversários repetidos: nenhum.",
           ` Jogos por semana: ${porSemana}.`),
         linhaEquilibrio(aval.equilibrio, confirmado));
@@ -185,7 +189,7 @@
       const total = eq.aceitaveis + eq.foraDoAceitavel;
       return el("p", { class: `equilibrio${eq.foraDoAceitavel ? " alerta" : ""}`, id: "equilibrio-calendario" },
         el("strong", {}, "Equilíbrio por nível: "),
-        `${eq.aceitaveis} de ${total} jogo(s) aceitáveis (diferença de até ${Regras.DIFERENCA_ACEITAVEL} estrela; ${eq.perfeitos} sem diferença)`,
+        `${eq.aceitaveis} de ${plural(total, "jogo aceitável", "jogos aceitáveis")} (diferença de até ${plural(Regras.DIFERENCA_ACEITAVEL, "estrela", "estrelas")}; ${eq.perfeitos} sem diferença)`,
         eq.foraDoAceitavel ? `, ${eq.foraDoAceitavel} fora do aceitável (maior diferença: ${eq.maiorDiferenca})` : "",
         `. Maior saldo de estrelas na temporada: ${saldo}.`);
     }
@@ -198,7 +202,7 @@
       nivelPorId = new Map(camp.jogadores.map((j) => [j.id, j.estrelas]));
       if (editandoSlot && (!rascunho || !rascunho[editandoSlot.indice])) editandoSlot = null;
 
-      resumo.textContent = confirmado ? `confirmado · ${atual.jogos.length} jogos` : rascunho ? "sorteio em análise" : "";
+      resumo.textContent = confirmado ? `confirmado · ${plural(atual.jogos.length, "jogo", "jogos")}` : rascunho ? "sorteio em análise" : "";
 
       const calendario = confirmado ? atual.jogos : rascunho;
 
@@ -206,12 +210,14 @@
         const explicacao = el("p", { class: "legenda" },
           "Sorteia as duplas e os jogos de todas as semanas de uma vez: todos com o mesmo número de jogos, no máximo um por semana e sem repetir parceiro. "
           + "Também equilibra os jogos pelo nível (estrelas) de cada jogador. Depois você pode trocar jogadores à mão e confirmar.");
-        const botaoSortear = el("button", { type: "button", id: "btn-sortear", class: "primario", disabled: !diag.pronto, onclick: sortear }, "🎲 Sortear calendário");
+        const botaoSortear = el("button", { type: "button", id: "btn-sortear", class: "primario", disabled: !diag.pronto, onclick: sortear },
+          Icones.svg("sortear"), "Sortear calendário");
         if (diag.pronto) {
           alvo.replaceChildren(explicacao, botaoSortear);
         } else {
           alvo.replaceChildren(explicacao,
-            el("ul", { class: "avisos-chave" }, el("li", {}, "⚠️ Antes de sortear, ajuste o cadastro:"), diag.problemas.map((p) => el("li", {}, p))),
+            el("ul", { class: "avisos-chave" }, itemAlerta("Antes de sortear, ajuste o cadastro:"),
+              diag.problemas.map((p) => el("li", { class: "sem-icone" }, p))),
             el("div", { class: "acoes-calendario" }, botaoSortear,
               el("button", { type: "button", dataset: { ir: "jogadores" }, onclick: () => app.irParaAba("jogadores") }, "Ir para Jogadores")));
         }
@@ -224,8 +230,9 @@
         confirmado
           ? el("p", { class: "legenda" }, `Calendário confirmado${camp.sorteio ? ` (semente ${camp.sorteio.semente})` : ""}. Os jogos são lançados na aba Rodadas.`)
           : el("div", { class: "acoes-calendario" },
-              el("button", { type: "button", id: "btn-sortear", onclick: sortear }, "🎲 Sortear de novo"),
-              el("button", { type: "button", id: "btn-confirmar-calendario", class: "primario", onclick: confirmarCalendario }, "✔ Confirmar calendário"),
+              el("button", { type: "button", id: "btn-sortear", onclick: sortear }, Icones.svg("sortear"), "Sortear de novo"),
+              el("button", { type: "button", id: "btn-confirmar-calendario", class: "primario", onclick: confirmarCalendario },
+                Icones.svg("confirmar"), "Confirmar calendário"),
               el("button", { type: "button", id: "btn-descartar-sorteio", class: "discreto", onclick: descartarSorteio }, "Descartar"),
               el("span", { class: "legenda" }, `Semente do sorteio: ${camp.sorteio.semente}. Clique num nome para trocar o jogador.`)),
         painelQualidade(aval, camp.config, confirmado),

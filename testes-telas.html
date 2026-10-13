@@ -30,6 +30,7 @@
   <script src="js/regras.js"></script>
   <script src="js/estado.js"></script>
   <script src="js/campeonatos.js"></script>
+  <script src="js/icones.js"></script>
   <script src="js/util.js"></script>
   <script src="js/telas/jogadores.js"></script>
   <script src="js/telas/calendario.js"></script>
@@ -218,7 +219,7 @@
       t.verdadeiro(buscar(raiz, "novos-nomes"), "campo para adicionar nomes");
       t.verdadeiro(raiz.textContent.includes("Nenhum jogador cadastrado ainda"), "diz que não há jogadores");
       t.igual(botoesProximoPasso(raiz), [], "sem botão de próximo passo (o passo é nesta tela)");
-      t.igual(texto(raiz, "resumo-jogadores"), "0 jogador(es)", "resumo no título");
+      t.igual(texto(raiz, "resumo-jogadores"), "0 jogadores", "resumo no título");
     });
 
     caso("V1.2 Calendário com o app vazio: sorteio bloqueado e caminho para Jogadores", (t) => {
@@ -283,7 +284,7 @@
       const raiz = montar("jogadores");
       verificarLimpeza(t, raiz, "jogadores");
       t.igual(buscar(raiz, "lista-jogadores").children.length, 32, "32 jogadores na lista");
-      t.igual(texto(raiz, "resumo-jogadores"), "32 jogador(es) · calendário confirmado", "resumo no título");
+      t.igual(texto(raiz, "resumo-jogadores"), "32 jogadores · calendário confirmado", "resumo no título");
       t.verdadeiro(buscar(raiz, "btn-reiniciar"), "botão \"Reiniciar campeonato\"");
       t.verdadeiro(!buscar(raiz, "novos-nomes"), "sem campo para adicionar nomes");
     });
@@ -378,19 +379,238 @@
       t.verdadeiro(estado.ultimaAcao().includes("3×1"), "a ação entra no desfazer");
     });
 
-    caso("V3.2 Placar inválido pela tela: aviso de erro e nada muda", (t) => {
-      const { montar, estado, avisos } = criarAppFalso(dadosComCalendario());
+    caso("V3.2 Placar inválido pela tela: nada muda (o erro aparece no campo, ver V5.1)", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComCalendario());
       const raiz = montar("rodadas");
       const jogo = estado.atual().jogos.find((j) => j.semana === 2);
       const historico = estado.atual().historico.length;
       digitarPlacar(raiz, jogo.id, "x", "1");
       t.igual(estado.atual().jogos.find((j) => j.id === jogo.id).resultado, null, "o jogo continua pendente");
       t.igual(estado.atual().historico.length, historico, "nada entra no desfazer");
-      const ultimo = avisos[avisos.length - 1];
-      t.verdadeiro(ultimo && ultimo.tipo === "erro" && ultimo.texto.includes("Placar inválido"), "aviso de erro");
       const campo = buscar(raiz, `gols-${jogo.id}-1`);
       t.igual(campo.value, "x", "o texto digitado continua no campo");
       t.verdadeiro(campo.classList.contains("invalido"), "o campo fica marcado como inválido");
+    });
+
+    caso("V3.3 O desfazer descreve o jogo por semana e número, sem o id interno", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      const jogos = estado.atual().jogos;
+      const jogo = jogos.filter((j) => j.semana === 2)[1];
+      digitarPlacar(raiz, jogo.id, "2", "2");
+      t.igual(estado.ultimaAcao(), "placar 2×2 (Semana 2 · Jogo 2)", "placar");
+      buscar(raiz, `anular-${jogo.id}`).click();
+      t.igual(estado.ultimaAcao(), "anular (Semana 2 · Jogo 2)", "anular");
+      buscar(raiz, `limpar-${jogo.id}`).click();
+      t.igual(estado.ultimaAcao(), "limpar (Semana 2 · Jogo 2)", "limpar");
+      buscar(raiz, `wo-${jogo.id}`).click();
+      buscar(raiz, `wo-${jogo.id}-2`).click();
+      t.igual(estado.ultimaAcao(), "W.O., dupla 2 presente (Semana 2 · Jogo 2)", "W.O.");
+    });
+
+    // ---------- V4: acessibilidade de todas as telas ----------
+
+    // Nome acessível simplificado: aria-label, aria-labelledby ou o texto que não está escondido do leitor.
+    function nomeAcessivel(e) {
+      if (e.getAttribute("aria-label")) return e.getAttribute("aria-label");
+      const ref = e.getAttribute("aria-labelledby");
+      if (ref) return ref.split(/\s+/).map((id) => (document.getElementById(id) || {}).textContent || "").join(" ");
+      const copia = e.cloneNode(true);
+      for (const oculto of copia.querySelectorAll('[aria-hidden="true"]')) oculto.remove();
+      return copia.textContent.trim();
+    }
+
+    // Textos que o organizador lê: o conteúdo e as dicas (title, aria-label).
+    function textosVisiveis(raiz) {
+      const atributos = [...raiz.querySelectorAll("[title], [aria-label]")]
+        .flatMap((e) => [e.getAttribute("title"), e.getAttribute("aria-label")]).filter(Boolean);
+      return [raiz.textContent, ...atributos].join("\n");
+    }
+
+    const EMOJI = /\p{Extended_Pictographic}/u;
+
+    function verificarAcessibilidade(t, raiz, nome) {
+      const botoes = [...raiz.querySelectorAll("button")];
+      const semNome = botoes.filter((b) => !/\p{L}/u.test(nomeAcessivel(b))).map((b) => b.id || b.outerHTML.slice(0, 80));
+      t.igual(semNome, [], `${nome}: todo botão tem nome acessível com letras (${botoes.length} botões)`);
+      const comEmoji = botoes.filter((b) => EMOJI.test(b.textContent + (b.getAttribute("aria-label") || ""))).map((b) => b.id || b.textContent);
+      t.igual(comEmoji, [], `${nome}: nenhum emoji em botões`);
+      const campos = [...raiz.querySelectorAll("input, select, textarea")].filter((c) => !c.hidden);
+      const semRotulo = campos.filter((c) => !(c.labels && c.labels.length) && !c.getAttribute("aria-label") && !c.getAttribute("aria-labelledby"))
+        .map((c) => c.id || c.outerHTML.slice(0, 80));
+      t.igual(semRotulo, [], `${nome}: todo campo tem rótulo (${campos.length} campos)`);
+      const quebrados = [...raiz.querySelectorAll("[aria-describedby]")]
+        .filter((e) => !document.getElementById(e.getAttribute("aria-describedby"))).map((e) => e.id);
+      t.igual(quebrados, [], `${nome}: todo aria-describedby aponta para uma mensagem que existe`);
+      const textos = textosVisiveis(raiz);
+      t.igual(textos.match(/\w\((es|s)\)/g), null, `${nome}: nenhum plural com "(es)" ou "(s)"`);
+      t.igual(textos.match(/\bs\d+-j\d+\b/g), null, `${nome}: nenhum id de jogo ("s3-j2") no texto`);
+      t.igual(raiz.textContent.match(new RegExp(EMOJI.source, "gu")), null, `${nome}: nenhum emoji no texto`);
+    }
+
+    const TELAS = ["jogadores", "calendario", "rodadas", "classificacao", "emJogo", "mataMata", "campeonatos"];
+
+    // Cadastro pronto (32 jogadores com estrelas), sem calendário: telas editáveis.
+    function dadosCadastro({ rascunho = false } = {}) {
+      const dados = dadosComCalendario();
+      dados.jogos = [];
+      dados.campeonato.sorteio = rascunho ? { semente: SEMENTE, confirmado: false, rascunho: calendarioDaFixture() } : null;
+      return dados;
+    }
+
+    caso("V4.1 Acessibilidade com o app vazio: todas as telas", (t) => {
+      for (const tela of TELAS) verificarAcessibilidade(t, criarAppFalso().montar(tela), tela);
+    });
+
+    caso("V4.2 Acessibilidade com a fixture (calendário confirmado, semana 1 lançada): todas as telas", (t) => {
+      for (const tela of TELAS) verificarAcessibilidade(t, criarAppFalso(dadosComCalendario()).montar(tela), tela);
+    });
+
+    caso("V4.3 Acessibilidade das telas editáveis: cadastro aberto, renomear, sorteio em análise", (t) => {
+      const cadastro = criarAppFalso(dadosCadastro());
+      const jogadores = cadastro.montar("jogadores");
+      t.verdadeiro(jogadores.querySelector(".estrelas button") && buscar(jogadores, `remover-${JOGADORES[0].id}`), "estrelas e remover disponíveis");
+      verificarAcessibilidade(t, jogadores, "jogadores (cadastro aberto)");
+      buscar(jogadores, `renomear-${JOGADORES[0].id}`).click();
+      t.verdadeiro(buscar(jogadores, `nome-${JOGADORES[0].id}`), "campo de renomear aberto");
+      verificarAcessibilidade(t, jogadores, "jogadores (renomeando)");
+      const comRascunho = criarAppFalso(dadosCadastro({ rascunho: true }));
+      const calendario = comRascunho.montar("calendario");
+      t.verdadeiro(calendario.querySelector("button.nome-slot"), "nomes do rascunho viram botões de troca");
+      verificarAcessibilidade(t, calendario, "calendário (sorteio em análise)");
+      calendario.querySelector("button.nome-slot").click();
+      t.verdadeiro(buscar(calendario, "troca-jogador"), "escolha do jogador aberta");
+      verificarAcessibilidade(t, calendario, "calendário (trocando um jogador)");
+    });
+
+    caso("V4.4 Acessibilidade no fim da temporada: em jogo, empates e mata-mata", (t) => {
+      const fim = criarAppFalso(dadosComCalendario({ semanasLancadas: 7 }));
+      const emJogo = fim.montar("emJogo");
+      t.verdadeiro(buscar(emJogo, "coluna-disputa"), "colunas de situação calculadas");
+      verificarAcessibilidade(t, emJogo, "em jogo (situações)");
+      const comEmpate = criarAppFalso(dadosComCalendario()); // semana 1: 8 jogadores em empate técnico
+      const classificacao = comEmpate.montar("classificacao");
+      t.verdadeiro(classificacao.querySelector(".controle-desempate button"), "botões de desempate");
+      verificarAcessibilidade(t, classificacao, "classificação (empate técnico)");
+      const mm = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const mataMata = mm.montar("mataMata");
+      verificarAcessibilidade(t, mataMata, "mata-mata (chaveamento gerado)");
+      buscar(mataMata, "editar-semi1-1").click();
+      t.verdadeiro(buscar(mataMata, "sel-semi1-1-1"), "editor da dupla aberto");
+      verificarAcessibilidade(t, mataMata, "mata-mata (trocando uma dupla)");
+    });
+
+    // ---------- V5: erro junto do campo ----------
+
+    // Mensagem ligada ao campo: aria-invalid e aria-describedby apontando para um .erro-campo com o texto.
+    function erroDoCampo(raiz, campo) {
+      const id = campo.getAttribute("aria-describedby");
+      const mensagem = id && buscar(raiz, id);
+      return mensagem && mensagem.classList.contains("erro-campo") ? mensagem.textContent : null;
+    }
+
+    function mudarCampo(campo, valor) {
+      campo.value = valor;
+      campo.dispatchEvent(new Event("input", { bubbles: true }));
+      campo.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    caso("V5.1 Rodadas: placar inválido mostra a mensagem junto do campo", (t) => {
+      const { montar, estado, avisos } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      const jogo = estado.atual().jogos.find((j) => j.semana === 2);
+      digitarPlacar(raiz, jogo.id, "x", "1");
+      const campo1 = buscar(raiz, `gols-${jogo.id}-1`), campo2 = buscar(raiz, `gols-${jogo.id}-2`);
+      t.igual(campo1.getAttribute("aria-invalid"), "true", "o campo inválido tem aria-invalid=\"true\"");
+      t.igual(campo2.getAttribute("aria-invalid"), null, "o outro campo não fica inválido");
+      t.igual(erroDoCampo(raiz, campo1), "Placar inválido: use números de 0 a 99.", "mensagem ligada ao campo");
+      t.verdadeiro(buscar(raiz, `jogo-${jogo.id}`).contains(raiz.querySelector(".erro-campo")), "a mensagem fica no cartão do jogo");
+      t.igual(avisos, [], "nenhum aviso no canto");
+      digitarPlacar(raiz, jogo.id, "2", "1");
+      t.igual(raiz.querySelectorAll(".erro-campo").length, 0, "corrigido: a mensagem some");
+      t.igual(buscar(raiz, `gols-${jogo.id}-1`).getAttribute("aria-invalid"), null, "corrigido: sem aria-invalid");
+      t.igual(estado.atual().jogos.find((j) => j.id === jogo.id).resultado, { tipo: "placar", gols1: 2, gols2: 1 }, "corrigido: placar lançado");
+    });
+
+    caso("V5.2 Mata-mata: placar inválido mostra a mensagem junto do campo", (t) => {
+      const { montar, estado, avisos } = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const raiz = montar("mataMata");
+      mudarCampo(buscar(raiz, "mm-semi1-0-gols1"), "abc");
+      const campo = buscar(raiz, "mm-semi1-0-gols1");
+      t.igual(campo.getAttribute("aria-invalid"), "true", "aria-invalid=\"true\"");
+      t.igual(campo.value, "abc", "o texto digitado continua no campo");
+      t.igual(erroDoCampo(raiz, campo), "Placar inválido: use números de 0 a 99.", "mensagem ligada ao campo");
+      t.igual(avisos, [], "nenhum aviso no canto");
+      mudarCampo(buscar(raiz, "mm-semi1-0-gols1"), "3");
+      t.igual(erroDoCampo(raiz, buscar(raiz, "mm-semi1-0-gols1")), null, "corrigido: a mensagem some");
+      t.igual(estado.atual().mataMata.semi1.partidas[0].gols1, 3, "corrigido: placar guardado");
+    });
+
+    caso("V5.3 Mata-mata: dupla inválida na troca mostra a mensagem junto dos campos", (t) => {
+      const { montar, avisos } = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const raiz = montar("mataMata");
+      buscar(raiz, "editar-semi1-1").click();
+      const sel1 = buscar(raiz, "sel-semi1-1-1");
+      buscar(raiz, "sel-semi1-1-2").value = sel1.value; // o mesmo jogador duas vezes
+      buscar(raiz, "salvar-semi1-1").click();
+      const depois = buscar(raiz, "sel-semi1-1-1");
+      t.verdadeiro(depois, "o editor continua aberto");
+      t.verdadeiro(erroDoCampo(raiz, depois), `mensagem ligada aos campos: ${erroDoCampo(raiz, depois)}`);
+      t.igual(avisos, [], "nenhum aviso no canto");
+    });
+
+    caso("V5.4 Jogadores: nome do campeonato vazio, número fora do limite e cor clara", (t) => {
+      const { montar, estado, avisos } = criarAppFalso(dadosCadastro());
+      const raiz = montar("jogadores");
+      mudarCampo(buscar(raiz, "nome-campeonato"), "   ");
+      const nome = buscar(raiz, "nome-campeonato");
+      t.igual(erroDoCampo(raiz, nome), "O nome do campeonato não pode ficar vazio.", "nome vazio: mensagem ligada ao campo");
+      t.igual(nome.getAttribute("aria-invalid"), "true", "nome vazio: aria-invalid");
+      t.igual(estado.atual().campeonato.nome, "Copa de teste", "nome vazio: o nome guardado não muda");
+      mudarCampo(buscar(raiz, "nome-campeonato"), "Copa nova");
+      t.igual(erroDoCampo(raiz, buscar(raiz, "nome-campeonato")), null, "nome válido: a mensagem some");
+      t.igual(estado.atual().campeonato.nome, "Copa nova", "nome válido: guardado");
+
+      mudarCampo(buscar(raiz, "config-jogos"), "0");
+      const jogos = buscar(raiz, "config-jogos");
+      t.igual(erroDoCampo(raiz, jogos), "Use um número de 1 a 99.", "jogos por jogador = 0: mensagem ligada ao campo");
+      t.igual(jogos.value, "0", "o valor recusado continua no campo");
+      t.igual(estado.atual().campeonato.config.jogosPorJogador, 6, "a configuração não muda");
+      mudarCampo(buscar(raiz, "config-semanas"), "abc");
+      t.verdadeiro(erroDoCampo(raiz, buscar(raiz, "config-semanas")), "semanas = abc: mensagem ligada ao campo");
+
+      mudarCampo(buscar(raiz, "aparencia-cor"), "#ffffff");
+      const cor = buscar(raiz, "aparencia-cor");
+      const erroCor = erroDoCampo(raiz, cor) || "";
+      t.verdadeiro(erroCor.startsWith("Cor clara demais") && erroCor.includes("contraste 1,0:1") && erroCor.includes("4,5:1"),
+        `cor clara: mensagem ligada ao campo, com número brasileiro (${erroCor})`);
+      t.igual(estado.aparencia(), null, "cor clara: a aparência não muda");
+      t.igual(avisos, [], "nenhum aviso no canto");
+    });
+
+    caso("V5.5 Jogadores: adicionar sem nomes e renomear para um nome repetido", (t) => {
+      const vazio = criarAppFalso();
+      const raiz1 = vazio.montar("jogadores");
+      buscar(raiz1, "btn-adicionar-nomes").click();
+      t.igual(erroDoCampo(raiz1, buscar(raiz1, "novos-nomes")), "Digite ao menos um nome (um por linha).", "sem nomes: mensagem no campo");
+      mudarCampo(buscar(raiz1, "novos-nomes"), "Ana Exemplo");
+      buscar(raiz1, "btn-adicionar-nomes").click();
+      t.igual(erroDoCampo(raiz1, buscar(raiz1, "novos-nomes")), null, "adicionou: a mensagem some");
+      mudarCampo(buscar(raiz1, "novos-nomes"), "Ana Exemplo");
+      buscar(raiz1, "btn-adicionar-nomes").click();
+      t.igual(vazio.estado.atual().campeonato.jogadores.length, 1, "o nome repetido não entra");
+      t.verdadeiro((erroDoCampo(raiz1, buscar(raiz1, "novos-nomes")) || "").includes("\"Ana Exemplo\" não foi adicionado"), "o repetido é explicado no campo");
+      t.igual(vazio.avisos.map((a) => a.texto), ["1 jogador adicionado."], "só o sucesso vira aviso, no singular");
+
+      const { montar, estado, avisos } = criarAppFalso(dadosCadastro());
+      const raiz = montar("jogadores");
+      buscar(raiz, `renomear-${JOGADORES[0].id}`).click();
+      buscar(raiz, `nome-${JOGADORES[0].id}`).value = estado.atual().campeonato.jogadores[1].nome;
+      buscar(raiz, `salvar-nome-${JOGADORES[0].id}`).click();
+      const campo = buscar(raiz, `nome-${JOGADORES[0].id}`);
+      t.verdadeiro(campo && campo.getAttribute("aria-invalid") === "true", "o campo continua aberto e inválido");
+      t.verdadeiro(erroDoCampo(raiz, campo), `mensagem ligada ao campo: ${erroDoCampo(raiz, campo)}`);
+      t.igual(avisos, [], "nenhum aviso no canto");
     });
 
     // ---------- execução e relatório ----------

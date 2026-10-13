@@ -3,65 +3,71 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d3b66" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b1f33" media="(prefers-color-scheme: dark)">
   <title>Copa FIFA em Duplas</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <!-- O endereço (#rodadas...) guarda a aba: o link só move o foco (ver ui.js). -->
+  <a class="pular-conteudo" id="pular-conteudo" href="#conteudo-principal">Pular para o conteúdo</a>
+  <!-- data-icone: ui.js coloca o ícone (js/icones.js) antes do texto. -->
   <header class="topo">
     <img id="logo-campeonato" class="logo-campeonato" alt="" hidden>
     <div class="topo-titulo">
       <details class="menu menu-campeonatos" id="menu-campeonatos">
         <summary title="Trocar de campeonato, criar um novo ou gerenciar os guardados">
-          <h1 id="titulo-campeonato">Copa FIFA em Duplas</h1><span class="seta" aria-hidden="true">▾</span>
+          <h1 id="titulo-campeonato">Copa FIFA em Duplas</h1><span class="seta" data-icone="abrir-menu"></span>
         </summary>
         <div class="menu-itens" id="itens-campeonatos"></div>
       </details>
       <p class="subtitulo" id="subtitulo-campeonato"></p>
     </div>
     <nav class="barra-acoes" aria-label="Ações">
-      <button type="button" id="btn-desfazer" title="Desfazer a última alteração (Ctrl+Z)">↶ Desfazer</button>
+      <button type="button" id="btn-desfazer" data-icone="desfazer" title="Desfazer a última alteração (Ctrl+Z)">Desfazer</button>
       <details class="menu" id="menu-backup">
-        <summary title="Exportar ou importar o backup em JSON">💾 Backup</summary>
+        <summary data-icone="backup" title="Exportar ou importar o backup em JSON">Backup</summary>
         <div class="menu-itens">
-          <button type="button" id="btn-exportar" title="Baixar um backup em JSON">⬇ Exportar backup (JSON)</button>
-          <button type="button" id="btn-importar" title="Restaurar um backup em JSON ou criar um campeonato a partir de um modelo">⬆ Importar backup (JSON)</button>
+          <button type="button" id="btn-exportar" data-icone="baixar" title="Baixar um backup em JSON">Exportar backup (JSON)</button>
+          <button type="button" id="btn-importar" data-icone="enviar" title="Restaurar um backup em JSON ou criar um campeonato a partir de um modelo">Importar backup (JSON)</button>
         </div>
       </details>
       <input type="file" id="arquivo-importar" accept=".json,application/json" hidden>
-      <button type="button" id="btn-telao" title="Tela cheia para a TV, alternando as telas a cada 15 s">📺 Modo telão</button>
+      <button type="button" id="btn-telao" data-icone="telao" title="Tela cheia para a TV, alternando as telas a cada 15 s">Modo telão</button>
       <details class="menu" id="menu-mais">
-        <summary title="Mais ações" aria-label="Mais ações">⋯</summary>
+        <summary data-icone="mais" title="Mais ações" aria-label="Mais ações"></summary>
         <div class="menu-itens">
-          <button type="button" id="btn-png-classificacao" title="Baixar a classificação como imagem (1080 px) para o grupo">🖼 PNG da classificação</button>
-          <button type="button" id="btn-png-mata-mata" title="Baixar o chaveamento como imagem (1080 px) para o grupo">🖼 PNG do mata-mata</button>
+          <button type="button" id="btn-png-classificacao" data-icone="imagem" title="Baixar a classificação como imagem (1080 px) para o grupo">PNG da classificação</button>
+          <button type="button" id="btn-png-mata-mata" data-icone="imagem" title="Baixar o chaveamento como imagem (1080 px) para o grupo">PNG do mata-mata</button>
           <hr>
-          <button type="button" id="btn-resetar" class="perigo" title="Apagar o campeonato inteiro e começar de novo">⟲ Resetar campeonato</button>
+          <button type="button" id="btn-resetar" data-icone="resetar" class="perigo" title="Apagar o campeonato inteiro e começar de novo">Resetar campeonato</button>
         </div>
       </details>
     </nav>
-    <p id="status-salvamento" class="status-salvamento" aria-live="polite"></p>
+    <p id="status-salvamento" class="status-salvamento"></p>
   </header>
 
   <nav class="abas" aria-label="Etapas do campeonato">
     <div class="abas-lista" role="tablist">
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-jogadores" aria-controls="aba-jogadores" data-aba="jogadores" title="Atalho: tecla 1">
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-jogadores" aria-controls="aba-jogadores" data-aba="jogadores" aria-keyshortcuts="Alt+1" title="Atalho: Alt+1">
         Jogadores<span class="indicador" id="indicador-jogadores"></span></button>
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-calendario" aria-controls="aba-calendario" data-aba="calendario" title="Atalho: tecla 2">
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-calendario" aria-controls="aba-calendario" data-aba="calendario" aria-keyshortcuts="Alt+2" title="Atalho: Alt+2">
         Calendário<span class="indicador" id="indicador-calendario"></span></button>
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-rodadas" aria-controls="aba-rodadas" data-aba="rodadas" title="Atalho: tecla 3">
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-rodadas" aria-controls="aba-rodadas" data-aba="rodadas" aria-keyshortcuts="Alt+3" title="Atalho: Alt+3">
         Rodadas<span class="indicador" id="indicador-rodadas"></span></button>
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-classificacao" aria-controls="aba-classificacao" data-aba="classificacao" title="Atalho: tecla 4">
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-classificacao" aria-controls="aba-classificacao" data-aba="classificacao" aria-keyshortcuts="Alt+4" title="Atalho: Alt+4">
         Classificação<span class="indicador" id="indicador-classificacao"></span></button>
-      <button type="button" role="tab" class="aba-btn" id="aba-btn-mata-mata" aria-controls="aba-mata-mata" data-aba="mata-mata" title="Atalho: tecla 5">
+      <button type="button" role="tab" class="aba-btn" id="aba-btn-mata-mata" aria-controls="aba-mata-mata" data-aba="mata-mata" aria-keyshortcuts="Alt+5" title="Atalho: Alt+5">
         Mata-mata<span class="indicador" id="indicador-mata-mata"></span></button>
     </div>
   </nav>
 
-  <div id="avisos" class="avisos" aria-live="assertive"></div>
+  <!-- Uma só região anunciada pelo leitor de tela, sem interromper (os avisos não têm role próprio). -->
+  <div id="avisos" class="avisos" aria-live="polite"></div>
   <div id="lembrete-backup" class="lembrete-backup" hidden></div>
 
   <!-- Cada tela monta o próprio conteúdo dentro da sua aba: Telas.<nome>.criar(app, raiz). -->
-  <main class="painel">
+  <main class="painel" id="conteudo-principal" tabindex="-1">
     <section id="aba-jogadores" class="aba" role="tabpanel" aria-labelledby="aba-btn-jogadores" hidden></section>
     <section id="aba-calendario" class="aba" role="tabpanel" aria-labelledby="aba-btn-calendario" hidden></section>
     <section id="aba-rodadas" class="aba aba-rodadas" role="tabpanel" aria-labelledby="aba-btn-rodadas" hidden></section>
@@ -76,6 +82,7 @@
   <script src="js/regras.js"></script>
   <script src="js/estado.js"></script>
   <script src="js/campeonatos.js"></script>
+  <script src="js/icones.js"></script>
   <script src="js/util.js"></script>
   <script src="js/exportar.js"></script>
   <script src="js/telao.js"></script>

@@ -16,8 +16,45 @@
       else if (k in e && typeof v !== "string") e[k] = v;
       else e.setAttribute(k, v === true ? "" : v);
     }
-    e.append(...filhos.flat().filter((f) => f !== null && f !== undefined && f !== false));
+    e.append(...filhos.flat(Infinity).filter((f) => f !== null && f !== undefined && f !== false));
     return e;
+  }
+
+  // ---------- textos ----------
+
+  // "1 jogador" / "0 jogadores" / "3 jogadores".
+  function plural(n, singular, formaPlural) {
+    return `${numero(n)} ${n === 1 ? singular : formaPlural}`;
+  }
+
+  // Número no formato brasileiro ("1.234", "4,5"), com `casas` decimais fixas.
+  function numero(x, casas = 0) {
+    return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas }).format(x);
+  }
+
+  // "Semana 3 · Jogo 2": como o organizador se refere a um jogo (o id interno nunca aparece).
+  function rotuloDoJogo(jogo, numeros) {
+    return `Semana ${Regras.semanaDoJogo(jogo)} · Jogo ${numeros.get(jogo.id)}`;
+  }
+
+  // ---------- botões e campos ----------
+
+  // Botão só com ícone: o `rotulo` vira o nome acessível (aria-label) e a dica (title).
+  // props = as mesmas de el() (id, class, onclick, disabled...).
+  function botaoIcone({ icone, rotulo, ...props }) {
+    return el("button", { type: "button", ...props, class: `botao-icone ${props.class || ""}`.trim(), "aria-label": rotulo, title: rotulo },
+      Icones.svg(icone));
+  }
+
+  // Erro de um campo, mostrado logo abaixo dele. O campo aponta para a mensagem com
+  // atributosDeErro(idMensagem, mensagem) e a mensagem é desenhada por mensagemDeErro.
+  function atributosDeErro(idMensagem, mensagem) {
+    return mensagem ? { "aria-invalid": "true", "aria-describedby": idMensagem } : {};
+  }
+
+  function mensagemDeErro(idMensagem, mensagem) {
+    if (!mensagem) return null;
+    return el("p", { class: "erro-campo", id: idMensagem }, Icones.svg("alerta"), el("span", {}, mensagem));
   }
 
   // Texto de uma mensagem em blocos: parágrafos separados por linha em branco; um bloco em que
@@ -170,19 +207,11 @@
       aba && el("button", { type: "button", class: "primario", dataset: { ir: aba }, onclick: () => irParaAba(aba) }, rotulo));
   }
 
-  // id do jogo -> número do jogo dentro da sua semana (1, 2...). Guardado enquanto a lista não muda.
+  // id do jogo -> número do jogo dentro da sua semana (Regras.numerosNaSemana), guardado enquanto
+  // a lista não muda.
   let cacheNumeros = { jogos: null, mapa: null };
   function numerosNaSemana(jogos) {
-    if (cacheNumeros.jogos !== jogos) {
-      const contagem = new Map();
-      const mapa = new Map();
-      for (const j of jogos) {
-        const semana = Regras.semanaDoJogo(j);
-        contagem.set(semana, (contagem.get(semana) || 0) + 1);
-        mapa.set(j.id, contagem.get(semana));
-      }
-      cacheNumeros = { jogos, mapa };
-    }
+    if (cacheNumeros.jogos !== jogos) cacheNumeros = { jogos, mapa: Regras.numerosNaSemana(jogos) };
     return cacheNumeros.mapa;
   }
 
@@ -200,5 +229,6 @@
     el, escolher, confirmar, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado,
     contraste, CONTRASTE_MINIMO, corLegivelComBranco, carregarImagem, prepararLogo,
     buscar, proximoPasso, numerosNaSemana,
+    plural, numero, rotuloDoJogo, botaoIcone, atributosDeErro, mensagemDeErro,
   };
 })();

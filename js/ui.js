@@ -44,10 +44,21 @@
 
   // ---------- utilitários compartilhados com as telas ----------
 
+  // Aviso no canto da tela, para o que não tem um campo onde mostrar a mensagem. O de sucesso some
+  // em 5 s; o de erro fica até ser fechado. A área #avisos é a única região anunciada (aria-live).
+  const DURACAO_AVISO = 5000;
   function avisar(texto, tipo = "info") {
-    const aviso = el("div", { class: `aviso ${tipo}`, role: tipo === "erro" ? "alert" : "status" }, texto);
-    document.getElementById("avisos").appendChild(aviso);
-    setTimeout(() => aviso.remove(), tipo === "erro" ? 8000 : 3500);
+    const area = document.getElementById("avisos");
+    // O mesmo aviso de novo: sai o antigo e entra o novo, no fim (e volta a ser anunciado).
+    for (const antigo of area.querySelectorAll(".aviso")) {
+      if (antigo.classList.contains(tipo) && antigo.querySelector(".aviso-texto").textContent === texto) antigo.remove();
+    }
+    const aviso = el("div", { class: `aviso ${tipo}` },
+      Icones.svg(tipo === "erro" ? "alerta" : "ok"),
+      el("span", { class: "aviso-texto" }, texto),
+      Util.botaoIcone({ icone: "fechar", rotulo: "Fechar aviso", onclick: () => aviso.remove() }));
+    area.appendChild(aviso);
+    if (tipo !== "erro") setTimeout(() => aviso.remove(), DURACAO_AVISO);
   }
 
   function cadastroTravado() {
@@ -110,7 +121,7 @@
   // ---------- abas ----------
 
   // Cada aba mostra uma ou mais telas; só as telas da aba visível são redesenhadas. As de etapa
-  // têm botão na barra (teclas 1–5); a de campeonatos se abre pelo seletor do cabeçalho.
+  // têm botão na barra (Alt+1 a Alt+5); a de campeonatos se abre pelo seletor do cabeçalho.
   const ABAS = [
     { id: "jogadores", telas: ["jogadores"] },
     { id: "calendario", telas: ["calendario"] },
@@ -158,12 +169,15 @@
     const lancados = atual.jogos.filter((j) => j.resultado).length;
     const empatePendente = tabela.some((l) => l.empateTecnico && !l.empateTecnico.ordemManual);
     const campeoes = atual.mataMata && Regras.resolverMataMata(atual.mataMata, tabela, camp.config).podio.campeoes;
+    // { texto ou icone que aparece, leitor: o mesmo por extenso (entra no nome da aba e na dica) }
     const indicadores = {
-      jogadores: camp.jogadores.length ? [String(camp.jogadores.length), `${camp.jogadores.length} jogadores`] : null,
-      calendario: travado ? ["✔", "Calendário confirmado"] : camp.sorteio && camp.sorteio.rascunho ? ["rascunho", "Sorteio ainda não confirmado"] : null,
-      rodadas: atual.jogos.length ? [`${lancados}/${atual.jogos.length}`, "Jogos lançados"] : null,
-      classificacao: empatePendente ? ["⚖️", "Empate técnico no top 8 sem ordem definida"] : null,
-      "mata-mata": campeoes ? ["🏆", "Campeões definidos"] : null,
+      jogadores: camp.jogadores.length
+        ? { texto: String(camp.jogadores.length), leitor: Util.plural(camp.jogadores.length, "jogador", "jogadores") } : null,
+      calendario: travado ? { icone: "confirmar", leitor: "calendário confirmado" }
+        : camp.sorteio && camp.sorteio.rascunho ? { texto: "rascunho", leitor: "sorteio ainda não confirmado" } : null,
+      rodadas: atual.jogos.length ? { texto: `${lancados}/${atual.jogos.length}`, leitor: `${lancados} de ${atual.jogos.length} jogos lançados` } : null,
+      classificacao: empatePendente ? { icone: "empate", leitor: "empate técnico no top 8 sem ordem definida" } : null,
+      "mata-mata": campeoes ? { icone: "trofeu", leitor: "campeões definidos" } : null,
     };
     for (const { id, semBotao } of ABAS) {
       const selecionada = id === ativa;
@@ -173,9 +187,16 @@
       botao.setAttribute("aria-selected", String(selecionada));
       botao.tabIndex = selecionada ? 0 : -1;
       const indicador = document.getElementById(`indicador-${id}`);
-      const [texto, titulo] = indicadores[id] || ["", ""];
-      indicador.textContent = texto;
-      indicador.title = titulo;
+      const ind = indicadores[id];
+      if (ind) {
+        indicador.replaceChildren(
+          el("span", { "aria-hidden": "true" }, ind.icone ? Icones.svg(ind.icone) : ind.texto),
+          el("span", { class: "so-leitor" }, `, ${ind.leitor}`));
+        indicador.title = ind.leitor[0].toUpperCase() + ind.leitor.slice(1);
+      } else {
+        indicador.replaceChildren();
+        indicador.title = "";
+      }
     }
   }
 
@@ -193,17 +214,17 @@
 
     let subtitulo;
     if (!n) {
-      subtitulo = "Cadastre os jogadores para começar";
+      subtitulo = ["Cadastre os jogadores para começar"];
     } else if (!atual.jogos.length) {
-      subtitulo = `${n} jogadores · ${camp.sorteio && camp.sorteio.rascunho ? "sorteio do calendário em análise" : "falta sortear o calendário"}`;
+      subtitulo = [`${Util.plural(n, "jogador", "jogadores")} · ${camp.sorteio && camp.sorteio.rascunho ? "sorteio do calendário em análise" : "falta sortear o calendário"}`];
     } else if (atual.mataMata) {
       const campeoes = Regras.resolverMataMata(atual.mataMata, tabela, camp.config).podio.campeoes;
-      subtitulo = campeoes ? `🏆 Campeões: ${campeoes.map((id) => nomePorId.get(id)).join(" e ")}` : "Fase final";
+      subtitulo = campeoes ? [Icones.svg("trofeu"), ` Campeões: ${campeoes.map((id) => nomePorId.get(id)).join(" e ")}`] : ["Fase final"];
     } else {
       const lancados = atual.jogos.filter((j) => j.resultado).length;
-      subtitulo = `Semana ${Regras.semanaAtual(atual.jogos, camp.config)} de ${camp.config.semanas} · ${lancados}/${atual.jogos.length} jogos lançados`;
+      subtitulo = [`Semana ${Regras.semanaAtual(atual.jogos, camp.config)} de ${camp.config.semanas} · ${lancados}/${atual.jogos.length} jogos lançados`];
     }
-    document.getElementById("subtitulo-campeonato").textContent = subtitulo;
+    document.getElementById("subtitulo-campeonato").replaceChildren(...subtitulo);
   }
 
   // Cor do campeonato no fundo do cabeçalho (vale nos dois temas) e logo ao lado do título.
@@ -230,12 +251,13 @@
         title: c.ativo ? "Campeonato aberto" : `Abrir "${c.nome}"`,
         onclick: () => { if (!c.ativo) abrirEdicao(c.id); },
       },
-      el("span", { class: "marca-ativa", "aria-hidden": "true" }, c.ativo ? "✔" : ""),
+      el("span", { class: "marca-ativa" }, c.ativo ? Icones.svg("confirmar") : null),
       el("span", { class: "edicao-nome" }, c.nome),
       el("small", {}, c.situacao.texto))),
       el("hr"),
-      el("button", { type: "button", id: "btn-novo-campeonato", onclick: novoCampeonato }, "+ Novo campeonato"),
-      el("button", { type: "button", id: "btn-gerenciar-campeonatos", onclick: () => irParaAba("campeonatos") }, "⚙ Gerenciar campeonatos"));
+      el("button", { type: "button", id: "btn-novo-campeonato", onclick: novoCampeonato }, Icones.svg("novo"), "Novo campeonato"),
+      el("button", { type: "button", id: "btn-gerenciar-campeonatos", onclick: () => irParaAba("campeonatos") },
+        Icones.svg("configurar"), "Gerenciar campeonatos"));
   }
 
   function renderizarLembreteBackup(atual) {
@@ -248,7 +270,8 @@
     }
     alvo.hidden = false;
     alvo.replaceChildren(el("div", { class: "alerta" },
-      `💾 ${lembrete.mensagem}`,
+      Icones.svg("backup"),
+      el("span", {}, lembrete.mensagem),
       el("button", { type: "button", id: "btn-lembrete-exportar", class: "primario mini", onclick: () => exportar() }, "Exportar backup agora"),
       el("button", { type: "button", id: "btn-lembrete-dispensar", class: "discreto mini", onclick: () => { lembreteDispensado = lembrete.mensagem; renderizar(); } }, "Dispensar")));
   }
@@ -266,13 +289,17 @@
       ? "Gere o chaveamento para exportar o mata-mata"
       : "Baixar o chaveamento como imagem (1080 px) para o grupo";
 
+    // A linha de status não é anunciada a cada salvamento; só o erro de salvamento vira aviso (uma vez).
     const st = estado.status();
     const linha = document.getElementById("status-salvamento");
     linha.classList.toggle("erro", Boolean(st.erro));
-    if (st.erro) linha.textContent = `⚠️ ${st.erro}`;
+    if (st.erro) linha.replaceChildren(Icones.svg("alerta"), ` ${st.erro}`);
     else if (st.salvoEm) linha.textContent = `Salvo no navegador às ${st.salvoEm.toLocaleTimeString("pt-BR")}`;
     else linha.textContent = "Dados carregados do navegador";
+    if (st.erro && st.erro !== erroSalvamentoAvisado) avisar(st.erro, "erro");
+    erroSalvamentoAvisado = st.erro || null;
   }
+  let erroSalvamentoAvisado = null;
 
   // Classificação ao vivo; a variação ▲▼ é em relação à semana anterior (ver Regras.classificacaoPorSemana).
   function calcularTabela(atual) {
@@ -617,7 +644,17 @@
     for (const menu of menus) if (menu.open && !menu.contains(ev.target)) menu.open = false;
   });
 
-  // Abas: clique, setas ←→ dentro da lista e teclas 1–5 fora de campos de texto.
+  // Ícones dos botões fixos do index.html (data-icone), antes do texto.
+  for (const alvo of document.querySelectorAll("[data-icone]")) alvo.prepend(Icones.svg(alvo.dataset.icone));
+
+  // "Pular para o conteúdo": só move o foco (o # do endereço guarda a aba).
+  document.getElementById("pular-conteudo").addEventListener("click", (ev) => {
+    ev.preventDefault();
+    document.getElementById("conteudo-principal").focus();
+  });
+
+  // Abas: clique, setas ←→ dentro da lista e Alt+1 a Alt+5. Alt+número não digita nada, então
+  // vale também com o foco num campo (atalho de uma tecla só atrapalharia quem digita).
   const botoesAba = ABAS_DE_ETAPA.map(({ id }) => document.getElementById(`aba-btn-${id}`));
   for (const botao of botoesAba) botao.addEventListener("click", () => irParaAba(botao.dataset.aba));
   document.querySelector(".abas-lista").addEventListener("keydown", (ev) => {
@@ -645,9 +682,9 @@
     if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z" && !digitando) {
       ev.preventDefault();
       desfazer();
-    } else if (/^[1-5]$/.test(ev.key) && !digitando && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+    } else if (ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && /^Digit[1-5]$/.test(ev.code)) {
       ev.preventDefault();
-      irParaAba(ABAS_DE_ETAPA[Number(ev.key) - 1].id);
+      irParaAba(ABAS_DE_ETAPA[Number(ev.code.slice(-1)) - 1].id);
     }
   });
 
@@ -655,7 +692,7 @@
   const stCampeonatos = campeonatos.status();
   if (stCampeonatos.aviso) avisar(stCampeonatos.aviso, "erro");
   if (st.aviso) avisar(st.aviso, "erro");
-  if (st.erro) avisar(st.erro, "erro");
+  // st.erro (falha ao salvar) vira aviso no primeiro desenho da barra (renderizarBarra).
   if (!abaDaUrl()) fixarAbaDaEtapa();
   renderizarAgora();
   // index.html#telao: janela separada para a TV. Tela cheia exige um clique (botão ⛶).

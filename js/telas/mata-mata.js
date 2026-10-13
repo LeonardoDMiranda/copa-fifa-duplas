@@ -3,7 +3,9 @@
 (function () {
   "use strict";
 
-  const { el, buscar, confirmar, MAX_GOLS, lerGols } = Util;
+  const { el, buscar, confirmar, MAX_GOLS, lerGols, botaoIcone } = Util;
+
+  const itemAlerta = (texto) => el("li", {}, Icones.svg("alerta"), el("span", {}, texto));
 
   const ROTULOS = { semi1: "Semifinal 1", semi2: "Semifinal 2", terceiro: "3º lugar", final: "Final" };
   const ORIGEM_DUPLA = {
@@ -17,7 +19,7 @@
   };
 
   function criar(app, raiz) {
-    const { estado, nomePorId, avisar, renderizar, tabelaAtual, nomesDupla } = app;
+    const { estado, nomePorId, renderizar, tabelaAtual, nomesDupla } = app;
 
     const alvo = el("div", { id: "conteudo-mata-mata" });
     raiz.append(el("section", { id: "tela-mata-mata", class: "tela" },
@@ -25,10 +27,12 @@
         el("h2", {}, "Mata-mata"),
         el("p", { class: "legenda" },
           "Semi 1 = 1º+8º × 2º+7º · Semi 2 = 3º+6º × 4º+5º · sem empate: prorrogação e, se preciso, pênaltis"
-          + " · final em melhor de 3 · ✎ troca uma dupla (surpresa da final). Não altera a classificação.")),
+          + " · final em melhor de 3 · ", Icones.svg("editar"), " troca uma dupla (surpresa da final). Não altera a classificação.")),
       alvo));
 
     const rascunhosMM = new Map(); // id do campo do mata-mata -> texto inválido digitado
+    // Erros mostrados embaixo do campo: id do campo de placar (ou `editor-<chave>-<lado>` da troca de dupla) -> mensagem.
+    const errosCampo = new Map();
     let editandoDupla = null; // { chave, lado } da dupla do mata-mata em edição
     let focarAposId = null; // após Enter num placar do mata-mata, foca o campo seguinte a este
 
@@ -54,8 +58,8 @@
         el("p", {}, "Prévia pela classificação atual:"),
         el("ul", { class: "previa" }, previa("semi1"), previa("semi2")),
         avisos.length
-          ? el("ul", { class: "avisos-chave" }, avisos.map((a) => el("li", {}, `⚠️ ${a}`)))
-          : el("p", { class: "tudo-certo" }, "✔ Todos os jogos lançados e nenhum empate técnico pendente no top 8."),
+          ? el("ul", { class: "avisos-chave" }, avisos.map(itemAlerta))
+          : el("p", { class: "tudo-certo" }, Icones.svg("ok"), "Todos os jogos lançados e nenhum empate técnico pendente no top 8."),
         el("button", { type: "button", id: "btn-gerar-chave", class: "primario", onclick: gerarChaveamento }, "Gerar chaveamento"));
     }
 
@@ -93,7 +97,8 @@
       const finaisDesatualizadas = finais.some((c) => c.lado1.desatualizada || c.lado2.desatualizada);
       return el("div", { class: "barra-mata-mata" },
         desatualizado && el("div", { class: "alerta" },
-          "⚠️ A classificação mudou depois de gerar o chaveamento: as duplas automáticas das semis não batem mais com ela. ",
+          Icones.svg("alerta"),
+          "A classificação mudou depois de gerar o chaveamento: as duplas automáticas das semis não batem mais com ela. ",
           el("button", {
             type: "button", id: "btn-atualizar-semis",
             onclick: async () => {
@@ -102,7 +107,8 @@
             },
           }, "Usar duplas da classificação atual")),
         finaisDesatualizadas && el("div", { class: "alerta" },
-          "⚠️ O resultado de uma semifinal mudou depois de lançar placares da final ou do 3º lugar: "
+          Icones.svg("alerta"),
+          "O resultado de uma semifinal mudou depois de lançar placares da final ou do 3º lugar: "
           + "as duplas que jogaram não são mais as que saem das semis. ",
           el("button", {
             type: "button", id: "btn-atualizar-finais",
@@ -117,22 +123,33 @@
     function editorDupla(c, lado, tabela) {
       const info = c[`lado${lado}`];
       const atual = info.dupla || [null, null];
-      const seletor = (n) => el("select", { id: `sel-${c.chave}-${lado}-${n}`, "aria-label": `Jogador ${n} da dupla ${lado}` },
-        el("option", { value: "" }, "— jogador —"),
+      const chaveErro = `editor-${c.chave}-${lado}`;
+      const idErro = `${chaveErro}-erro`;
+      const erro = errosCampo.get(chaveErro);
+      const seletor = (n) => el("select", {
+        id: `sel-${c.chave}-${lado}-${n}`, "aria-label": `Jogador ${n} da dupla ${lado}`, ...Util.atributosDeErro(idErro, erro),
+      },
+        el("option", { value: "" }, "Jogador"),
         tabela.map((l) => el("option", { value: l.id, selected: l.id === atual[n - 1] }, `${l.posicao}º ${l.nome}`)));
       const sel1 = seletor(1), sel2 = seletor(2);
+      const fechar = () => { editandoDupla = null; errosCampo.delete(chaveErro); };
 
       const salvar = () => {
         const dupla = [sel1.value, sel2.value];
         const outra = c[`dupla${3 - lado}`];
-        const erro = lado === 1 ? Regras.validarDuplas(dupla, outra) : Regras.validarDuplas(outra, dupla);
-        if (erro) { avisar(erro, "erro"); return; }
-        editandoDupla = null;
+        const erroDupla = lado === 1 ? Regras.validarDuplas(dupla, outra) : Regras.validarDuplas(outra, dupla);
+        if (erroDupla) {
+          errosCampo.set(chaveErro, erroDupla);
+          app.focarDepois(sel1.id);
+          renderizar();
+          return;
+        }
+        fechar();
         modificarMataMata(`${ROTULOS[c.chave]}: dupla ${lado} = ${nomesDupla(dupla)}`,
           (m) => Regras.definirDupla(m, c.chave, lado, dupla));
       };
       const voltar = () => {
-        editandoDupla = null;
+        fechar();
         modificarMataMata(`${ROTULOS[c.chave]}: dupla ${lado} volta à automática`,
           (m) => Regras.voltarDuplaAutomatica(m, c.chave, lado, tabelaAtual()));
       };
@@ -142,7 +159,8 @@
         sel1, el("span", {}, "+"), sel2,
         el("button", { type: "button", id: `salvar-${c.chave}-${lado}`, class: "primario mini", onclick: salvar }, "Salvar"),
         info.manual && el("button", { type: "button", class: "mini", onclick: voltar }, "Voltar à automática"),
-        el("button", { type: "button", class: "discreto mini", onclick: () => { editandoDupla = null; renderizar(); } }, "Cancelar"));
+        el("button", { type: "button", class: "discreto mini", onclick: () => { fechar(); renderizar(); } }, "Cancelar"),
+        Util.mensagemDeErro(idErro, erro));
     }
 
     function linhaDupla(c, lado, tabela) {
@@ -164,12 +182,14 @@
           class: "tag-manual",
           title: info.automatica ? `Automática seria: ${nomesDupla(info.automatica)}` : "Automática ainda indefinida",
         }, "alterada manualmente"),
-        vencedora && el("span", { class: "tag-vence" }, "✔ vence"),
-        el("button", {
-          type: "button", id: `editar-${c.chave}-${lado}`, class: "discreto mini", title: "Trocar esta dupla",
+        vencedora && el("span", { class: "tag-vence" }, Icones.svg("confirmar"), "vence"),
+        botaoIcone({
+          icone: "editar", rotulo: `Trocar a dupla ${lado} (${ROTULOS[c.chave]})`, id: `editar-${c.chave}-${lado}`, class: "discreto mini",
           onclick: () => { editandoDupla = { chave: c.chave, lado }; renderizar(); },
-        }, "✎"));
+        }));
     }
+
+    const idErroMM = (id) => `${id}-erro`;
 
     function entradaMM(c, indice, campo, rotulo, partida) {
       const id = `mm-${c.chave}-${indice}-${campo}`;
@@ -184,6 +204,7 @@
         maxlength: "2",
         value: valor,
         "aria-label": `${ROTULOS[c.chave]}, jogo ${indice + 1}, ${rotulo}, dupla ${campo.slice(-1)}`,
+        ...Util.atributosDeErro(idErroMM(id), errosCampo.get(id)),
         dataset: { chave: c.chave, indice: String(indice), campo },
         onchange: aoMudarPlacarMM,
         onkeydown: aoTeclarNoPlacarMM,
@@ -191,13 +212,18 @@
       });
     }
 
+    // A linha do placar e, embaixo, o erro de cada um dos dois campos (se houver).
     function linhaPlacarMM(c, indice, etapa, partida) {
       const rotulo = NOMES_CAMPO[etapa];
-      return el("div", { class: `linha-placar etapa-${etapa}` },
-        el("span", { class: "rotulo-etapa" }, rotulo[0].toUpperCase() + rotulo.slice(1)),
-        entradaMM(c, indice, `${etapa}1`, rotulo, partida),
-        el("span", { class: "x" }, "×"),
-        entradaMM(c, indice, `${etapa}2`, rotulo, partida));
+      const ids = [1, 2].map((lado) => `mm-${c.chave}-${indice}-${etapa}${lado}`);
+      return [
+        el("div", { class: `linha-placar etapa-${etapa}` },
+          el("span", { class: "rotulo-etapa" }, rotulo[0].toUpperCase() + rotulo.slice(1)),
+          entradaMM(c, indice, `${etapa}1`, rotulo, partida),
+          el("span", { class: "x" }, "×"),
+          entradaMM(c, indice, `${etapa}2`, rotulo, partida)),
+        ids.map((id) => Util.mensagemDeErro(idErroMM(id), errosCampo.get(id))),
+      ];
     }
 
     function partidasDoConfronto(c) {
@@ -211,7 +237,7 @@
 
         let resultado = "";
         if (a.vencedor) {
-          resultado = `✔ Dupla ${a.vencedor} vence`
+          resultado = `Dupla ${a.vencedor} vence`
             + (a.decididoEm === "prorrogacao" ? " na prorrogação" : a.decididoEm === "penaltis" ? " nos pênaltis" : "");
         } else if (a.erro) resultado = a.erro;
         else if (a.precisa === "prorrogacao") resultado = "Empate: lance a prorrogação.";
@@ -222,7 +248,8 @@
           linhaPlacarMM(c, i, "gols", partida),
           mostrarProrrogacao && linhaPlacarMM(c, i, "prorrogacao", partida),
           mostrarPenaltis && linhaPlacarMM(c, i, "penaltis", partida),
-          resultado && el("div", { class: "resultado-partida" + (a.erro ? " erro" : a.vencedor ? "" : " pendente") }, resultado)));
+          resultado && el("div", { class: "resultado-partida" + (a.erro ? " erro" : a.vencedor ? "" : " pendente") },
+            Icones.svg(a.vencedor ? "confirmar" : a.erro ? "alerta" : "info"), resultado)));
       }
       return el("div", { class: "partidas" }, blocos);
     }
@@ -242,7 +269,7 @@
           el("span", { class: "status" }, status)),
         linhaDupla(c, 1, tabela),
         linhaDupla(c, 2, tabela),
-        erroDuplas && el("div", { class: "alerta" }, `⚠️ ${erroDuplas}`),
+        erroDuplas && el("div", { class: "alerta" }, Icones.svg("alerta"), erroDuplas),
         c.melhorDe > 1 && c.pronto && el("div", { class: "placar-serie" },
           `Série: ${serie.vitorias[0]} × ${serie.vitorias[1]}`,
           !serie.vencedor && el("span", { class: "legenda" }, ` (vence quem fizer ${serie.necessarias})`)),
@@ -252,17 +279,17 @@
     }
 
     function podio(p) {
-      const degrau = (classe, medalha, titulo, dupla) => el("div", { class: `degrau ${classe}${dupla ? "" : " vazio"}` },
-        el("span", { class: "medalha" }, medalha),
+      const degrau = (classe, icone, titulo, dupla) => el("div", { class: `degrau ${classe}${dupla ? "" : " vazio"}` },
+        el("span", { class: "medalha" }, Icones.svg(icone)),
         el("div", {},
           el("div", { class: "titulo-degrau" }, titulo),
           dupla
             ? dupla.map((id) => el("div", { class: "nome-podio" }, nomePorId.get(id)))
             : el("div", { class: "a-definir" }, "a definir")));
       return el("div", { class: "podio", id: "podio" },
-        degrau("ouro", "🥇", "Campeões", p.campeoes),
-        degrau("prata", "🥈", "Vice", p.vice),
-        degrau("bronze", "🥉", "3º lugar", p.terceiro));
+        degrau("ouro", "trofeu", "Campeões", p.campeoes),
+        degrau("prata", "medalha", "Vice", p.vice),
+        degrau("bronze", "medalha", "3º lugar", p.terceiro));
     }
 
     function renderizarMataMata(atual, tabela) {
@@ -295,11 +322,12 @@
       const g = lerGols(campoEl.value);
       if (g.invalido) {
         rascunhosMM.set(campoEl.id, campoEl.value);
-        avisar(`Placar inválido em ${ROTULOS[chave]}: use números de 0 a ${MAX_GOLS}.`, "erro");
+        errosCampo.set(campoEl.id, `Placar inválido: use números de 0 a ${MAX_GOLS}.`);
         renderizar();
         return;
       }
       rascunhosMM.delete(campoEl.id);
+      errosCampo.delete(campoEl.id);
       const valor = g.vazio ? null : g.valor;
       const jogo = Regras.MELHOR_DE[chave] > 1 ? ` jogo ${indice + 1}` : "";
       const etapa = NOMES_CAMPO[campo.slice(0, -1)];
@@ -336,6 +364,7 @@
       focarCampoSeguinte,
       limparRascunhos() {
         rascunhosMM.clear();
+        errosCampo.clear();
         editandoDupla = null;
       },
     };
