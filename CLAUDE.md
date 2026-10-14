@@ -49,7 +49,7 @@ js/campeonatos.js   # várias edições: índice (ativa, arquivadas), migração
 js/icones.js        # ícones SVG da interface (Tabler Icons, MIT): Icones.svg(nome), sempre aria-hidden
 js/util.js          # helpers de apresentação compartilhados (el, plural, numero, rotuloDoJogo, botaoIcone, erro junto do campo...)
 js/abas.js         # FUNÇÕES PURAS: abas de cada fase (preparação ou temporada), endereço válido e aba da etapa
-js/telas/*.js       # uma tela cada (configuracao, jogadores, sorteio, rodadas, classificacao, mata-mata, campeonato, campeonatos): Telas.<nome>.criar(app, raiz), que monta o próprio conteúdo na raiz
+js/telas/*.js       # uma tela cada (configuracao, jogadores, sorteio, rodadas, classificacao, mata-mata, campeonato, campeonatos, ficha): Telas.<nome>.criar(app, raiz), que monta o próprio conteúdo na raiz
 js/ui.js            # orquestração: cria o estado e as telas, redesenho, foco, cabeçalho (seletor de edições) e barra de ações
 js/exportar.js      # geração de PNG via Canvas API
 js/telao.js         # modo telão (tela cheia, alterna telas); também abre sozinho em index.html#telao

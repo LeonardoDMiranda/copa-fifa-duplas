@@ -316,9 +316,9 @@ table.classificacao {
 .classificacao .col-situacao { text-align: left; }
 .classificacao td.col-situacao { min-width: 20em; }
 .marca-situacao { display: inline-flex; align-items: center; gap: var(--esp-1); font-weight: 600; }
-.col-situacao.garantido .marca-situacao .icone { color: var(--sobe); }
-.col-situacao.disputa .marca-situacao .icone { color: var(--ambar-texto); }
-.col-situacao.eliminado .marca-situacao { font-weight: 400; color: var(--texto-suave); }
+.col-situacao.garantido .marca-situacao .icone, .ficha-situacao.garantido .marca-situacao .icone { color: var(--sobe); }
+.col-situacao.disputa .marca-situacao .icone, .ficha-situacao.disputa .marca-situacao .icone { color: var(--ambar-texto); }
+.col-situacao.eliminado .marca-situacao, .ficha-situacao.eliminado .marca-situacao { font-weight: 400; color: var(--texto-suave); }
 
 .classificacao tr.classificado td { background: var(--classificado); }
 .classificacao tr.classificado td:first-child { box-shadow: inset 3px 0 0 var(--classificado-borda); }
@@ -501,7 +501,7 @@ h3.jogo-numero { position: relative; margin: 0; font-size: inherit; }
   margin: var(--esp-2) 0;
 }
 .jogo > .erro-campo { justify-content: center; margin: 0 0 var(--esp-2); }
-.dupla { display: flex; flex-direction: column; gap: 2px; padding: var(--esp-1) var(--esp-2); border-radius: var(--raio); }
+.dupla { display: flex; flex-direction: column; gap: 0; padding: var(--esp-1) var(--esp-2); border-radius: var(--raio); }
 .dupla.d1 { align-items: flex-end; text-align: right; }
 .dupla.d2 { align-items: flex-start; }
 .dupla.vencedora { background: var(--classificado); font-weight: 700; }
@@ -1102,16 +1102,70 @@ button.chip-semana.selecionada { outline: 2px solid var(--destaque); outline-off
 .navegacao-semanas .descansam { margin: 6px 0 0; font-size: var(--fonte-sm); color: var(--texto-suave); }
 input.gols.invalido { border-color: var(--erro-texto); background: var(--erro-fundo); }
 
-.agenda { margin-top: 18px; border-top: 1px solid var(--borda); padding-top: 10px; }
-.agenda h3 { margin: 0 0 6px; font-size: var(--fonte-base); }
-.agenda select { align-self: flex-start; max-width: 100%; font: inherit; padding: var(--esp-1) var(--esp-2); }
-.agenda-lista { margin: 6px 0 0; padding-left: 1.6em; font-size: var(--fonte-md); }
-.agenda-lista li { padding: 2px 0; }
-.resultado-agenda { font-weight: 600; }
-.resultado-agenda.pendente { color: var(--ambar-texto); font-weight: 400; }
-.resultado-agenda.vencedora { color: var(--sobe); }
-.resultado-agenda.perdedora { color: var(--desce); }
-.resultado-agenda.empate, .resultado-agenda.anulada { color: var(--texto-suave); }
+/* ---------- ficha do jogador ---------- */
+
+/* Nome que abre a ficha: parece texto (sublinhado ao passar o mouse), segue a linha. */
+button.nome-jogador-btn {
+  display: inline; min-height: 0; padding: 0; border: none; border-radius: 2px;
+  background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer;
+}
+button.nome-jogador-btn:hover:not(:disabled) { background: none; text-decoration: underline; text-underline-offset: 2px; }
+/* Nomes empilhados (cartão do jogo, pódio): fora do texto corrido, com altura mínima de alvo (WCAG 2.5.8). */
+.dupla button.nome-jogador-btn, .nome-podio button.nome-jogador-btn { display: inline-flex; align-items: center; min-height: 24px; }
+/* Na coluna estreita do top 8, o nome longo termina em "…". */
+.tabela-top .col-jogador button.nome-jogador-btn {
+  display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom;
+}
+
+/* Janela lateral, à direita, na altura toda. O conteúdo ocupa a janela inteira (clique fora = no fundo). */
+dialog.ficha {
+  inset: 0 0 0 auto;
+  margin: 0;
+  width: min(440px, 100vw);
+  max-width: 100vw;
+  height: 100%;
+  max-height: 100%;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--borda);
+  background: var(--superficie);
+  color: var(--texto);
+  box-shadow: -8px 0 32px var(--sombra);
+  overflow-y: auto;
+}
+dialog.ficha::backdrop { background: var(--veu); }
+.ficha-conteudo { min-height: 100%; padding: var(--esp-4) var(--esp-5) var(--esp-6); }
+.ficha-topo { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--esp-3); }
+.ficha-topo h2 { margin: 0 0 var(--esp-1); font-size: var(--fonte-xl); overflow-wrap: anywhere; }
+.ficha-topo h2:focus { outline: none; }
+.ficha-topo h2:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+
+/* Posição, pontos e saldo numa linha; V/E/D e jogos, mais largos, na de baixo. */
+.ficha-numeros { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--esp-2); margin: 0 0 var(--esp-4); }
+.ficha-numeros > div { grid-column: span 2; }
+.ficha-numeros > div:nth-child(n + 4) { grid-column: span 3; }
+.ficha-numeros > div { padding: var(--esp-2); border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie-2); }
+.ficha-numeros dt { font-size: var(--fonte-xs); text-transform: uppercase; color: var(--texto-suave); }
+.ficha-numeros dd { margin: 2px 0 0; font-size: var(--fonte-lg); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.ficha-secao { margin: 0 0 var(--esp-4); }
+.ficha-secao h3 { margin: 0 0 var(--esp-2); font-size: var(--fonte-base); }
+.ficha-situacao .marca-situacao { display: flex; }
+.ficha-conquista { display: flex; align-items: center; gap: var(--esp-1); margin: 0 0 var(--esp-2); font-weight: 700; color: var(--ouro-texto); }
+
+.ficha-jogos { margin: 0; padding: 0; list-style: none; }
+.ficha-jogos li { padding: var(--esp-2) 0; border-bottom: 1px solid var(--borda); }
+.ficha-jogos li:last-child { border-bottom: none; }
+.ficha-jogo-topo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--esp-1) var(--esp-3); }
+/* Fora do texto corrido, o botão do jogo tem a área de clique cheia. */
+.ficha-jogo-topo .nome-slot { display: inline-flex; align-items: center; min-height: var(--alvo-min); margin-left: -3px; font-weight: 600; }
+.ficha-jogo-duplas { margin-top: 2px; font-size: var(--fonte-md); color: var(--texto-suave); }
+.ficha-jogo-duplas .nome-jogador-btn { color: var(--texto); }
+.resultado-jogo { font-size: var(--fonte-sm); font-weight: 600; }
+.resultado-jogo.pendente { color: var(--ambar-texto); font-weight: 400; }
+.resultado-jogo.vencedora { color: var(--sobe); }
+.resultado-jogo.perdedora { color: var(--desce); }
+.resultado-jogo.empate, .resultado-jogo.anulada { color: var(--texto-suave); }
 
 #controle-classificacao { margin: 6px 0 10px; }
 #controle-classificacao select { align-self: flex-start; font: inherit; padding: var(--esp-1) var(--esp-2); }

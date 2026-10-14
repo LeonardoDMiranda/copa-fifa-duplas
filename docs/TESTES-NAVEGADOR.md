@@ -45,6 +45,13 @@ e abrir `http://127.0.0.1:8765/index.html`. Dicas:
 - **PNGs:** desde a Fase 21, ficam no botão "Baixar imagem" da Classificação (`#btn-png-classificacao`) e do
   Mata-mata (`#btn-png-mata-mata`, só com o chaveamento gerado). O Resetar é o "Reiniciar campeonato" da zona
   de perigo da aba Ajustes (`#btn-reiniciar`).
+- **Fase 22:** o nome de cada jogador (Rodadas, top 8, Classificação e Mata-mata) é um botão
+  `.nome-jogador-btn` que abre a ficha (`#ficha-jogador`, um `<dialog>` modal). Ids dos nomes: `#ver-linha-<id>`
+  (Classificação), `#ver-top-<id>` (top 8), `#ver-<id do jogo>-<id>` (cartão), `#ver-descansa-<id>`,
+  `#ver-<semi1|semi2|final|terceiro>-<lado>-<id>`, `#ver-previa-...` e `#ver-podio-<ouro|prata|bronze>-<id>`.
+  Na ficha: `#ficha-titulo`, `#ficha-posicao`, `#ficha-pontos`, `#ficha-saldo`, `#ficha-ved`, `#ficha-jogos`,
+  `#ficha-situacao`, `#ficha-lista-jogos` (botões `#ficha-semana-<id do jogo>`), `#ficha-fase-final`,
+  `#ficha-conquista` e `#ficha-fechar`.
 - **Fase 21:** as semanas das Rodadas são botões `#chip-semana-N` (a escolhida tem `aria-current="true"`),
   com `#semana-anterior`, `#semana-proxima` e `#semana-atual`; não há mais `<select>` de semana. A coluna
   Situação da Classificação é `td.col-situacao` (classe `garantido`, `disputa` ou `eliminado`), em linhas
@@ -155,7 +162,7 @@ Tela do passo **Sorteio** (`#sorteio`); depois da confirmação, o calendário c
 | 4.11 | "Limpar" num jogo lançado. | Volta a ficar pendente. |
 | 4.12 | Lançar 0×0 e 1×1. | 0×0: E+1 e 0 ponto para os 4. 1×1: E+1 e 1 ponto. |
 | 4.13 | Completar uma semana. | O botão dela fica verde (completa) e o ponto da semana em andamento passa para a seguinte. |
-| 4.14 **(R)** | Agenda do jogador: escolher um jogador no seletor. | Aparece na hora o resumo (posição, pontos, V/E/D, SG) e os 6 jogos dele. A posição bate com a tabela de classificação. (Vai para a ficha do jogador na Fase 22.) |
+| 4.14 **(R)** | Clicar no nome de um jogador num cartão de jogo, no top 8 ao vivo e em "Descansam". | Abre a ficha do jogador (seção 17). A antiga "Agenda do jogador" no pé das Rodadas saiu na Fase 22. |
 | 4.15 | Leitor de tela nos cartões. | Cada cartão tem um título (`h3`) "Semana N · Jogo M"; na tela aparece só "Jogo M". |
 
 ## 5. Classificação
@@ -342,9 +349,43 @@ Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
 | 16.10 | Importar um backup de antes das estrelas (jogadores sem `estrelas`), com o calendário confirmado. | Abre normalmente; na aba Jogadores, estrelas vazias (só para ver) e nomes em âmbar. No Calendário, sem `★N` nem Δ, e a linha "Equilíbrio por nível: não avaliado (o calendário foi confirmado sem as estrelas...)". Sem calendário confirmado, o resumo diz "N sem estrelas" e o sorteio pede para defini-las. |
 | 16.11 | Aba Jogadores e Calendário em ~400 px e no tema escuro. | Estrelas legíveis (cheias em âmbar, vazias em cinza) e sem rolagem horizontal. |
 
+## 17. Ficha do jogador
+
+| # | Passos | Esperado |
+|---|---|---|
+| 17.1 | Com 7 semanas lançadas, clicar no nome de um jogador "Em disputa" na Classificação. | Abre uma janela à direita, com o fundo escurecido. Título com o nome e foco nele. "Classificação ao vivo: dentro/fora do top 8." Posição, pontos, saldo, V / E / D e "Jogos: N de 6" iguais aos da linha da tabela. |
+| 17.2 | Na mesma ficha, ver "Situação para o top 8" e "Jogos". | A situação é igual à da coluna (ícone, "Próximo: Semana 8 · Jogo N", "depende do saldo/desempate"). Um jogo por linha do calendário, na ordem: "Semana 3 · Jogo 1", resultado ("vitória 2×1", "derrota 1×3", "empate", "anulado", "pendente", "(W.O.)") e "com Parceiro × Adversário + Adversário". |
+| 17.3 | Fechar com Esc; abrir de novo e fechar com o X; abrir de novo e clicar no fundo escurecido. | Fecha nas três formas; o foco volta ao nome clicado. |
+| 17.4 | Na ficha, clicar no nome do parceiro; depois fechar. | A ficha passa a ser a do parceiro, sem fechar; ao fechar, o foco volta ao nome clicado primeiro. |
+| 17.5 | Na ficha, clicar em "Semana 4 · Jogo N". | A ficha fecha, abre a aba Rodadas na semana 4 e o foco fica no botão "S4". |
+| 17.6 | Com até a semana 1 lançada, abrir uma ficha. | Situação: "Disponível quando faltarem até 8 jogos (faltam 42)." |
+| 17.7 | Com a ficha aberta, lançar um placar dela em outra janela (ou no telão). | A ficha aberta mostra os números novos sem fechar. |
+| 17.8 | Mata-mata decidido: abrir a ficha pelo pódio (campeão e vice) e pela prévia/confrontos. | Seção "Fase final" com a conquista ("Campeão", "Vice-campeão", "3º lugar") e um item por confronto: "Semifinal 1: vitória 1×1 nos pênaltis", "Final: vitória série 2×1". Quem ficou fora do top 8 não tem a seção. |
+| 17.9 | Telão e PNGs. | Nenhum nome vira botão; nada muda. |
+| 17.10 | Ficha em ~400 px e no tema escuro; só com o teclado (Tab até um nome, Enter, Tab pela ficha, Esc). | A ficha ocupa a largura toda, sem rolagem lateral, legível no escuro; o foco não sai da ficha enquanto ela está aberta e volta ao nome no Esc. |
+
 ---
 
 ## Última execução
+
+**Fase 22 (ficha do jogador), 2026-10-13**, Playwright (Chromium 155) e Lighthouse (Chrome DevTools) via
+servidor local, antes do commit da fase. Massa: 32 jogadores fictícios com calendário confirmado e 7 semanas
+lançadas; depois, todos os jogos lançados e o mata-mata decidido (semi 1 nos pênaltis, final 2×1).
+
+- `testes.html`: 101 passaram, 0 falharam. `testes-telas.html`: 52 passaram, 0 falharam (V9.1 a V9.7 novos;
+  a verificação de "null" no texto ficou mais rígida e o executor aceita casos assíncronos).
+- **Lighthouse (acessibilidade, modo snapshot):** 100 em Rodadas, Classificação, Mata-mata (prévia e
+  decidido) e com a ficha aberta (fase de grupos e fase final), nos temas claro e escuro.
+- **Passaram:** 17.1, 17.2, 17.3 (Esc com tecla de verdade), 17.5 (foco em "S4"), 17.8 e 17.10 (400 px no
+  escuro, 1920 px sem rolagem lateral).
+- **Ajustado antes do commit:** a ficha sem fase final mostrava um "null" solto; o quadro "Jogos" ficava
+  sozinho numa segunda linha; o botão "Semana N · Jogo M" da ficha e os nomes empilhados nos cartões tinham
+  menos de 24 px de altura (alvo de clique).
+- **Visto uma vez, sem reproduzir:** numa sequência Esc → Enter → tema escuro → 400 px, a ficha apareceu
+  fechada na semana 2 das Rodadas, como se "Semana 2 · Jogo 6" tivesse sido clicado. Refeito três vezes
+  (inclusive desde o carregamento), não se repetiu.
+- **Falta:** o caso 1.1 (duplo clique, `file://`), 17.7 com duas janelas, o passeio completo só com o teclado e
+  o roteiro completo.
 
 **Fase 21 (Rodadas, Classificação e Mata-mata enxutas), 2026-10-13**, Playwright (Chromium) e Lighthouse
 (Chrome DevTools) via servidor local, antes do commit da fase. Massa: 32 jogadores fictícios com calendário

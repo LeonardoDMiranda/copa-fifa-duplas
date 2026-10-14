@@ -1,5 +1,5 @@
 // Tela "Classificação": ao vivo ou após uma semana, com a ordem manual dos empates técnicos e, ao
-// vivo, a coluna "Situação" (garantido, em disputa ou eliminado para o top 8).
+// vivo, a coluna "Situação" (garantido, em disputa ou eliminado para o top 8). O nome abre a ficha.
 
 (function () {
   "use strict";
@@ -7,15 +7,8 @@
   const { el, formatarSaldo, botaoIcone } = Util;
   const { VAGAS_FASE_FINAL } = Regras;
 
-  // Situação de cada jogador (Regras.calcularSituacoes): ícone e texto da coluna.
-  const SITUACOES = {
-    garantido: { icone: "ok", texto: "Garantido" },
-    disputa: { icone: "disputa", texto: "Em disputa" },
-    eliminado: { icone: "eliminado", texto: "Eliminado" },
-  };
-
   function criar(app, raiz) {
-    const { estado, nomePorId, renderizar, numerosNaSemana } = app;
+    const { estado, nomePorId, renderizar } = app;
 
     const rotulo = el("span", { id: "rotulo-classificacao", class: "contador" });
     const controle = el("div", { id: "controle-classificacao" });
@@ -59,21 +52,6 @@
     // Semana escolhida para ver a classificação (null = ao vivo). Só leitura quando não é ao vivo.
     let semanaClassificacao = null;
 
-    // O cálculo enumera até Regras.MAX_CENARIOS_SITUACOES cenários: só refaz quando jogos,
-    // desempates ou jogadores mudam. Devolve null se houver pendentes demais
-    // (ver Regras.limitePendentesSituacoes).
-    let cacheSituacoes = { chave: null, valor: null };
-    function situacoesDe(atual) {
-      const chave = JSON.stringify([atual.jogos.map((j) => j.resultado), atual.desempatesManuais, atual.campeonato]);
-      if (cacheSituacoes.chave !== chave) {
-        cacheSituacoes = {
-          chave,
-          valor: Regras.calcularSituacoes(app.base(), atual.jogos, atual.desempatesManuais, atual.campeonato.config),
-        };
-      }
-      return cacheSituacoes.valor;
-    }
-
     function definirOrdemManual(ordem) {
       const nomes = ordem.map((x) => nomePorId.get(x)).join(" > ");
       estado.modificar(`desempate manual: ${nomes}`, (s) => {
@@ -90,7 +68,8 @@
 
     function celulaJogador(linha, editavel) {
       const empate = linha.empateTecnico;
-      if (!empate) return el("td", { class: "col-jogador" }, linha.nome);
+      const nome = app.botaoJogador(linha.id, `ver-linha-${linha.id}`);
+      if (!empate) return el("td", { class: "col-jogador" }, nome);
 
       const nomes = empate.grupo.map((id) => nomePorId.get(id)).join(", ");
       const i = empate.grupo.indexOf(linha.id);
@@ -99,7 +78,7 @@
         ? `Empate técnico (${nomes}). Ordem definida pelo organizador.`
         : `Empate técnico (${nomes}). Ordem alfabética provisória: defina com as setas ou confirme a ordem atual.`;
       return el("td", { class: "col-jogador" },
-        linha.nome,
+        nome,
         el("span", { class: "empate" + (empate.ordemManual ? "" : " provisorio"), title: explicacao },
           Icones.svg("empate"), el("span", { class: "so-leitor" }, explicacao)),
         editavel && el("span", { class: "controle-desempate" },
@@ -125,33 +104,8 @@
       return el("td", { class: "col-var" });
     }
 
-    // "Próximo: Semana 8 · Jogo 3" (+N se ainda joga mais depois), ou "não joga mais", e as marcas
-    // de quem depende do saldo ou do desempate. Só para quem está em disputa.
-    function detalhesDaDisputa(s, jogos) {
-      const detalhes = [];
-      if (s.jogosPendentes.length) {
-        const proximo = jogos.find((j) => j.id === s.jogosPendentes[0]);
-        const mais = s.jogosPendentes.length - 1;
-        detalhes.push(el("div", { class: "proximo-jogo" },
-          `Próximo: ${Util.rotuloDoJogo(proximo, numerosNaSemana(jogos))}`,
-          mais > 0 && el("span", { class: "tag-repete", title: `Joga mais ${mais} depois deste` },
-            el("span", { "aria-hidden": "true" }, `+${mais}`),
-            el("span", { class: "so-leitor" }, `, joga mais ${mais} depois deste`))));
-      } else {
-        detalhes.push(el("div", { class: "nao-joga" }, "Não joga mais, só pode cair"));
-      }
-      const marcas = [];
-      if (s.dependeDoSaldo) marcas.push(el("span", { class: "tag-saldo" }, "depende do saldo"));
-      if (s.dependeDoDesempate) marcas.push(el("span", { class: "tag-saldo" }, Icones.svg("empate"), "depende do desempate"));
-      if (marcas.length) detalhes.push(el("div", { class: "marcas" }, marcas));
-      return detalhes;
-    }
-
     function celulaSituacao(s, jogos) {
-      const { icone, texto } = SITUACOES[s.situacao];
-      return el("td", { class: `col-situacao ${s.situacao}` },
-        el("span", { class: "marca-situacao" }, Icones.svg(icone), texto),
-        s.situacao === "disputa" && detalhesDaDisputa(s, jogos));
+      return el("td", { class: `col-situacao ${s.situacao}` }, Util.marcaSituacao(s, jogos));
     }
 
     function controleClassificacao(ultimaSemana) {
@@ -224,7 +178,7 @@
       const tabelaVista = aoVivo
         ? tabela
         : Regras.classificacaoPorSemana(app.base(), atual.jogos, atual.desempatesManuais, cfg, semanaClassificacao);
-      const situacoes = aoVivo && atual.jogos.length ? situacoesDe(atual) : null;
+      const situacoes = aoVivo && atual.jogos.length ? Util.situacoes(app.base(), atual) : null;
       controleClassificacao(ultimaSemana);
       rotulo.textContent = aoVivo ? "" : `após a semana ${semanaClassificacao}`;
       renderizarResumoSituacao(atual, situacoes);

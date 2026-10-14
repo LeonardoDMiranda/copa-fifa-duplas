@@ -168,10 +168,12 @@ Uma aba por etapa (Alt+1, Alt+2...; a aba ativa fica no endereço, ex.: `index.h
 
 **Temporada** (calendário confirmado):
 
-4. **Rodadas**: navegação por semana (◀ S1…Sn ▶, com o progresso na cor de cada botão, e "Semana atual"), cartões dos jogos com placar, "W.O." (escolhendo a dupla presente pelos nomes), "Anular" e "Limpar"; quem descansa na semana; agenda do jogador (vai para a ficha do jogador na Fase 22); top 8 ao vivo ao lado.
+4. **Rodadas**: navegação por semana (◀ S1…Sn ▶, com o progresso na cor de cada botão, e "Semana atual"), cartões dos jogos com placar, "W.O." (escolhendo a dupla presente pelos nomes), "Anular" e "Limpar"; quem descansa na semana; top 8 ao vivo ao lado.
 5. **Classificação**: ao vivo ou ao fim de uma semana, na largura toda; top 8 em verde, ▲▼ em relação à semana anterior, empate técnico com controle de ordem manual; explicação em "Como ler". Ao vivo, com até 8 jogos pendentes (pontuação padrão), a coluna **Situação** (ver 2.4); antes disso, uma linha diz quando ela aparece. "Baixar imagem" gera o PNG da classificação vista (ao vivo ou da semana escolhida).
 6. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio. Com o chaveamento gerado, "Baixar imagem" gera o PNG do mata-mata.
 7. **Ajustes** (`#campeonato`): Configuração, Jogadores e o calendário completo, só para ver (o nome, a aparência e o renomear continuam editáveis), e a **zona de perigo** com "Reiniciar campeonato". Os endereços dos passos da preparação (e o antigo `#calendario`) levam para cá depois da confirmação.
+
+**Ficha do jogador** (`js/telas/ficha.js`): o nome de cada jogador nas Rodadas (cartões, "Descansam" e top 8), na Classificação e no Mata-mata (prévia, confrontos e pódio) abre uma janela lateral. Ela mostra os números ao vivo (posição, pontos, saldo, V/E/D e jogos disputados), a situação para o top 8 (como na coluna, ou quando ela fica disponível), a fase final de quem entrou no chaveamento (conquista e resultado de cada confronto) e todos os jogos do calendário, com parceiro, adversários e resultado. O nome do parceiro ou de um adversário troca a ficha; "Semana N · Jogo M" leva àquela semana nas Rodadas. Esc, o X ou um clique fora fecham, e o foco volta ao nome clicado. Os números são sempre os ao vivo, mesmo com a Classificação "após a semana N". O telão e os PNGs não mudam.
 
 **Campeonatos** (`index.html#campeonatos`, fora das abas de etapa): edições em uso e arquivadas, em cartões com Abrir (ou Desarquivar) à vista e um menu ⋯ com Duplicar, Exportar backup, Exportar modelo, Arquivar e Excluir; a aberta fica destacada; "Novo campeonato" e "Novo a partir de modelo"; espaço usado, em barra.
 
@@ -198,6 +200,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 19 | Cabeçalho novo (título simples, botão "Trocar", menu "Campeonato") e tela de Campeonatos com cartões e menu ⋯ por edição |
 | 20 | Preparação em 3 passos (Configuração, Jogadores e Sorteio) e, depois de confirmar o calendário, abas Rodadas, Classificação, Mata-mata e Ajustes (os 3 passos só para ver, mais a zona de perigo com o Reiniciar). Lógica das abas em `js/abas.js` |
 | 21 | Rodadas com a navegação ◀ S1…Sn ▶ e "Semana atual" (sai o seletor de semana), W.O. com os nomes das duplas e título em cada cartão; Classificação na largura toda, com a coluna "Situação" no lugar do painel "O que está em jogo" e "Como ler"; "Baixar imagem" na Classificação e no Mata-mata |
+| 22 | Ficha do jogador: janela lateral aberta pelo nome (Rodadas, top 8, Classificação e Mata-mata), com números ao vivo, situação, fase final e todos os jogos. Sai a "Agenda do jogador" das Rodadas |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -222,7 +225,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
 | U | Base da interface: `plural`, `numero` (formato brasileiro), `rotuloDoJogo`, `botaoIcone` (nome acessível), ícones decorativos e atributos do erro junto do campo |
 
-`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata).
+`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata) e V9 (ficha do jogador: números iguais aos da tabela, um jogo por linha do calendário, Esc/X/clique fora com o foco de volta ao nome, troca para o parceiro, fase final do campeão, ir para a semana e ficha aberta atualizando).
 
 ## 7. Pendências
 

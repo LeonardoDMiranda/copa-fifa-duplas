@@ -1,4 +1,5 @@
 // Tela "Mata-mata": chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio.
+// Os nomes abrem a ficha do jogador (js/telas/ficha.js).
 
 (function () {
   "use strict";
@@ -7,7 +8,7 @@
 
   const itemAlerta = (texto) => el("li", {}, Icones.svg("alerta"), el("span", {}, texto));
 
-  const ROTULOS = { semi1: "Semifinal 1", semi2: "Semifinal 2", terceiro: "3º lugar", final: "Final" };
+  const ROTULOS = Util.ROTULOS_MATA_MATA;
   const ORIGEM_DUPLA = {
     semi1: ["1º + 8º", "2º + 7º"],
     semi2: ["3º + 6º", "4º + 5º"],
@@ -19,7 +20,10 @@
   };
 
   function criar(app, raiz) {
-    const { estado, nomePorId, renderizar, tabelaAtual, nomesDupla } = app;
+    const { estado, renderizar, tabelaAtual, nomesDupla } = app;
+
+    // "Nome + Nome", cada nome abrindo a ficha. `local` deixa os ids únicos na tela.
+    const duplaComFicha = (dupla, local) => dupla.map((id, i) => [i ? " + " : null, app.botaoJogador(id, `ver-${local}-${id}`)]);
 
     const alvo = el("div", { id: "conteudo-mata-mata" });
     raiz.append(el("section", { id: "tela-mata-mata", class: "tela" },
@@ -53,7 +57,8 @@
       const semis = Regras.duplasDasSemis(tabela);
       const previa = (chave) => el("li", {},
         el("strong", {}, `${ROTULOS[chave]}: `),
-        `${nomesDupla(semis[chave][0])} (${ORIGEM_DUPLA[chave][0]}) × ${nomesDupla(semis[chave][1])} (${ORIGEM_DUPLA[chave][1]})`);
+        duplaComFicha(semis[chave][0], `previa-${chave}-1`), ` (${ORIGEM_DUPLA[chave][0]}) × `,
+        duplaComFicha(semis[chave][1], `previa-${chave}-2`), ` (${ORIGEM_DUPLA[chave][1]})`);
       return el("div", { class: "gerar-chave" },
         el("p", {}, "Prévia pela classificação atual:"),
         el("ul", { class: "previa" }, previa("semi1"), previa("semi2")),
@@ -179,7 +184,7 @@
       return el("div", { class: classe },
         el("span", { class: "rotulo-lado" }, `Dupla ${lado}`),
         el("span", { class: info.dupla ? "nomes" : "nomes a-definir" },
-          info.dupla ? nomesDupla(info.dupla) : ORIGEM_DUPLA[c.chave][lado - 1]),
+          info.dupla ? duplaComFicha(info.dupla, `${c.chave}-${lado}`) : ORIGEM_DUPLA[c.chave][lado - 1]),
         info.dupla && !info.manual && el("span", { class: "origem-dupla" }, ORIGEM_DUPLA[c.chave][lado - 1]),
         info.manual && el("span", {
           class: "tag-manual",
@@ -287,7 +292,7 @@
         el("div", {},
           el("div", { class: "titulo-degrau" }, titulo),
           dupla
-            ? dupla.map((id) => el("div", { class: "nome-podio" }, nomePorId.get(id)))
+            ? dupla.map((id) => el("div", { class: "nome-podio" }, app.botaoJogador(id, `ver-podio-${classe}-${id}`)))
             : el("div", { class: "a-definir" }, "a definir")));
       return el("div", { class: "podio", id: "podio" },
         degrau("ouro", "trofeu", "Campeões", p.campeoes),

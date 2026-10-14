@@ -41,6 +41,7 @@
   <script src="js/telas/mata-mata.js"></script>
   <script src="js/telas/campeonato.js"></script>
   <script src="js/telas/campeonatos.js"></script>
+  <script src="js/telas/ficha.js"></script>
   <script>
     "use strict";
 
@@ -118,7 +119,8 @@
     // ---------- app falso ----------
 
     // Mesma interface do `app` do ui.js, com o Estado e os Campeonatos reais sobre um armazenamento
-    // em memória. O redesenho é síncrono; avisos e pedidos de troca de aba só ficam registrados.
+    // em memória. O redesenho é síncrono; avisos, pedidos de troca de aba e de semana só ficam
+    // registrados. Os nomes abrem a ficha se ela estiver montada (montar("ficha")).
     // `dados`: estado v2 inicial (sem ele, o app começa vazio, como na primeira abertura).
     function criarAppFalso(dados = null) {
       const area = document.getElementById("area-telas");
@@ -130,7 +132,14 @@
       const avisos = [];
       const abasPedidas = [];
       const imagens = []; // tipos pedidos a app.exportarPNG
+      const fichasPedidas = []; // jogadores cujo nome foi clicado
+      const semanasPedidas = []; // semanas pedidas a app.verSemana
       const telas = [];
+      let ficha = null; // tela da ficha, quando montada
+      function abrirFicha(id, origem) {
+        fichasPedidas.push(id);
+        if (ficha) ficha.abrir(id, origem);
+      }
 
       const base = () => Regras.baseDosJogadores(estado.atual().campeonato.jogadores);
       function tabelaAtual() {
@@ -161,6 +170,8 @@
         proximoPasso: (texto, aba, rotulo) => Util.proximoPasso(texto, aba, rotulo, irParaAba),
         cadastroTravado: () => Regras.cadastroTravado(estado.atual().campeonato, estado.atual().jogos),
         nomesDupla: (dupla) => dupla.map((id) => nomePorId.get(id)).join(" + "),
+        botaoJogador: (id, idDom) => Util.botaoJogador(id, nomePorId.get(id), idDom, abrirFicha),
+        verSemana: (n) => { semanasPedidas.push(n); },
         numerosNaSemana: Util.numerosNaSemana,
         tabelaAtual,
         limparRascunhos() { for (const t of telas) if (t.limparRascunhos) t.limparRascunhos(); },
@@ -183,20 +194,23 @@
       function montar(nome) {
         const raiz = el("section", { class: "aba" });
         area.appendChild(raiz);
-        telas.push(Telas[nome].criar(app, raiz));
+        const tela = Telas[nome].criar(app, raiz);
+        if (nome === "ficha") ficha = tela;
+        telas.push(tela);
         renderizar();
         return raiz;
       }
 
-      return { app, estado, avisos, abasPedidas, imagens, montar, tabelaAtual };
+      return { app, estado, avisos, abasPedidas, imagens, fichasPedidas, semanasPedidas, montar, tabelaAtual };
     }
 
     // ---------- verificações comuns ----------
 
     // Nada de "undefined", "null" ou "NaN" no texto nem nos atributos, e nenhum id repetido.
+    // No texto, sem exigir limite de palavra: um filho null vira "null" colado no texto vizinho ("saldonullJogos").
     function verificarLimpeza(t, raiz, nome) {
       const lixo = /\b(undefined|null|NaN)\b/;
-      t.verdadeiro(!lixo.test(raiz.textContent), `${nome}: sem "undefined", "null" ou "NaN" no texto`);
+      t.verdadeiro(!/undefined|null|NaN/.test(raiz.textContent), `${nome}: sem "undefined", "null" ou "NaN" no texto`);
       const atributos = [...raiz.querySelectorAll("*")].flatMap((e) => [...e.attributes].map((a) => `${a.name}="${a.value}"`));
       const sujos = atributos.filter((a) => lixo.test(a));
       t.igual(sujos, [], `${nome}: sem "undefined", "null" ou "NaN" nos atributos`);
@@ -916,39 +930,248 @@
       t.verdadeiro(medalhas.length === 3 && medalhas.every((m) => m.getAttribute("aria-hidden") === "true"), "as 3 medalhas com aria-hidden");
     });
 
+    // ---------- V9: ficha do jogador ----------
+
+    // A ficha precisa estar visível para receber o foco: a área das telas aparece durante o caso.
+    // No fim, fecha a ficha que tiver ficado aberta (senão o resto da página fica inerte).
+    async function comAreaVisivel(fn) {
+      const area = document.getElementById("area-telas");
+      area.hidden = false;
+      try {
+        await fn();
+      } finally {
+        for (const d of area.querySelectorAll("dialog[open]")) d.close();
+        area.hidden = true;
+      }
+    }
+
+    // Fecha como o Esc (requestClose dispara "cancel" e depois "close") e espera o "close", que é assíncrono.
+    function fecharComEsc(dialogo) {
+      const fechou = new Promise((resolver) => dialogo.addEventListener("close", resolver, { once: true }));
+      if (dialogo.requestClose) dialogo.requestClose();
+      else dialogo.close();
+      return fechou;
+    }
+
+    function esperarFechar(dialogo) {
+      return new Promise((resolver) => dialogo.addEventListener("close", resolver, { once: true }));
+    }
+
+    // Todos os jogos lançados, chaveamento gerado e decidido: semis 2×0 (dupla 1), final 1×0 duas vezes
+    // (dupla 1, série 2×0) e 3º lugar 1×0.
+    function dadosComCampeoes() {
+      const dados = dadosComCalendario({ mataMata: true });
+      const mm = dados.mataMata;
+      mm.semi1.partidas = [{ gols1: 2, gols2: 0 }];
+      mm.semi2.partidas = [{ gols1: 2, gols2: 0 }];
+      mm.final.partidas = [{ gols1: 1, gols2: 0 }, { gols1: 1, gols2: 0 }];
+      mm.terceiro.partidas = [{ gols1: 1, gols2: 0 }];
+      return dados;
+    }
+
+    const idAtivo = () => document.activeElement && document.activeElement.id;
+
+    caso("V9.1 Ficha aberta pela Classificação: números iguais aos da tabela, situação e um jogo por linha do calendário", (t) => comAreaVisivel(() => {
+      const ctx = criarAppFalso(dadosComCalendario({ semanasLancadas: 7 }));
+      const classificacao = ctx.montar("classificacao");
+      const raiz = ctx.montar("ficha");
+      const atual = ctx.estado.atual();
+      const situacoes = Regras.calcularSituacoes(ctx.app.base(), atual.jogos, atual.desempatesManuais, atual.campeonato.config);
+      const s = situacoes.find((x) => x.situacao === "disputa" && x.jogosPendentes.length);
+      const linha = ctx.tabelaAtual().find((l) => l.id === s.id);
+      clicar(classificacao, `ver-linha-${linha.id}`);
+      const dialogo = buscar(raiz, "ficha-jogador");
+      t.verdadeiro(dialogo.open, "a ficha abre (modal)");
+      t.igual(ctx.fichasPedidas, [linha.id], "o clique pede a ficha do jogador da linha");
+      t.igual(texto(raiz, "ficha-titulo"), linha.nome, "título com o nome");
+      t.igual(idAtivo(), "ficha-titulo", "o foco vai para o título da ficha");
+      t.igual(["ficha-posicao", "ficha-pontos", "ficha-ved", "ficha-saldo"].map((id) => texto(raiz, id)),
+        [`${linha.posicao}º`, String(linha.pontos), `${linha.v} / ${linha.e} / ${linha.d}`, Util.formatarSaldo(linha.sg)],
+        "posição, pontos, V/E/D e saldo iguais aos da tabela");
+      const jogosDele = atual.jogos.filter((j) => j.dupla1.includes(linha.id) || j.dupla2.includes(linha.id));
+      t.igual(texto(raiz, "ficha-jogos"), `${linha.jogos} de ${jogosDele.length}`, "jogos disputados e do calendário");
+      const numeros = Util.numerosNaSemana(atual.jogos);
+      const itens = [...buscar(raiz, "ficha-lista-jogos").children];
+      t.igual(itens.map((li) => li.querySelector(".nome-slot").textContent), jogosDele.map((j) => Util.rotuloDoJogo(j, numeros)),
+        "um jogo por linha do calendário, na ordem");
+      const pendentes = itens.filter((li) => li.querySelector(".resultado-jogo").textContent === "pendente").length;
+      t.igual(pendentes, jogosDele.filter((j) => !j.resultado).length, "os pendentes aparecem como pendentes");
+      t.verdadeiro(itens.every((li) => li.querySelectorAll(".ficha-jogo-duplas .nome-jogador-btn").length === 3), "cada jogo com o parceiro e os 2 adversários");
+      const situacao = buscar(raiz, "ficha-situacao");
+      t.verdadeiro(situacao.classList.contains("disputa"), "situação igual à das regras (em disputa)");
+      t.igual(situacao.textContent, buscar(classificacao, `linha-${linha.id}`).querySelector("td.col-situacao").textContent,
+        "o mesmo texto da coluna Situação (com o próximo jogo)");
+      verificarLimpeza(t, raiz, "ficha");
+      verificarAcessibilidade(t, raiz, "ficha");
+      t.igual(dialogo.getAttribute("aria-labelledby"), "ficha-titulo", "a janela tem o nome do jogador como título");
+    }));
+
+    caso("V9.2 Esc, \"Fechar\" e clique fora fecham a ficha, e o foco volta ao nome clicado", (t) => comAreaVisivel(async () => {
+      const ctx = criarAppFalso(dadosComCalendario({ semanasLancadas: 7 }));
+      const classificacao = ctx.montar("classificacao");
+      const raiz = ctx.montar("ficha");
+      const dialogo = buscar(raiz, "ficha-jogador");
+      const id = ctx.tabelaAtual()[0].id;
+
+      clicar(classificacao, `ver-linha-${id}`);
+      await fecharComEsc(dialogo);
+      t.verdadeiro(!dialogo.open, `Esc fecha${dialogo.requestClose ? "" : " (sem requestClose neste navegador: close())"}`);
+      t.igual(idAtivo(), `ver-linha-${id}`, "Esc: o foco volta ao nome clicado");
+      t.igual(buscar(raiz, "ficha-corpo").children.length, 0, "a ficha fechada fica vazia");
+
+      clicar(classificacao, `ver-linha-${id}`);
+      let fechou = esperarFechar(dialogo);
+      clicar(raiz, "ficha-fechar");
+      await fechou;
+      t.verdadeiro(!dialogo.open, "\"Fechar\" fecha");
+      t.igual(idAtivo(), `ver-linha-${id}`, "\"Fechar\": o foco volta ao nome clicado");
+
+      clicar(classificacao, `ver-linha-${id}`);
+      fechou = esperarFechar(dialogo);
+      buscar(raiz, "ficha-titulo").click();
+      t.verdadeiro(dialogo.open, "clicar dentro da ficha não fecha");
+      dialogo.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await fechou;
+      t.verdadeiro(!dialogo.open, "clicar no fundo escurecido fecha");
+    }));
+
+    caso("V9.3 O nome do parceiro troca a ficha sem fechar; ao fechar, o foco volta ao primeiro nome", (t) => comAreaVisivel(async () => {
+      const ctx = criarAppFalso(dadosComCalendario());
+      const rodadas = ctx.montar("rodadas");
+      const raiz = ctx.montar("ficha");
+      const dialogo = buscar(raiz, "ficha-jogador");
+      const id = ctx.tabelaAtual()[0].id;
+      clicar(rodadas, `ver-top-${id}`);
+      const parceiro = buscar(raiz, "ficha-lista-jogos").querySelector(".ficha-jogo-duplas .nome-jogador-btn");
+      const nomeParceiro = parceiro.textContent;
+      parceiro.click();
+      t.verdadeiro(dialogo.open, "a ficha continua aberta");
+      t.igual(texto(raiz, "ficha-titulo"), nomeParceiro, "a ficha passa a ser a do parceiro");
+      t.igual(idAtivo(), "ficha-titulo", "o foco vai para o título novo");
+      const fechou = esperarFechar(dialogo);
+      clicar(raiz, "ficha-fechar");
+      await fechou;
+      t.igual(idAtivo(), `ver-top-${id}`, "o foco volta ao nome clicado primeiro (no top 8)");
+    }));
+
+    caso("V9.4 Os nomes viram botões da ficha: top 8, cartões, descansam, classificação e mata-mata; a agenda saiu das Rodadas", (t) => {
+      const ctx = criarAppFalso(dadosComCalendario());
+      const rodadas = ctx.montar("rodadas");
+      t.verdadeiro(!buscar(rodadas, "select-agenda") && !buscar(rodadas, "agenda-jogador"), "sem a agenda do jogador nas Rodadas");
+      const jogo = ctx.estado.atual().jogos.find((j) => j.semana === 2);
+      const top = ctx.tabelaAtual()[0].id;
+      t.igual(buscar(rodadas, `jogo-${jogo.id}`).querySelectorAll(".nome-jogador-btn").length, 4, "4 nomes em cada cartão");
+      const descansam = [...rodadas.querySelectorAll(".descansam .nome-jogador-btn")];
+      t.igual(descansam.length, 8, "8 nomes em \"Descansam\"");
+      clicar(rodadas, `ver-top-${top}`);
+      clicar(rodadas, `ver-${jogo.id}-${jogo.dupla2[1]}`);
+      descansam[0].click();
+      t.igual(ctx.fichasPedidas, [top, jogo.dupla2[1], descansam[0].id.replace("ver-descansa-", "")], "top 8, cartão e descansam pedem a ficha certa");
+      const botao = buscar(rodadas, `ver-top-${top}`);
+      t.igual([botao.getAttribute("aria-haspopup"), botao.title], ["dialog", `Ver a ficha de ${botao.textContent}`], "o botão avisa que abre uma janela");
+
+      const classificacao = criarAppFalso(dadosComCalendario()).montar("classificacao");
+      t.igual(classificacao.querySelectorAll("#corpo-classificacao .nome-jogador-btn").length, 32, "32 nomes na classificação");
+
+      const previa = criarAppFalso(dadosComCalendario()).montar("mataMata");
+      t.igual(previa.querySelectorAll(".previa .nome-jogador-btn").length, 8, "8 nomes na prévia do chaveamento");
+
+      const campeoes = criarAppFalso(dadosComCampeoes());
+      const mm = campeoes.montar("mataMata");
+      t.igual(mm.querySelectorAll(".dupla-mm .nome-jogador-btn").length, 16, "16 nomes nos 4 confrontos");
+      t.igual(mm.querySelectorAll(".podio .nome-jogador-btn").length, 6, "6 nomes no pódio");
+      verificarLimpeza(t, mm, "mata-mata decidido");
+      mm.querySelector(".degrau.ouro .nome-jogador-btn").click();
+      t.igual(campeoes.fichasPedidas.length, 1, "o nome no pódio pede a ficha");
+    });
+
+    caso("V9.5 Ficha de um campeão: conquista e confrontos da fase final; quem ficou fora não tem a seção", (t) => comAreaVisivel(() => {
+      const ctx = criarAppFalso(dadosComCampeoes());
+      const mm = ctx.montar("mataMata");
+      const raiz = ctx.montar("ficha");
+      const campeao = mm.querySelector(".degrau.ouro .nome-jogador-btn");
+      campeao.click();
+      t.igual(texto(raiz, "ficha-conquista"), "Campeão", "conquista: Campeão");
+      const itens = [...buscar(raiz, "ficha-fase-final").children];
+      t.igual(itens.map((li) => li.querySelector("strong").textContent)[1], "Final", "semifinal e final");
+      t.igual(itens.length, 2, "dois confrontos");
+      t.verdadeiro(itens[0].querySelector("strong").textContent.startsWith("Semifinal"), "primeiro, a semifinal");
+      t.igual(itens.map((li) => li.querySelector(".resultado-jogo").textContent), ["vitória 2×0", "vitória série 2×0"], "resultado de cada confronto");
+      verificarLimpeza(t, raiz, "ficha do campeão");
+      verificarAcessibilidade(t, raiz, "ficha do campeão");
+      buscar(raiz, "ficha-jogador").close();
+
+      const fora = ctx.tabelaAtual()[31].id;
+      ctx.app.botaoJogador(fora, "teste-fora").click();
+      t.verdadeiro(!buscar(raiz, "ficha-fase-final") && !buscar(raiz, "ficha-conquista"), "o último colocado não tem a seção Fase final");
+    }));
+
+    caso("V9.6 Escolher um jogo na ficha fecha a ficha e pede a semana nas Rodadas", (t) => comAreaVisivel(() => {
+      const ctx = criarAppFalso(dadosComCalendario());
+      const classificacao = ctx.montar("classificacao");
+      const raiz = ctx.montar("ficha");
+      const id = ctx.tabelaAtual()[0].id;
+      clicar(classificacao, `ver-linha-${id}`);
+      const jogo = ctx.estado.atual().jogos.filter((j) => j.dupla1.includes(id) || j.dupla2.includes(id))[2];
+      clicar(raiz, `ficha-semana-${jogo.id}`);
+      t.verdadeiro(!buscar(raiz, "ficha-jogador").open, "a ficha fecha");
+      t.igual(ctx.semanasPedidas, [jogo.semana], "pede a semana do jogo");
+    }));
+
+    caso("V9.7 Ficha com pendentes demais: a situação diz quando aparece; lançar um placar atualiza a ficha aberta", (t) => comAreaVisivel(() => {
+      const ctx = criarAppFalso(dadosComCalendario());
+      const classificacao = ctx.montar("classificacao");
+      const raiz = ctx.montar("ficha");
+      const id = ctx.tabelaAtual()[0].id;
+      clicar(classificacao, `ver-linha-${id}`);
+      const limite = Regras.limitePendentesSituacoes(ctx.estado.atual().campeonato.config);
+      t.igual(texto(raiz, "ficha-situacao"), `Disponível quando faltarem até ${limite} jogos (faltam 42).`, "explica quando a situação aparece");
+      const jogo = ctx.estado.atual().jogos.find((j) => !j.resultado && (j.dupla1.includes(id) || j.dupla2.includes(id)));
+      const antes = Number(texto(raiz, "ficha-pontos"));
+      const lado = jogo.dupla1.includes(id) ? 1 : 2;
+      ctx.estado.modificar("placar de teste", (s) => {
+        s.jogos.find((j) => j.id === jogo.id).resultado = { tipo: "placar", gols1: lado === 1 ? 2 : 0, gols2: lado === 1 ? 0 : 2 };
+      });
+      t.igual(Number(texto(raiz, "ficha-pontos")), antes + 3, "a ficha aberta mostra os 3 pontos novos");
+      t.verdadeiro(buscar(raiz, "ficha-jogador").open, "e continua aberta");
+    }));
+
     // ---------- execução e relatório ----------
 
-    let passaram = 0, falharam = 0;
-    const container = document.getElementById("casos");
-    for (const c of casos) {
-      const registro = [];
-      try {
-        c.fn(criarVerificador(registro));
-      } catch (erro) {
-        registro.push({ ok: false, texto: `Exceção: ${erro.message}` });
+    // Um caso pode ser assíncrono (ex.: esperar o "close" da ficha): os casos rodam um de cada vez.
+    (async () => {
+      let passaram = 0, falharam = 0;
+      const container = document.getElementById("casos");
+      for (const c of casos) {
+        const registro = [];
+        try {
+          await c.fn(criarVerificador(registro));
+        } catch (erro) {
+          registro.push({ ok: false, texto: `Exceção: ${erro.message}` });
+        }
+        const ok = registro.length > 0 && registro.every((r) => r.ok);
+        ok ? passaram++ : falharam++;
+        const ul = document.createElement("ul");
+        for (const r of registro) {
+          const li = document.createElement("li");
+          li.textContent = `${r.ok ? "✔" : "✘"} ${r.texto}`;
+          if (!r.ok) li.className = "erro";
+          ul.appendChild(li);
+        }
+        const h2 = document.createElement("h2");
+        h2.textContent = `${ok ? "✅" : "❌"} ${c.titulo}`;
+        const div = document.createElement("div");
+        div.className = `caso ${ok ? "passou" : "falhou"}`;
+        div.append(h2, ul);
+        container.appendChild(div);
       }
-      const ok = registro.length > 0 && registro.every((r) => r.ok);
-      ok ? passaram++ : falharam++;
-      const ul = document.createElement("ul");
-      for (const r of registro) {
-        const li = document.createElement("li");
-        li.textContent = `${r.ok ? "✔" : "✘"} ${r.texto}`;
-        if (!r.ok) li.className = "erro";
-        ul.appendChild(li);
-      }
-      const h2 = document.createElement("h2");
-      h2.textContent = `${ok ? "✅" : "❌"} ${c.titulo}`;
-      const div = document.createElement("div");
-      div.className = `caso ${ok ? "passou" : "falhou"}`;
-      div.append(h2, ul);
-      container.appendChild(div);
-    }
-    document.getElementById("area-telas").replaceChildren();
+      document.getElementById("area-telas").replaceChildren();
 
-    const resumo = document.getElementById("resumo");
-    resumo.textContent = `${passaram} passaram, ${falharam} falharam`;
-    resumo.className = falharam ? "falha" : "ok";
-    document.title = `${falharam ? "❌" : "✅"} Testes das telas – Copa FIFA em Duplas`;
+      const resumo = document.getElementById("resumo");
+      resumo.textContent = `${passaram} passaram, ${falharam} falharam`;
+      resumo.className = falharam ? "falha" : "ok";
+      document.title = `${falharam ? "❌" : "✅"} Testes das telas – Copa FIFA em Duplas`;
+    })();
   </script>
 </body>
 </html>

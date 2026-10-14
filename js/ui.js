@@ -85,6 +85,9 @@
     proximoPasso: (texto, aba, rotulo) => Util.proximoPasso(texto, aba, rotulo, irParaAba),
     cadastroTravado,
     nomesDupla,
+    // Nome que abre a ficha do jogador (`idDom` único na tela).
+    botaoJogador: (id, idDom) => Util.botaoJogador(id, nomePorId.get(id), idDom, (jogador, origem) => telas.ficha.abrir(jogador, origem)),
+    verSemana,
     numerosNaSemana: Util.numerosNaSemana,
     tabelaAtual,
     limparRascunhos,
@@ -107,6 +110,8 @@
     mataMata: Telas.mataMata.criar(app, raiz("mata-mata")),
     campeonato: Telas.campeonato.criar(app, raiz("campeonato")),
     campeonatos: Telas.campeonatos.criar(app, raiz("campeonatos")),
+    // Janela sobre qualquer aba: fica fora das <section>.
+    ficha: Telas.ficha.criar(app, document.body),
   };
 
   // Descarta o que foi digitado e não lançado em todas as telas (ex.: depois de desfazer).
@@ -134,6 +139,14 @@
 
   function irParaAba(id) {
     if (location.hash !== `#${id}`) location.hash = id; // o "hashchange" redesenha
+  }
+
+  // Semana `n` na aba Rodadas, com o foco no botão dela (ex.: um jogo escolhido na ficha do jogador).
+  function verSemana(n) {
+    telas.rodadas.mostrarSemana(n);
+    app.focarDepois(`chip-semana-${n}`);
+    irParaAba("rodadas");
+    renderizar();
   }
 
   // Fixa no endereço a aba da etapa (ao abrir, resetar ou importar). Depois disso a aba só muda
@@ -560,6 +573,7 @@
     if (location.hash !== "#telao" && location.hash !== `#${aba}`) history.replaceState(null, "", `#${aba}`);
     renderizarAbas(atual, tabela, aba);
     for (const nome of ABA_POR_ID.get(aba).telas) telas[nome].renderizar(atual, tabela);
+    telas.ficha.renderizar(atual, tabela);
     renderizarBarra();
     if (focoPendente) {
       const { id, selecionar } = focoPendente;

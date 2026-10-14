@@ -1,4 +1,5 @@
-// Tela "Rodadas": jogos por semana, lançamento de placar, W.O., anular, agenda do jogador e top 8 ao vivo.
+// Tela "Rodadas": jogos por semana, lançamento de placar, W.O., anular e top 8 ao vivo.
+// Os nomes abrem a ficha do jogador (js/telas/ficha.js), com todos os jogos dele.
 
 (function () {
   "use strict";
@@ -11,7 +12,6 @@
     const contador = el("span", { id: "contador-jogos", class: "contador" });
     const navegacao = el("div", { id: "navegacao-semanas" });
     const lista = el("div", { id: "lista-jogos", class: "lista-jogos" });
-    const agenda = el("div", { id: "agenda-jogador" });
     const painel = el("aside", { id: "painel-top", class: "tela painel-top", "aria-label": "Classificação ao vivo", hidden: true });
     raiz.append(
       el("section", { id: "tela-jogos", class: "tela" },
@@ -20,7 +20,7 @@
           el("p", { class: "legenda" },
             "Digite o placar e aperte Tab/Enter. 0×0 conta empate, mas vale 0 ponto. \"Anular\" fecha um jogo sem efeito "
             + "(ex.: W.O. das duas duplas).")),
-        navegacao, lista, agenda),
+        navegacao, lista),
       painel);
 
     // Texto digitado nos campos de placar e ainda não lançado (placar pela metade, inválido
@@ -29,7 +29,6 @@
     const woAberto = new Set(); // ids de jogos com a escolha de W.O. aberta
     const errosCampo = new Map(); // id do jogo -> mensagem de placar inválido, mostrada embaixo do placar
     let semanaEscolhida = null; // semana exibida; começa na semana em andamento e depois só muda por escolha
-    let agendaJogador = null; // jogador escolhido na agenda
 
     // "Semana 3 · Jogo 2": usado nas mensagens e nas descrições do "Desfazer".
     function rotuloDe(id) {
@@ -108,15 +107,15 @@
           el("span", { class: "status" }, status)),
         el("div", { class: "jogo-placar" },
           el("div", { class: "dupla d1" + classeDoLado(r, 1) },
-            jogo.dupla1.map((id) => el("span", { class: "nome" }, nomePorId.get(id)))),
+            jogo.dupla1.map((id) => el("span", { class: "nome" }, app.botaoJogador(id, `ver-${jogo.id}-${id}`)))),
           el("div", { class: "placar" }, entrada(1, valor1), el("span", { class: "x" }, "×"), entrada(2, valor2)),
           el("div", { class: "dupla d2" + classeDoLado(r, 2) },
-            jogo.dupla2.map((id) => el("span", { class: "nome" }, nomePorId.get(id))))),
+            jogo.dupla2.map((id) => el("span", { class: "nome" }, app.botaoJogador(id, `ver-${jogo.id}-${id}`))))),
         Util.mensagemDeErro(idErro, erro),
         acoes);
     }
 
-    // ---------- navegação por semana e agenda ----------
+    // ---------- navegação por semana ----------
 
     function irParaSemana(n) {
       semanaEscolhida = n;
@@ -139,7 +138,7 @@
       const emAndamento = Regras.semanaAtual(atual.jogos, cfg);
 
       const jogam = new Set(atual.jogos.filter((j) => Regras.semanaDoJogo(j) === semana).flatMap((j) => [...j.dupla1, ...j.dupla2]));
-      const descansam = [...nomePorId].filter(([id]) => !jogam.has(id)).map(([, nome]) => nome);
+      const descansam = [...nomePorId.keys()].filter((id) => !jogam.has(id));
 
       const botaoSemana = (p) => {
         let classe = "chip-semana";
@@ -165,60 +164,9 @@
             title: `Ir para a semana em andamento (semana ${emAndamento})`, onclick: () => irParaSemana(emAndamento),
           }, "Semana atual")),
         descansam.length
-          ? el("p", { class: "descansam" }, `Descansam na semana ${semana} (${descansam.length}): ${descansam.join(", ")}`)
+          ? el("p", { class: "descansam" }, `Descansam na semana ${semana} (${descansam.length}): `,
+            descansam.map((id, i) => [i ? ", " : null, app.botaoJogador(id, `ver-descansa-${id}`)]))
           : null);
-    }
-
-    // Como o jogo ficou para quem estava no `lado` (1 ou 2).
-    function resultadoParaLado(jogo, lado, cfg) {
-      const r = jogo.resultado;
-      const ef = Regras.efeitosDoResultado(r, cfg);
-      if (!ef) return { texto: "pendente", classe: "pendente" };
-      if (r.tipo === "anulado") return { texto: "anulado", classe: "anulada" };
-      const e = ef[lado];
-      const placar = `${e.gp}×${e.gc}${r.tipo === "wo" ? " (W.O.)" : ""}`;
-      if (e.v) return { texto: `vitória ${placar}`, classe: "vencedora" };
-      if (e.d) return { texto: `derrota ${placar}`, classe: "perdedora" };
-      return { texto: `empate ${placar}`, classe: "empate" };
-    }
-
-    function agendaDoJogador(atual, tabela) {
-      const cfg = atual.campeonato.config;
-      if (agendaJogador && !nomePorId.has(agendaJogador)) agendaJogador = null;
-      const ordenados = [...nomePorId].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
-      const seletor = el("select", {
-        id: "select-agenda", "aria-label": "Jogador da agenda",
-        onchange: (ev) => { agendaJogador = ev.target.value || null; renderizar(); },
-      },
-        el("option", { value: "" }, "Escolha um jogador"),
-        ordenados.map(([id, nome]) => el("option", { value: id, selected: id === agendaJogador }, nome)));
-
-      let corpo = null;
-      if (agendaJogador) {
-        const numeros = numerosNaSemana(atual.jogos);
-        const linhaDele = tabela.find((l) => l.id === agendaJogador);
-        const jogosDele = atual.jogos.filter((j) => j.dupla1.includes(agendaJogador) || j.dupla2.includes(agendaJogador));
-        corpo = el("div", {},
-          el("p", { class: "legenda", id: "agenda-resumo" },
-            `${linhaDele.posicao}º · ${linhaDele.pontos} pts · ${linhaDele.v}V ${linhaDele.e}E ${linhaDele.d}D · SG ${formatarSaldo(linhaDele.sg)} · ${jogosDele.length} jogos no calendário`),
-          el("ol", { class: "agenda-lista" }, jogosDele.map((j) => {
-            const lado = j.dupla1.includes(agendaJogador) ? 1 : 2;
-            const minha = lado === 1 ? j.dupla1 : j.dupla2;
-            const outra = lado === 1 ? j.dupla2 : j.dupla1;
-            const parceiro = nomePorId.get(minha.find((id) => id !== agendaJogador));
-            const r = resultadoParaLado(j, lado, cfg);
-            return el("li", {},
-              el("button", {
-                type: "button", class: "nome-slot", title: "Ver esta semana", onclick: () => irParaSemana(Regras.semanaDoJogo(j)),
-              }, Util.rotuloDoJogo(j, numeros)),
-              ` com ${parceiro} × ${nomesDupla(outra)} `,
-              el("span", { class: `resultado-agenda ${r.classe}` }, r.texto));
-          })));
-      }
-      return el("div", { class: "agenda" },
-        el("h3", {}, "Agenda do jogador"),
-        el("label", { class: "campo-config" }, seletor),
-        corpo);
     }
 
     // Painel ao lado dos jogos: top 8 ao vivo e quem vem logo atrás, para acompanhar sem trocar de aba.
@@ -239,7 +187,7 @@
             if (l.posicao === vagas) classe += " linha-corte";
             return el("tr", { class: classe },
               el("td", { class: "col-pos" }, `${l.posicao}º`),
-              el("td", { class: "col-jogador" }, l.nome, l.empateTecnico && el("span", { class: "empate", title: "Empate técnico" },
+              el("td", { class: "col-jogador" }, app.botaoJogador(l.id, `ver-top-${l.id}`), l.empateTecnico && el("span", { class: "empate", title: "Empate técnico" },
                 Icones.svg("empate"), el("span", { class: "so-leitor" }, "empate técnico"))),
               el("td", { class: "col-pts" }, String(l.pontos)),
               el("td", {}, String(l.v)),
@@ -254,7 +202,6 @@
       if (!atual.jogos.length) {
         painel.replaceChildren();
         navegacao.replaceChildren();
-        agenda.replaceChildren();
         const camp = atual.campeonato;
         const cadastroPronto = Regras.diagnosticarCampeonato(camp.jogadores, camp.config).pronto;
         lista.replaceChildren(cadastroPronto
@@ -269,7 +216,6 @@
       lista.replaceChildren(...atual.jogos
         .filter((j) => Regras.semanaDoJogo(j) === semana)
         .map((jogo) => cartaoJogo(jogo, numeros.get(jogo.id))));
-      agenda.replaceChildren(agendaDoJogador(atual, tabela));
       painelTop(painel, tabela);
       const lancados = atual.jogos.filter((j) => j.resultado).length;
       contador.textContent = `${lancados}/${atual.jogos.length} lançados`;
@@ -354,6 +300,8 @@
 
     return {
       renderizar: renderizarJogos,
+      // Escolhe a semana exibida (ex.: um jogo escolhido na ficha do jogador); o redesenho fica com quem chama.
+      mostrarSemana(n) { semanaEscolhida = n; },
       limparRascunhos() {
         rascunhos.clear();
         woAberto.clear();
@@ -361,7 +309,6 @@
       },
       reiniciarVisao() {
         semanaEscolhida = null;
-        agendaJogador = null;
       },
     };
   }

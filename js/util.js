@@ -225,10 +225,75 @@
     return " empate";
   }
 
+  // Nome de cada confronto do mata-mata (tela do Mata-mata e ficha do jogador).
+  const ROTULOS_MATA_MATA = { semi1: "Semifinal 1", semi2: "Semifinal 2", terceiro: "3º lugar", final: "Final" };
+
+  // Nome de um jogador que abre a ficha dele (js/telas/ficha.js). `idDom` precisa ser único na tela:
+  // o mesmo jogador pode aparecer em vários lugares (top 8, cartão do jogo...).
+  function botaoJogador(id, nome, idDom, abrirFicha) {
+    return el("button", {
+      type: "button", id: idDom, class: "nome-jogador-btn", "aria-haspopup": "dialog", title: `Ver a ficha de ${nome}`,
+      onclick: (ev) => abrirFicha(id, ev.currentTarget),
+    }, nome);
+  }
+
+  // ---------- situação para o top 8 (coluna da Classificação e ficha do jogador) ----------
+
+  // Situação (Regras.calcularSituacoes) de cada jogador ao vivo, ou null com pendentes demais
+  // (ver Regras.limitePendentesSituacoes). O cálculo enumera até Regras.MAX_CENARIOS_SITUACOES
+  // cenários: só refaz quando jogos, desempates ou jogadores mudam.
+  let cacheSituacoes = { chave: null, valor: null };
+  function situacoes(base, atual) {
+    const chave = JSON.stringify([atual.jogos.map((j) => j.resultado), atual.desempatesManuais, atual.campeonato]);
+    if (cacheSituacoes.chave !== chave) {
+      cacheSituacoes = { chave, valor: Regras.calcularSituacoes(base, atual.jogos, atual.desempatesManuais, atual.campeonato.config) };
+    }
+    return cacheSituacoes.valor;
+  }
+
+  // Ícone e texto de cada situação.
+  const SITUACOES = {
+    garantido: { icone: "ok", texto: "Garantido" },
+    disputa: { icone: "disputa", texto: "Em disputa" },
+    eliminado: { icone: "eliminado", texto: "Eliminado" },
+  };
+
+  // "Próximo: Semana 8 · Jogo 3" (+N se ainda joga mais depois), ou "não joga mais", e as marcas
+  // de quem depende do saldo ou do desempate. Só para quem está em disputa.
+  function detalhesDaDisputa(s, jogos) {
+    const detalhes = [];
+    if (s.jogosPendentes.length) {
+      const proximo = jogos.find((j) => j.id === s.jogosPendentes[0]);
+      const mais = s.jogosPendentes.length - 1;
+      detalhes.push(el("div", { class: "proximo-jogo" },
+        `Próximo: ${rotuloDoJogo(proximo, numerosNaSemana(jogos))}`,
+        mais > 0 && el("span", { class: "tag-repete", title: `Joga mais ${mais} depois deste` },
+          el("span", { "aria-hidden": "true" }, `+${mais}`),
+          el("span", { class: "so-leitor" }, `, joga mais ${mais} depois deste`))));
+    } else {
+      detalhes.push(el("div", { class: "nao-joga" }, "Não joga mais, só pode cair"));
+    }
+    const marcas = [];
+    if (s.dependeDoSaldo) marcas.push(el("span", { class: "tag-saldo" }, "depende do saldo"));
+    if (s.dependeDoDesempate) marcas.push(el("span", { class: "tag-saldo" }, Icones.svg("empate"), "depende do desempate"));
+    if (marcas.length) detalhes.push(el("div", { class: "marcas" }, marcas));
+    return detalhes;
+  }
+
+  // A situação com ícone e, para quem está em disputa, os detalhes.
+  function marcaSituacao(s, jogos) {
+    const { icone, texto } = SITUACOES[s.situacao];
+    return [
+      el("span", { class: "marca-situacao" }, Icones.svg(icone), texto),
+      s.situacao === "disputa" && detalhesDaDisputa(s, jogos),
+    ];
+  }
+
   globalThis.Util = {
     el, escolher, confirmar, MAX_GOLS, lerGols, formatarSaldo, dois, carimbo, slug, classeDoLado,
     contraste, CONTRASTE_MINIMO, corLegivelComBranco, carregarImagem, prepararLogo,
     buscar, proximoPasso, numerosNaSemana,
     plural, numero, rotuloDoJogo, botaoIcone, atributosDeErro, mensagemDeErro,
+    botaoJogador, situacoes, marcaSituacao, ROTULOS_MATA_MATA,
   };
 })();
