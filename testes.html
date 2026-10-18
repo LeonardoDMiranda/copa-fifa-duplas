@@ -1151,6 +1151,93 @@
       t.verdadeiro(muitos.startsWith("48 jogos") && muitos.includes("semana 1: 6") && muitos.includes("semana 8: 6"), `muitos pendentes: resume por semana (${muitos})`);
     });
 
+    // ---------- Remarcação de jogos (Fase 23) ----------
+
+    caso("M1 Remarcar: muda a semana, vai para o fim da semana de destino e guarda a semana original", (t) => {
+      const jogos = jogosEmSemanas();
+      const novo = Regras.remarcarJogo(jogos, "j1", 3);
+      const j1 = novo.find((j) => j.id === "j1");
+      t.campos(j1, { semana: 3, semanaOriginal: 1 }, "j1 foi para a semana 3");
+      t.igual(novo.map((j) => j.id).sort(), jogos.map((j) => j.id).sort(), "nenhum jogo some nem muda de id");
+      t.igual(Regras.numerosNaSemana(novo).get("j1"), 4, "entra como último jogo da semana 3 (já tinha 3)");
+      t.igual(Regras.numerosNaSemana(novo).get("j2"), 1, "o outro jogo da semana 1 passa a ser o Jogo 1");
+      t.verdadeiro(jogos[0].semana === 1 && !("semanaOriginal" in jogos[0]), "a lista de entrada não é alterada");
+      const denovo = Regras.remarcarJogo(novo, "j1", 5).find((j) => j.id === "j1");
+      t.campos(denovo, { semana: 5, semanaOriginal: 1 }, "remarcar de novo mantém a semana original");
+      t.verdadeiro(Regras.jogoRemarcado(denovo), "remarcado = semana diferente da original");
+      const volta = Regras.remarcarJogo(novo, "j1", 1).find((j) => j.id === "j1");
+      t.verdadeiro(volta.semana === 1 && !("semanaOriginal" in volta) && !Regras.jogoRemarcado(volta), "voltar à semana original apaga a marca");
+      t.verdadeiro(!Regras.jogoRemarcado(jogos[0]), "jogo nunca remarcado");
+      const vazia = Regras.remarcarJogo(jogos, "j5", 8).find((j) => j.id === "j5");
+      t.igual(Regras.numerosNaSemana(Regras.remarcarJogo(jogos, "j5", 8)).get("j5"), 1, "semana de destino vazia: Jogo 1");
+      t.igual(vazia.semana, 8, "pode ir para a última semana");
+    });
+
+    caso("M2 Remarcar: recusa semana fora do campeonato, a mesma semana e jogo já lançado", (t) => {
+      const jogos = jogosEmSemanas({ j2: placar(1, 0) });
+      t.igual(Regras.erroDeRemarcacao(jogos, "j1", 3), null, "jogo pendente para outra semana: sem erro");
+      t.verdadeiro(Regras.erroDeRemarcacao(jogos, "j1", 0), "semana 0 recusada");
+      t.verdadeiro(Regras.erroDeRemarcacao(jogos, "j1", 9), "semana 9 recusada (o campeonato tem 8)");
+      t.verdadeiro(Regras.erroDeRemarcacao(jogos, "j1", 2.5), "semana não inteira recusada");
+      t.verdadeiro(Regras.erroDeRemarcacao(jogos, "j1", 1), "a mesma semana recusada");
+      t.verdadeiro(Regras.erroDeRemarcacao(jogos, "j2", 3), "jogo com resultado recusado");
+      t.verdadeiro(Regras.erroDeRemarcacao(jogos, "nao-existe", 3), "jogo inexistente recusado");
+      t.igual(Regras.erroDeRemarcacao(jogos, "j1", 8, { ...Regras.REGRAS_PADRAO, semanas: 12 }), null, "o limite vem da config");
+      let erro = null;
+      try { Regras.remarcarJogo(jogos, "j2", 3); } catch (e) { erro = e; }
+      t.verdadeiro(erro, "remarcarJogo lança erro quando a remarcação é inválida");
+    });
+
+    caso("M3 Aviso de jogador que já joga na semana de destino", (t) => {
+      const jogos = jogosEmSemanas();
+      const comum = jogos[0].dupla1[0];
+      const outros = [...jogos, { id: "jx", semana: 2, dupla1: [comum, "pa"], dupla2: ["pb", "pc"], resultado: null }];
+      t.igual(Regras.jogadoresOcupadosNaSemana(outros, "j1", 2), [comum], "quem do jogo já joga na semana 2");
+      t.igual(Regras.jogadoresOcupadosNaSemana(outros, "j1", 1), [], "o próprio jogo não conta");
+      t.igual(Regras.jogadoresOcupadosNaSemana(outros, "j1", 8), [], "semana livre: ninguém");
+      t.igual(Regras.jogadoresOcupadosNaSemana(outros, "nao-existe", 2), [], "jogo inexistente: ninguém");
+    });
+
+    caso("M4 Jogo remarcado conta na semana nova: progresso, semana em andamento e classificação por semana", (t) => {
+      let jogos = jogosEmSemanas({ j1: placar(2, 1), j2: placar(1, 0) });
+      t.igual(Regras.semanaAtual(jogos), 2, "semana 1 completa: andamento na 2");
+      jogos = Regras.remarcarJogo(jogos, "j3", 1);
+      t.igual(Regras.semanaAtual(jogos), 1, "jogo adiantado para a semana 1: a semana 1 volta a ter pendência");
+      t.igual(Regras.progressoPorSemana(jogos, 8).slice(0, 2).map((p) => [p.total, p.resolvidos]), [[3, 2], [1, 0]], "progresso acompanha a nova semana");
+      jogos = jogos.map((j) => (j.id === "j3" ? { ...j, resultado: placar(3, 0) } : j));
+      const ate1 = Regras.classificacaoPorSemana(baseZerada(), jogos, [], undefined, 1);
+      const jogador = jogos.find((j) => j.id === "j3").dupla1[0];
+      t.igual(linha(ate1, jogador).pontos, 3, "após a semana 1, o jogo adiantado já conta");
+      const adiado = Regras.remarcarJogo(jogosEmSemanas({ j1: placar(2, 1) }), "j2", 4);
+      const ate3 = Regras.classificacaoPorSemana(baseZerada(), adiado.map((j) => (j.id === "j2" ? { ...j, resultado: placar(1, 0) } : j)), [], undefined, 3);
+      t.igual(linha(ate3, adiado.find((j) => j.id === "j2").dupla1[0]).pontos, 0, "jogo adiado para a semana 4 não conta após a semana 3");
+    });
+
+    caso("M5 Remarcação é salva, desfeita e validada na importação", (t) => {
+      const arm = memoria2026();
+      const est = criarEstado(arm);
+      const feito = est.modificar("remarcar teste", (s) => { s.jogos = Regras.remarcarJogo(s.jogos, "j1", 4, s.campeonato.config); });
+      t.verdadeiro(feito, "a remarcação conta como alteração");
+      const reaberto = Estado.criar(arm).atual().jogos.find((j) => j.id === "j1");
+      t.campos(reaberto, { semana: 4, semanaOriginal: 1 }, "reabrir recupera a semana e a original");
+      t.igual(JSON.parse(est.exportarJSON()).jogos.find((j) => j.id === "j1").semanaOriginal, 1, "o backup traz a semana original");
+      est.desfazer();
+      const desfeito = est.atual().jogos.find((j) => j.id === "j1");
+      t.verdadeiro(desfeito.semana === 1 && !("semanaOriginal" in desfeito), "desfazer devolve a semana");
+      const tenta = (ajustar) => {
+        const json = JSON.parse(criarEstado(memoria2026()).exportarJSON());
+        ajustar(json.jogos.find((j) => j.id === "j1"));
+        try { criarEstado().importarJSON(JSON.stringify(json)); return null; } catch (e) { return e; }
+      };
+      t.verdadeiro(tenta((j) => { j.semana = 2; j.semanaOriginal = 99; }), "semana original fora do campeonato é recusada");
+      t.verdadeiro(tenta((j) => { j.semana = 2; j.semanaOriginal = "x"; }), "semana original que não é número é recusada");
+      const limpo = criarEstado();
+      const json = JSON.parse(limpo.exportarJSON());
+      Object.assign(json.jogos.find((j) => j.id === "j1"), { semana: 2, semanaOriginal: 2 });
+      limpo.importarJSON(JSON.stringify(json));
+      t.verdadeiro(!("semanaOriginal" in limpo.atual().jogos.find((j) => j.id === "j1")), "semana original igual à semana atual é descartada");
+    });
+
     // ---------- Telão, PNG e backup (Fase 11) ----------
 
     caso("T1 PNG da classificação cabe em 1600 px com qualquer número de jogadores", (t) => {

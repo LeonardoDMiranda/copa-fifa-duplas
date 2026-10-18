@@ -98,6 +98,15 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
 - O sorteio usa uma **semente**: a mesma semente gera o mesmo calendário. O organizador pode sortear de novo e trocar jogadores à mão antes de **confirmar**.
 - Depois de confirmado, o calendário vira os jogos (`s<semana>-j<n>`) e o cadastro trava: só dá para renomear jogadores.
 
+### 2.5.1 Remarcação de jogos
+
+- As duplas combinam de adiar ou adiantar um jogo; o organizador muda o jogo de semana (qualquer semana de 1 a N, sem criar semana extra). Só jogo **sem resultado** (para remarcar um lançado, limpe o resultado antes).
+- O jogo **mantém o id** (`s2-j3`), que é só chave interna: o número que aparece ("Semana 5 · Jogo 7") vem da posição na lista, e o jogo remarcado entra como **último** da semana de destino.
+- `semanaOriginal` guarda a semana do calendário sorteado, só enquanto o jogo estiver fora dela; remarcar de volta apaga a marca. A marca "Remarcado da semana N" aparece no cartão das Rodadas, na ficha do jogador e no calendário de Ajustes.
+- O jogo conta na **semana nova** em tudo: progresso por semana, semana em andamento, "Descansam", lembrete de backup e classificação "após a semana N".
+- Se algum dos 4 jogadores já joga na semana de destino, o app **avisa** e deixa remarcar (a regra de 1 jogo por semana é do sorteio). A análise de qualidade do calendário em Ajustes continua avaliando o calendário **sorteado** (jogo remarcado conta na semana original).
+- Regras puras em `Regras.erroDeRemarcacao`, `remarcarJogo`, `jogadoresOcupadosNaSemana` e `jogoRemarcado`; entra no desfazer como "remarcar (Semana 2 · Jogo 3) para a semana 5".
+
 ### 2.6 Backup
 
 - Exportar/importar JSON guarda e restaura o campeonato inteiro (uma edição por arquivo).
@@ -139,7 +148,7 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
     jogadores: [ { id, nome, estrelas: 1..5 | null } ],   // null = nível ainda não definido
     sorteio: null | { semente, confirmado, rascunho?: [ { semana, dupla1, dupla2 } ] }
   },
-  jogos: [ { id, semana, dupla1: [id, id], dupla2: [id, id],
+  jogos: [ { id, semana, semanaOriginal?, dupla1: [id, id], dupla2: [id, id],   // semanaOriginal: só se remarcado
              resultado: null | { tipo: "placar", gols1, gols2 } | { tipo: "wo", vencedor: 1 | 2 } | { tipo: "anulado" } } ],
   desempatesManuais: [ { jogadores: [id, ...] } ],
   mataMata: null | { semi1, semi2, terceiro, final },  // cada um: { dupla1, dupla2, duplaManual1?, duplaManual2?, partidas: [Partida] }
@@ -168,7 +177,7 @@ Uma aba por etapa (Alt+1, Alt+2...; a aba ativa fica no endereço, ex.: `index.h
 
 **Temporada** (calendário confirmado):
 
-4. **Rodadas**: navegação por semana (◀ S1…Sn ▶, com o progresso na cor de cada botão, e "Semana atual"), cartões dos jogos com placar, "W.O." (escolhendo a dupla presente pelos nomes), "Anular" e "Limpar"; quem descansa na semana; top 8 ao vivo ao lado.
+4. **Rodadas**: navegação por semana (◀ S1…Sn ▶, com o progresso na cor de cada botão, e "Semana atual"), cartões dos jogos com placar, "W.O." (escolhendo a dupla presente pelos nomes), "Anular", "Remarcar" (escolhe a semana no próprio cartão, com aviso se alguém já joga nela; ver 2.5.1) e "Limpar"; quem descansa na semana; top 8 ao vivo ao lado.
 5. **Classificação**: ao vivo ou ao fim de uma semana, na largura toda; top 8 em verde, ▲▼ em relação à semana anterior, empate técnico com controle de ordem manual; explicação em "Como ler". Ao vivo, com até 8 jogos pendentes (pontuação padrão), a coluna **Situação** (ver 2.4); antes disso, uma linha diz quando ela aparece. "Baixar imagem" gera o PNG da classificação vista (ao vivo ou da semana escolhida).
 6. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio. Com o chaveamento gerado, "Baixar imagem" gera o PNG do mata-mata.
 7. **Ajustes** (`#campeonato`): Configuração, Jogadores e o calendário completo, só para ver (o nome, a aparência e o renomear continuam editáveis), e a **zona de perigo** com "Reiniciar campeonato". Os endereços dos passos da preparação (e o antigo `#calendario`) levam para cá depois da confirmação.
@@ -201,6 +210,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 20 | Preparação em 3 passos (Configuração, Jogadores e Sorteio) e, depois de confirmar o calendário, abas Rodadas, Classificação, Mata-mata e Ajustes (os 3 passos só para ver, mais a zona de perigo com o Reiniciar). Lógica das abas em `js/abas.js` |
 | 21 | Rodadas com a navegação ◀ S1…Sn ▶ e "Semana atual" (sai o seletor de semana), W.O. com os nomes das duplas e título em cada cartão; Classificação na largura toda, com a coluna "Situação" no lugar do painel "O que está em jogo" e "Como ler"; "Baixar imagem" na Classificação e no Mata-mata |
 | 22 | Ficha do jogador: janela lateral aberta pelo nome (Rodadas, top 8, Classificação e Mata-mata), com números ao vivo, situação, fase final e todos os jogos. Sai a "Agenda do jogador" das Rodadas |
+| 23 | Remarcação de jogos: botão "Remarcar" no cartão (semana de 1 a N, aviso de conflito), marca "Remarcado da semana N" nas Rodadas, na ficha e nos Ajustes; `semanaOriginal` no jogo e regras em `Regras.remarcarJogo` |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -218,6 +228,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | C | Cadastro de jogadores |
 | S | Sorteio e confirmação do calendário |
 | R | Rodadas e classificação por semana |
+| M | Remarcação: ordem e número do jogo, semana original, recusas, aviso de conflito, efeito nas semanas e na classificação, salvar/desfazer/importar |
 | T | PNG e telão com qualquer número de jogadores |
 | B | Lembrete e registro de backup |
 | E | Várias edições: migração, índice corrompido, criar/duplicar/arquivar/excluir, trocar a ativa, importar como novo ou substituindo |
@@ -225,7 +236,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
 | U | Base da interface: `plural`, `numero` (formato brasileiro), `rotuloDoJogo`, `botaoIcone` (nome acessível), ícones decorativos e atributos do erro junto do campo |
 
-`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata) e V9 (ficha do jogador: números iguais aos da tabela, um jogo por linha do calendário, Esc/X/clique fora com o foco de volta ao nome, troca para o parceiro, fase final do campeão, ir para a semana e ficha aberta atualizando).
+`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata), V9 (ficha do jogador: números iguais aos da tabela, um jogo por linha do calendário, Esc/X/clique fora com o foco de volta ao nome, troca para o parceiro, fase final do campeão, ir para a semana e ficha aberta atualizando) e V10 (remarcação: botão só em jogo sem resultado, semana atual desabilitada, remarcar e desfazer, aviso de conflito, marca nos Ajustes e na ficha com o calendário sorteado ainda avaliado como respeitado).
 
 ## 7. Pendências
 

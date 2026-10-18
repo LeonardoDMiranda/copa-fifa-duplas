@@ -150,6 +150,7 @@
                 type: "button", id: `ficha-semana-${j.id}`, class: "nome-slot", title: `Ver a semana ${semana} nas Rodadas`,
                 onclick: () => verSemana(semana),
               }, Util.rotuloDoJogo(j, numerosJogos)),
+              Regras.jogoRemarcado(j) && el("span", { class: "marca-remarcado" }, `Remarcado da semana ${j.semanaOriginal}`),
               el("span", { class: `resultado-jogo ${r.classe}` }, r.texto)),
             duplas(lado === 1 ? j.dupla1 : j.dupla2, lado === 1 ? j.dupla2 : j.dupla1, j.id));
         })));

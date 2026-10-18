@@ -538,6 +538,11 @@ input.gols:disabled { background: var(--superficie-2); color: var(--texto-suave)
 
 .jogo-acoes { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; }
 .jogo-acoes .pergunta { font-size: var(--fonte-sm); font-weight: 600; }
+.jogo-remarcar { align-items: center; }
+.jogo-remarcar select { min-height: 28px; }
+.aviso-remarcar { flex-basis: 100%; display: flex; justify-content: center; align-items: center; gap: var(--esp-2); margin: 0; font-size: var(--fonte-sm); color: var(--alerta-texto); }
+.aviso-remarcar:empty { display: none; }
+.marca-remarcado { padding: 1px var(--esp-2); border-radius: var(--raio-pilula); background: var(--alerta-fundo); color: var(--alerta-texto); font-size: var(--fonte-xs); font-weight: 600; }
 
 /* ---------- controle de desempate manual ---------- */
 

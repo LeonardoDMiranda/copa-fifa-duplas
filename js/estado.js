@@ -122,13 +122,21 @@
       }
       const erroDuplas = Regras.validarDuplas(j.dupla1, j.dupla2);
       if (erroDuplas) throw new Error(`jogo ${j.id}: ${erroDuplas}`);
-      return {
+      const jogo = {
         id: j.id,
         semana: j.semana,
         dupla1: j.dupla1.slice(),
         dupla2: j.dupla2.slice(),
         resultado: validarResultado(j.resultado, config, j.id),
       };
+      // Semana do calendário sorteado, só para jogo remarcado; igual à atual não diz nada.
+      if (j.semanaOriginal !== undefined && j.semanaOriginal !== null) {
+        if (!Number.isInteger(j.semanaOriginal) || j.semanaOriginal < 1 || j.semanaOriginal > config.semanas) {
+          throw new Error(`semana original inválida no jogo ${j.id} (o campeonato tem ${config.semanas} semanas).`);
+        }
+        if (j.semanaOriginal !== j.semana) jogo.semanaOriginal = j.semanaOriginal;
+      }
+      return jogo;
     });
   }
 

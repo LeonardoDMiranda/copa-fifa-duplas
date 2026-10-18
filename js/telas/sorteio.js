@@ -158,7 +158,8 @@
           nomeNoCalendario(calendario, i, 1, 0, editavel), " + ", nomeNoCalendario(calendario, i, 1, 1, editavel),
           el("span", { class: "x" }, " × "),
           nomeNoCalendario(calendario, i, 2, 0, editavel), " + ", nomeNoCalendario(calendario, i, 2, 1, editavel),
-          diferencas ? marcaDiferenca(diferencas[i]) : null))),
+          diferencas ? marcaDiferenca(diferencas[i]) : null,
+          Regras.jogoRemarcado(j) ? el("span", { class: "marca-remarcado" }, `Remarcado da semana ${j.semanaOriginal}`) : null))),
         descansam.length
           ? el("p", { class: "descansam" }, `Descansam (${descansam.length}): ${descansam.join(", ")}`)
           : null);
@@ -225,11 +226,16 @@
         return;
       }
 
-      const aval = Regras.avaliarCalendario(camp.jogadores, calendario, camp.config);
+      // A avaliação é do calendário sorteado: jogo remarcado conta na semana original (a remarcação
+      // é combinada entre as duplas e não quebra o regulamento do sorteio).
+      const sorteado = calendario.map((j) => (j.semanaOriginal ? { ...j, semana: j.semanaOriginal } : j));
+      const aval = Regras.avaliarCalendario(camp.jogadores, sorteado, camp.config);
+      const remarcados = calendario.filter(Regras.jogoRemarcado).length;
       const semanas = Array.from({ length: camp.config.semanas }, (_, i) => i + 1);
       alvo.replaceChildren(
         confirmado
-          ? el("p", { class: "legenda" }, `Calendário confirmado${camp.sorteio ? ` (semente ${camp.sorteio.semente})` : ""}. Os jogos são lançados na aba Rodadas.`)
+          ? el("p", { class: "legenda" }, `Calendário confirmado${camp.sorteio ? ` (semente ${camp.sorteio.semente})` : ""}. Os jogos são lançados na aba Rodadas.`,
+              remarcados ? ` ${plural(remarcados, "jogo remarcado", "jogos remarcados")} (as análises abaixo valem para o calendário sorteado).` : "")
           : el("div", { class: "acoes-calendario" },
               el("button", { type: "button", id: "btn-sortear", onclick: sortear }, Icones.svg("sortear"), "Sortear de novo"),
               el("button", { type: "button", id: "btn-confirmar-calendario", class: "primario", onclick: confirmarCalendario },

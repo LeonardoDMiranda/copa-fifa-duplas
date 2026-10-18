@@ -1136,6 +1136,96 @@
       t.verdadeiro(buscar(raiz, "ficha-jogador").open, "e continua aberta");
     }));
 
+    // ---------- V10: remarcação de jogos ----------
+
+    // Escolhe a semana no <select> de remarcar e avisa a tela, como o navegador faz.
+    function escolherSemana(raiz, idJogo, semana) {
+      const seletor = buscar(raiz, `remarcar-${idJogo}-semana`);
+      seletor.value = String(semana);
+      seletor.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    caso("V10.1 Rodadas: Remarcar só em jogo sem resultado; a semana atual do jogo não é opção", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      const pendente = estado.atual().jogos.find((j) => j.semana === 2);
+      t.verdadeiro(!buscar(raiz, `remarcar-${pendente.id}`).disabled, "jogo pendente: Remarcar habilitado");
+      clicar(raiz, "chip-semana-1");
+      const lancado = estado.atual().jogos.find((j) => j.semana === 1);
+      t.verdadeiro(buscar(raiz, `remarcar-${lancado.id}`).disabled, "jogo com resultado: Remarcar desabilitado");
+      clicar(raiz, "semana-atual");
+      clicar(raiz, `remarcar-${pendente.id}`);
+      const seletor = buscar(raiz, `remarcar-${pendente.id}-semana`);
+      t.igual(seletor.options.length, 8, "uma opção por semana do campeonato");
+      t.verdadeiro(seletor.options[1].disabled && seletor.options[1].textContent === "Semana 2 (atual)", "a semana atual do jogo aparece desabilitada");
+      t.igual(seletor.value, "3", "começa na semana seguinte");
+      t.igual(seletor.labels[0].textContent, "Remarcar para a", "o seletor tem rótulo");
+      clicar(raiz, `remarcar-${pendente.id}-cancelar`);
+      t.verdadeiro(!buscar(raiz, `remarcar-${pendente.id}-semana`) && buscar(raiz, `remarcar-${pendente.id}`), "Cancelar fecha o painel");
+      t.igual(estado.atual().jogos.find((j) => j.id === pendente.id).semana, 2, "e não muda nada");
+    });
+
+    caso("V10.2 Rodadas: remarcar muda o jogo de semana, mostra a semana nova com a marca e o desfazer devolve", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      const jogo = estado.atual().jogos.find((j) => j.semana === 2);
+      clicar(raiz, `remarcar-${jogo.id}`);
+      escolherSemana(raiz, jogo.id, 5);
+      clicar(raiz, `remarcar-${jogo.id}-confirmar`);
+      const depois = estado.atual().jogos.find((j) => j.id === jogo.id);
+      t.igual([depois.semana, depois.semanaOriginal], [5, 2], "o estado guarda a semana nova e a original");
+      t.igual(semanaMarcada(raiz), ["chip-semana-5"], "a tela mostra a semana de destino");
+      t.igual(buscar(raiz, `jogo-${jogo.id}`).querySelector(".marca-remarcado").textContent, "Remarcado da semana 2", "o cartão diz de onde veio");
+      t.igual(Util.numerosNaSemana(estado.atual().jogos).get(jogo.id), 7, "entra como último jogo da semana 5 (que tinha 6)");
+      t.verdadeiro(estado.atual().jogos.filter((j) => j.semana === 2).length === 5, "a semana 2 ficou com 5 jogos");
+      const historico = estado.atual().historico;
+      t.verdadeiro(historico[historico.length - 1].descricao.includes("para a semana 5"), "o desfazer descreve a remarcação");
+      estado.desfazer();
+      const desfeito = estado.atual().jogos.find((j) => j.id === jogo.id);
+      t.verdadeiro(desfeito.semana === 2 && !("semanaOriginal" in desfeito), "desfazer devolve o jogo à semana 2");
+    });
+
+    caso("V10.3 Rodadas: o aviso diz quem já joga na semana de destino e não impede de remarcar", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComCalendario());
+      const raiz = montar("rodadas");
+      const nomes = new Map(estado.atual().campeonato.jogadores.map((j) => [j.id, j.nome]));
+      const jogo = estado.atual().jogos.find((j) => j.semana === 2);
+      const jogos = estado.atual().jogos;
+      const comConflito = [3, 4, 5, 6, 7, 8].find((n) => Regras.jogadoresOcupadosNaSemana(jogos, jogo.id, n).length);
+      const semConflito = [3, 4, 5, 6, 7, 8].find((n) => !Regras.jogadoresOcupadosNaSemana(jogos, jogo.id, n).length);
+      t.verdadeiro(comConflito, "há uma semana de destino com conflito no calendário de teste");
+      clicar(raiz, `remarcar-${jogo.id}`);
+      escolherSemana(raiz, jogo.id, comConflito);
+      const ocupados = Regras.jogadoresOcupadosNaSemana(jogos, jogo.id, comConflito);
+      const aviso = texto(raiz, `remarcar-${jogo.id}-aviso`);
+      t.verdadeiro(ocupados.every((id) => aviso.includes(nomes.get(id))) && aviso.includes(`semana ${comConflito}`), `o aviso cita os nomes: ${aviso}`);
+      t.verdadeiro(!buscar(raiz, `remarcar-${jogo.id}-confirmar`).disabled, "o botão Remarcar continua habilitado");
+      if (semConflito) {
+        escolherSemana(raiz, jogo.id, semConflito);
+        t.igual(texto(raiz, `remarcar-${jogo.id}-aviso`), "", "semana sem conflito: sem aviso");
+      }
+      escolherSemana(raiz, jogo.id, comConflito);
+      clicar(raiz, `remarcar-${jogo.id}-confirmar`);
+      t.igual(estado.atual().jogos.find((j) => j.id === jogo.id).semana, comConflito, "remarca mesmo com o aviso");
+    });
+
+    caso("V10.4 Ajustes e ficha mostram a marca; o calendário sorteado continua respeitando o regulamento", (t) => comAreaVisivel(() => {
+      const ctx = criarAppFalso(dadosComCalendario());
+      const sorteio = ctx.montar("sorteio");
+      const ficha = ctx.montar("ficha");
+      const classificacao = ctx.montar("classificacao");
+      const jogos = ctx.estado.atual().jogos;
+      const jogo = jogos.find((j) => j.semana === 2);
+      const destino = [3, 4, 5, 6, 7, 8].find((n) => Regras.jogadoresOcupadosNaSemana(jogos, jogo.id, n).length);
+      t.verdadeiro(buscar(sorteio, "qualidade-calendario").querySelector(".tudo-certo"), "antes: regulamento respeitado");
+      ctx.estado.modificar("remarcar de teste", (s) => { s.jogos = Regras.remarcarJogo(s.jogos, jogo.id, destino, s.campeonato.config); });
+      t.verdadeiro(buscar(sorteio, "qualidade-calendario").querySelector(".tudo-certo"), "depois de remarcar com conflito: o sorteio ainda é avaliado como respeitado");
+      t.igual(sorteio.querySelectorAll(".marca-remarcado").length, 1, "Ajustes marca o jogo remarcado");
+      t.verdadeiro(sorteio.textContent.includes("1 jogo remarcado"), "e diz quantos foram remarcados");
+      clicar(classificacao, `ver-linha-${jogo.dupla1[0]}`);
+      t.igual(ficha.querySelectorAll("#ficha-lista-jogos .marca-remarcado").length, 1, "a ficha do jogador marca o jogo remarcado");
+    }));
+
     // ---------- execução e relatório ----------
 
     // Um caso pode ser assíncrono (ex.: esperar o "close" da ficha): os casos rodam um de cada vez.

@@ -24,7 +24,8 @@ Regras que o app implementa. Só vale o que está aqui.
   - **Prioridade:** quando não der para evitar as duas coisas, o equilíbrio vem antes. É melhor repetir um adversário do que ter um jogo fora do aceitável.
 - Jogos por semana = total de jogos ÷ semanas (ex.: 32 jogadores × 6 jogos ÷ 4 = 48 jogos, 6 por semana). Se não divide, as primeiras semanas ficam com 1 jogo a mais. O total só fecha se jogadores × jogos por jogador for divisível por 4.
 - O sorteio usa uma **semente** (guardada no backup): a mesma semente gera o mesmo calendário. O organizador pode sortear de novo e trocar jogadores à mão antes de **confirmar**; depois de confirmado, só dá para renomear jogadores.
-- Reposição: não há remarcação de jogos. Quem não comparece leva W.O.; o W.O. das duas duplas (ou outro caso em que o jogo não vale) é **anulado**: sem pontos, V/E/D nem gols para ninguém.
+- **Remarcação:** as duas duplas podem combinar de **adiar ou adiantar** um jogo para outra semana do campeonato (de 1 até a última). O organizador remarca no app; o jogo mantém seu resultado e conta na semana nova. Só jogo **sem resultado** pode ser remarcado. O limite de 1 jogo por jogador por semana vale para o sorteio: ao remarcar, o app **avisa** se algum jogador já joga na semana escolhida, mas não impede. Não há semana extra além da última.
+- Quem não comparece leva W.O.; o W.O. das duas duplas (ou outro caso em que o jogo não vale) é **anulado**: sem pontos, V/E/D nem gols para ninguém.
 
 ## Pontuação (fase de classificação)
 
@@ -68,7 +69,7 @@ Na fase de classificação o jogo pode terminar empatado (sem prorrogação nem 
 ## Regras de jogo (informativas, não afetam cálculos)
 
 - Partidas de 5 minutos, mais 2 minutos antes para ajustes (táticas e substituições).
-- Presencial, em dia e horário definidos pela organização. Sem reposição em outros dias.
+- Presencial, em dia e horário definidos pela organização. Jogo só muda de semana por remarcação combinada entre as duplas (ver "Sorteio do calendário").
 - Proibido jogar com Soccer Aid e Adidas All-Stars Team.
 - Proibido ativar qualquer assistência (troca automática de jogador, finalização calibrada, auxílio na defesa etc.).
 - Configurações no padrão do sistema.

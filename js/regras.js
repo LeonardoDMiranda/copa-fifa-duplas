@@ -1024,6 +1024,53 @@
     return mapa;
   }
 
+  // ---------- Remarcação ----------
+  // Dupla e adversária combinam de adiar ou adiantar um jogo: ele muda de semana. O id não muda
+  // (os resultados e a ficha se apoiam nele); `semanaOriginal` guarda onde o jogo estava no
+  // calendário sorteado e só existe enquanto ele estiver fora dela.
+
+  function jogoRemarcado(jogo) {
+    return Number.isInteger(jogo.semanaOriginal) && jogo.semanaOriginal !== semanaDoJogo(jogo);
+  }
+
+  // Motivo de o jogo não poder ir para `novaSemana`, ou null se pode. Só semanas do campeonato
+  // e só jogo sem resultado.
+  function erroDeRemarcacao(jogos, idJogo, novaSemana, config = REGRAS_PADRAO) {
+    const jogo = jogos.find((j) => j.id === idJogo);
+    if (!jogo) return "Jogo não encontrado.";
+    if (efeitosDoResultado(jogo.resultado, config)) return "Jogo com resultado não pode ser remarcado. Limpe o resultado antes.";
+    if (!Number.isInteger(novaSemana) || novaSemana < 1 || novaSemana > config.semanas) {
+      return `Escolha uma semana de 1 a ${config.semanas}.`;
+    }
+    if (novaSemana === semanaDoJogo(jogo)) return `O jogo já está na semana ${novaSemana}.`;
+    return null;
+  }
+
+  // Nova lista com o jogo na semana `novaSemana`, como último da semana (o número dele ali fica
+  // previsível). Lança Error se erroDeRemarcacao não for null.
+  function remarcarJogo(jogos, idJogo, novaSemana, config = REGRAS_PADRAO) {
+    const erro = erroDeRemarcacao(jogos, idJogo, novaSemana, config);
+    if (erro) throw new Error(erro);
+    const original = jogos.find((j) => j.id === idJogo);
+    const { semanaOriginal: _, ...resto } = original;
+    const origem = Number.isInteger(original.semanaOriginal) ? original.semanaOriginal : semanaDoJogo(original);
+    const movido = { ...resto, semana: novaSemana };
+    if (origem !== novaSemana) movido.semanaOriginal = origem;
+    const demais = jogos.filter((j) => j.id !== idJogo);
+    let posicao = 0;
+    demais.forEach((j, i) => { if (semanaDoJogo(j) <= novaSemana) posicao = i + 1; });
+    return [...demais.slice(0, posicao), movido, ...demais.slice(posicao)];
+  }
+
+  // Jogadores do jogo que já têm outro jogo em `semana` (aviso ao remarcar: o limite de 1 jogo por
+  // jogador por semana vale para o sorteio, não impede a remarcação). Na ordem dos jogadores do jogo.
+  function jogadoresOcupadosNaSemana(jogos, idJogo, semana) {
+    const jogo = jogos.find((j) => j.id === idJogo);
+    if (!jogo) return [];
+    const ocupados = new Set(jogos.filter((j) => j.id !== idJogo && semanaDoJogo(j) === semana).flatMap((j) => [...j.dupla1, ...j.dupla2]));
+    return [...jogo.dupla1, ...jogo.dupla2].filter((id) => ocupados.has(id));
+  }
+
   // [{ semana, total, resolvidos }] para as semanas 1..semanas. "Resolvido" = tem resultado
   // válido (placar, W.O. ou anulado).
   function progressoPorSemana(jogos, semanas, config = REGRAS_PADRAO) {
@@ -1322,6 +1369,10 @@
     diagnosticarCampeonato,
     semanaDoJogo,
     numerosNaSemana,
+    jogoRemarcado,
+    erroDeRemarcacao,
+    remarcarJogo,
+    jogadoresOcupadosNaSemana,
     progressoPorSemana,
     contarSemanasCompletas,
     precisaDeBackup,

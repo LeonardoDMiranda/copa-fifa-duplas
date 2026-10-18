@@ -28,6 +28,7 @@
     const rascunhos = new Map(); // id do jogo -> { 1: texto, 2: texto }
     const woAberto = new Set(); // ids de jogos com a escolha de W.O. aberta
     const errosCampo = new Map(); // id do jogo -> mensagem de placar inválido, mostrada embaixo do placar
+    const remarcando = new Map(); // id do jogo -> semana de destino escolhida, com a remarcação aberta
     let semanaEscolhida = null; // semana exibida; começa na semana em andamento e depois só muda por escolha
 
     // "Semana 3 · Jogo 2": usado nas mensagens e nas descrições do "Desfazer".
@@ -45,6 +46,7 @@
       const rascunho = rascunhos.get(jogo.id);
       const erro = errosCampo.get(jogo.id);
       const idErro = `erro-jogo-${jogo.id}`;
+      const semanas = estado.atual().campeonato.config.semanas;
 
       let valor1 = "", valor2 = "";
       if (ehWO) { valor1 = r.vencedor === 1 ? "3" : "0"; valor2 = r.vencedor === 2 ? "3" : "0"; }
@@ -78,7 +80,9 @@
       else if (r) status = "Lançado";
 
       const idPergunta = `wo-${jogo.id}-pergunta`;
-      const acoes = woAberto.has(jogo.id)
+      const acoes = remarcando.has(jogo.id)
+        ? painelRemarcar(jogo)
+        : woAberto.has(jogo.id)
         ? el("div", { class: "jogo-acoes", role: "group", "aria-labelledby": idPergunta },
             el("span", { class: "pergunta", id: idPergunta }, "W.O.: qual dupla estava presente?"),
             el("button", { type: "button", id: `wo-${jogo.id}-1`, onclick: () => lancarWO(jogo.id, 1) }, nomesDupla(jogo.dupla1)),
@@ -95,6 +99,11 @@
               onclick: () => anularJogo(jogo.id),
             }, "Anular"),
             el("button", {
+              type: "button", id: `remarcar-${jogo.id}`, disabled: Boolean(r) || semanas < 2,
+              title: r ? "Jogo com resultado não pode ser remarcado: limpe o resultado antes" : "Muda o jogo de semana (adiar ou adiantar)",
+              onclick: () => abrirRemarcacao(jogo),
+            }, "Remarcar"),
+            el("button", {
               type: "button", id: `limpar-${jogo.id}`, class: "discreto",
               disabled: !r && !(rascunho && (rascunho[1] || rascunho[2])),
               onclick: () => limparJogo(jogo.id),
@@ -104,6 +113,8 @@
       return el("article", { class: `jogo ${r ? "lancado" : "pendente"}`, id: `jogo-${jogo.id}` },
         el("div", { class: "jogo-topo" },
           el("h3", { class: "jogo-numero" }, el("span", { class: "so-leitor" }, `Semana ${Regras.semanaDoJogo(jogo)} · `), `Jogo ${numero}`),
+          Regras.jogoRemarcado(jogo) && el("span", { class: "marca-remarcado", title: "Este jogo foi combinado para outra semana" },
+            `Remarcado da semana ${jogo.semanaOriginal}`),
           el("span", { class: "status" }, status)),
         el("div", { class: "jogo-placar" },
           el("div", { class: "dupla d1" + classeDoLado(r, 1) },
@@ -113,6 +124,77 @@
             jogo.dupla2.map((id) => el("span", { class: "nome" }, app.botaoJogador(id, `ver-${jogo.id}-${id}`))))),
         Util.mensagemDeErro(idErro, erro),
         acoes);
+    }
+
+    // ---------- remarcação ----------
+
+    // Abre a escolha da semana, já na vizinha (a seguinte; na última semana, a anterior).
+    function abrirRemarcacao(jogo) {
+      const semanas = estado.atual().campeonato.config.semanas;
+      const semana = Regras.semanaDoJogo(jogo);
+      remarcando.set(jogo.id, semana < semanas ? semana + 1 : semana - 1);
+      app.focarDepois(`remarcar-${jogo.id}-semana`);
+      renderizar();
+    }
+
+    // "Fulano já joga na semana 5." (vazio se ninguém do jogo joga nela). Não impede a remarcação.
+    function avisoDeOcupados(jogo, destino) {
+      const ids = Regras.jogadoresOcupadosNaSemana(estado.atual().jogos, jogo.id, destino);
+      if (!ids.length) return "";
+      const nomes = ids.map((id) => nomePorId.get(id));
+      const lista = nomes.length > 1 ? `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}` : nomes[0];
+      return `${lista} ${nomes.length > 1 ? "já jogam" : "já joga"} na semana ${destino}.`;
+    }
+
+    function painelRemarcar(jogo) {
+      const atual = estado.atual();
+      const cfg = atual.campeonato.config;
+      const semanaAtualDoJogo = Regras.semanaDoJogo(jogo);
+      const idSelect = `remarcar-${jogo.id}-semana`;
+      const idAviso = `remarcar-${jogo.id}-aviso`;
+      const aviso = el("p", { class: "aviso-remarcar", id: idAviso, role: "status" });
+      const confirmar = el("button", { type: "button", id: `remarcar-${jogo.id}-confirmar`, class: "primario", onclick: () => remarcarJogo(jogo.id) }, "Remarcar");
+
+      // Atualiza só o aviso e o botão: redesenhar tiraria o foco do seletor.
+      function atualizar() {
+        const destino = remarcando.get(jogo.id);
+        const texto = avisoDeOcupados(jogo, destino);
+        aviso.replaceChildren(...(texto ? [Icones.svg("alerta"), el("span", {}, texto)] : []));
+        confirmar.disabled = Boolean(Regras.erroDeRemarcacao(estado.atual().jogos, jogo.id, destino, cfg));
+      }
+
+      const seletor = el("select", {
+        id: idSelect, "aria-describedby": idAviso,
+        onchange: (ev) => { remarcando.set(jogo.id, Number(ev.target.value)); atualizar(); },
+      }, Array.from({ length: cfg.semanas }, (_, i) => i + 1).map((n) => el("option", {
+        value: String(n), selected: n === remarcando.get(jogo.id), disabled: n === semanaAtualDoJogo,
+      }, n === semanaAtualDoJogo ? `Semana ${n} (atual)` : `Semana ${n}`)));
+      atualizar();
+
+      return el("div", { class: "jogo-acoes jogo-remarcar", role: "group", "aria-label": "Remarcar o jogo" },
+        el("label", { for: idSelect, class: "pergunta" }, "Remarcar para a"),
+        seletor,
+        confirmar,
+        el("button", {
+          type: "button", id: `remarcar-${jogo.id}-cancelar`, class: "discreto",
+          onclick: () => { remarcando.delete(jogo.id); app.focarDepois(`remarcar-${jogo.id}`); renderizar(); },
+        }, "Cancelar"),
+        aviso);
+    }
+
+    // Move o jogo e mostra a semana nova, com o foco no botão dele.
+    function remarcarJogo(id) {
+      const semana = remarcando.get(id);
+      const rotulo = rotuloDe(id);
+      remarcando.delete(id);
+      const mudou = estado.modificar(`remarcar (${rotulo}) para a semana ${semana}`, (s) => {
+        s.jogos = Regras.remarcarJogo(s.jogos, id, semana, s.campeonato.config);
+      });
+      if (mudou) {
+        semanaEscolhida = semana;
+        app.focarDepois(`remarcar-${id}`);
+      }
+      renderizar();
     }
 
     // ---------- navegação por semana ----------
@@ -305,6 +387,7 @@
       limparRascunhos() {
         rascunhos.clear();
         woAberto.clear();
+        remarcando.clear();
         errosCampo.clear();
       },
       reiniciarVisao() {
