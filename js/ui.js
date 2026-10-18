@@ -67,7 +67,7 @@
   }
 
   function nomesDupla(dupla) {
-    return dupla.map((id) => nomePorId.get(id)).join(" + ");
+    return dupla.map((id) => (id ? nomePorId.get(id) : "sem dupla")).join(" + ");
   }
 
   // ---------- telas ----------

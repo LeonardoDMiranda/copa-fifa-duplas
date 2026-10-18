@@ -1069,6 +1069,69 @@
     return mesmoConjunto(a, b);
   }
 
+  // ---------- Trocar duplas de lugar ----------
+  // O organizador reorganiza o chaveamento trocando de lugar duas duplas de confrontos da mesma
+  // rodada (a = { chave, lado }, b = igual). As duas ficam como "alteradas manualmente"; trocar de novo
+  // as devolve ao lugar de origem. Os vencedores avançam pelos confrontos como sempre.
+
+  // Por que não dá para trocar, ou null se dá. Com `b` null, só confere se `a` pode ser a 1ª escolhida:
+  // o confronto não pode ter placar (limpe antes) e a dupla precisa estar definida.
+  function erroDeTrocaDeLugar(mataMata, classificacao, a, b, config = REGRAS_PADRAO) {
+    const resolvido = resolverMataMata(mataMata, classificacao, config);
+    const fontes = resolvido.estrutura.fontes;
+    const origem = (x) => {
+      if (!x || !fontes[x.chave] || (x.lado !== 1 && x.lado !== 2)) return "Confronto não encontrado.";
+      const c = resolvido[x.chave];
+      if (c.partidas.length) return `${rotuloDoConfronto(x.chave)} já tem placar lançado. Limpe os placares dele antes de trocar as duplas de lugar.`;
+      if (!c[`dupla${x.lado}`]) return `A dupla ${x.lado} de ${rotuloDoConfronto(x.chave)} ainda não está definida.`;
+      return null;
+    };
+    const erroA = origem(a);
+    if (erroA || !b) return erroA;
+    const erroB = origem(b);
+    if (erroB) return erroB;
+    if (a.chave === b.chave) return "As duas duplas já se enfrentam: escolha uma dupla de outro confronto.";
+    const rodada = resolvido.estrutura.rodadaDe;
+    if (rodada[a.chave] === undefined || rodada[a.chave] !== rodada[b.chave]) {
+      return "Só dá para trocar duplas de lugar entre confrontos da mesma rodada.";
+    }
+    // Um jogador não pode ficar nas duas duplas do mesmo confronto (acontece se alguma dupla foi editada à mão).
+    const dupla = (x) => resolvido[x.chave][`dupla${x.lado}`];
+    const depois = (x, nova) => (x.lado === 1 ? [nova, resolvido[x.chave].dupla2] : [resolvido[x.chave].dupla1, nova]);
+    for (const [x, nova] of [[a, dupla(b)], [b, dupla(a)]]) {
+      const [d1, d2] = depois(x, nova);
+      const erro = duplaCompleta(d1) && duplaCompleta(d2) ? validarDuplas(d1, d2) : null;
+      if (erro) return `${rotuloDoConfronto(x.chave)}: ${erro}`;
+    }
+    return null;
+  }
+
+  // Novo mata-mata com as duplas de `a` e `b` trocadas de lugar. Lança Error se erroDeTrocaDeLugar não for null.
+  function trocarDeLugar(mataMata, classificacao, a, b, config = REGRAS_PADRAO) {
+    const erro = erroDeTrocaDeLugar(mataMata, classificacao, a, b, config);
+    if (erro) throw new Error(erro);
+    const resolvido = resolverMataMata(mataMata, classificacao, config);
+    const novo = clonarMataMata(mataMata);
+    const colocar = (alvo, dupla) => {
+      const lado = resolvido[alvo.chave][`lado${alvo.lado}`];
+      const doResultado = resolvido.estrutura.fontes[alvo.chave][alvo.lado - 1].dupla === undefined;
+      const c = novo[alvo.chave];
+      if (lado.automatica && mesmaDupla(dupla, lado.automatica)) {
+        // De volta ao lugar de origem: deixa de ser manual (como depois de "Voltar à automática").
+        c[`duplaManual${alvo.lado}`] = false;
+        c[`dupla${alvo.lado}`] = doResultado ? null : lado.automatica.slice();
+      } else {
+        c[`dupla${alvo.lado}`] = dupla.slice();
+        c[`duplaManual${alvo.lado}`] = true;
+      }
+    };
+    const duplaA = resolvido[a.chave][`dupla${a.lado}`];
+    const duplaB = resolvido[b.chave][`dupla${b.lado}`];
+    colocar(a, duplaB);
+    colocar(b, duplaA);
+    return novo;
+  }
+
   // Resolve o mata-mata inteiro: duplas efetivas, séries, avanço de vencedores/perdedores e pódio.
   function resolverMataMata(mataMata, classificacao, config = REGRAS_PADRAO) {
     const formato = formatoDoMataMata(mataMata);
@@ -1510,6 +1573,8 @@
     duplasIniciais,
     duplaCompleta,
     estruturaDoMataMata,
+    erroDeTrocaDeLugar,
+    trocarDeLugar,
     melhorDeDoConfronto,
     rotuloDoConfronto,
     REGRAS_PADRAO,

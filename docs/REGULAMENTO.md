@@ -76,6 +76,7 @@ Na fase de classificação o jogo pode terminar empatado (sem prorrogação nem 
 - **Rodadas:** Final, Semifinais, Quartas de final, Oitavas de final e, antes disso, "Rodada N". Com 4 classificados há só a final.
 - **3º lugar:** a disputa (perdedores das duas semifinais) é opcional. Só existe quando há duas semifinais; com 4 ou 6 classificados a opção não se aplica.
 - **Jogos por rodada:** o padrão é jogo único em todas as rodadas e MD3 na final; o organizador pode escolher jogo único, melhor de 3 ou melhor de 5 para cada rodada e para o 3º lugar. Nos melhores de N termina quem chega à maioria das vitórias.
+- **Reorganizar o chaveamento:** a qualquer momento o organizador pode trocar de lugar duas duplas de confrontos da **mesma rodada** (ex.: a 2ª dupla da Semi 1 com a 1ª da Semi 2). Os vencedores avançam pelos confrontos como ficaram. Só vale para confrontos **sem placar lançado** (para trocar de um confronto já jogado, o organizador limpa os placares antes) e entre duplas já definidas. As duplas trocadas ficam marcadas como alteradas pela organização; trocar de novo as devolve ao lugar de origem.
 - A configuração vale até o chaveamento ser gerado. Depois, o chaveamento guarda o próprio formato.
 - W.O. na fase final continua não previsto (ver "Casos NÃO previstos").
 

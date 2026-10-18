@@ -64,6 +64,7 @@
     "estrela": '<path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z"/>', // star
     "disputa": '<path d="M21 3v5l-11 9l-4 4l-3 -3l4 -4l9 -11z"/><path d="M5 13l6 6"/><path d="M14.32 17.32l3.68 3.68l3 -3l-3.365 -3.365"/><path d="M10 5.5l-2 -2.5h-5v5l3 2.5"/>', // swords
     "info": '<path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/>', // info-circle
+    "trocar": '<path d="M7 10h14l-4 -4"/><path d="M17 14h-14l4 4"/>', // arrows-exchange
   };
 
   // <svg class="icone ..."> pronto para colocar num botão ou ao lado de um texto.

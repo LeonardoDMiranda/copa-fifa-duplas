@@ -36,6 +36,9 @@
     // Erros mostrados embaixo do campo: id do campo de placar (ou `editor-<chave>-<lado>` da troca de dupla) -> mensagem.
     const errosCampo = new Map();
     let editandoDupla = null; // { chave, lado } da dupla do mata-mata em edição
+    let trocando = null; // { chave, lado } da dupla escolhida para trocar de lugar (falta escolher com quem)
+    let avisoTroca = ""; // por que uma troca de lugar não pôde ser feita
+    let mataMataAtual = null; // mata-mata resolvido do último desenho (a estrutura diz quais confrontos são da mesma rodada)
     let focarAposId = null; // após Enter num placar do mata-mata, foca o campo seguinte a este
 
     // Depois de cada alteração, guarda as duplas que jogaram o 3º lugar e a final (ver
@@ -137,6 +140,61 @@
           el("button", { type: "button", id: "btn-apagar-chave", class: "perigo discreto acao-direita", onclick: apagarChaveamento }, "Apagar chaveamento")));
     }
 
+    // ---------- trocar duplas de lugar ----------
+    // Escolhe uma dupla e depois, na mesma rodada, aquela com quem ela troca de lugar.
+
+    const mesmoLugar = (a, b) => Boolean(a && b) && a.chave === b.chave && a.lado === b.lado;
+
+    function iniciarTroca(lugar) {
+      const erro = Regras.erroDeTrocaDeLugar(estado.atual().mataMata, tabelaAtual(), lugar, null, app.config());
+      avisoTroca = erro || "";
+      trocando = erro ? null : lugar;
+      if (trocando) app.focarDepois("trocar-cancelar");
+      renderizar();
+    }
+
+    function cancelarTroca() {
+      const origem = trocando;
+      trocando = null;
+      avisoTroca = "";
+      if (origem) app.focarDepois(`trocar-${origem.chave}-${origem.lado}`);
+      renderizar();
+    }
+
+    function trocarCom(destino) {
+      const origem = trocando;
+      trocando = null;
+      avisoTroca = "";
+      app.focarDepois(`trocar-${origem.chave}-${origem.lado}`);
+      modificarMataMata(
+        `${ROTULOS[origem.chave]}, dupla ${origem.lado} troca de lugar com ${ROTULOS[destino.chave]}, dupla ${destino.lado}`,
+        (m) => Regras.trocarDeLugar(m, tabelaAtual(), origem, destino, app.config()));
+    }
+
+    // O que aparece ao lado de uma dupla: "trocar de lugar" (sem escolha em andamento), "cancelar" (na dupla
+    // escolhida) ou "trocar com esta" (nas outras da mesma rodada, se a troca vale).
+    function controleDeTroca(c, lado, tabela) {
+      const lugar = { chave: c.chave, lado };
+      if (!c[`dupla${lado}`]) return null;
+      if (!trocando) {
+        return botaoIcone({
+          icone: "trocar", rotulo: `Trocar de lugar a dupla ${lado} (${ROTULOS[c.chave]})`, id: `trocar-${c.chave}-${lado}`,
+          class: "discreto mini", onclick: () => iniciarTroca(lugar),
+        });
+      }
+      if (mesmoLugar(trocando, lugar)) {
+        return el("button", { type: "button", id: "trocar-cancelar", class: "mini", "aria-pressed": "true", onclick: cancelarTroca }, "Cancelar troca");
+      }
+      const rodada = mataMataAtual.estrutura.rodadaDe;
+      if (rodada[c.chave] === undefined || rodada[c.chave] !== rodada[trocando.chave] || c.chave === trocando.chave) return null;
+      const erro = Regras.erroDeTrocaDeLugar(estado.atual().mataMata, tabela, trocando, lugar, app.config());
+      if (erro) return el("span", { class: "legenda troca-indisponivel", id: `troca-indisponivel-${c.chave}-${lado}` }, "não pode trocar");
+      return el("button", {
+        type: "button", id: `trocar-com-${c.chave}-${lado}`, class: "primario mini",
+        "aria-label": `Trocar de lugar com a dupla ${lado} (${ROTULOS[c.chave]})`, onclick: () => trocarCom(lugar),
+      }, "Trocar com esta");
+    }
+
     function editorDupla(c, lado, tabela) {
       const info = c[`lado${lado}`];
       const atual = info.dupla || [null, null];
@@ -205,7 +263,8 @@
         botaoIcone({
           icone: "editar", rotulo: `Trocar a dupla ${lado} (${ROTULOS[c.chave]})`, id: `editar-${c.chave}-${lado}`, class: "discreto mini",
           onclick: () => { editandoDupla = { chave: c.chave, lado }; renderizar(); },
-        }));
+        }),
+        controleDeTroca(c, lado, tabela));
     }
 
     const idErroMM = (id) => `${id}-erro`;
@@ -321,8 +380,16 @@
         return;
       }
       const mm = Regras.resolverMataMata(atual.mataMata, tabela, atual.campeonato.config);
-      alvo.replaceChildren(
+      mataMataAtual = mm;
+      if (trocando && !mm.estrutura.fontes[trocando.chave]) trocando = null; // o chaveamento mudou (ex.: apagado em outra janela)
+      // replaceChildren não descarta os false/null (como el() faz): filtra antes.
+      alvo.replaceChildren(...[
         barraMataMata(mm),
+        Boolean(avisoTroca) && el("div", { class: "alerta", id: "aviso-troca", role: "alert" }, Icones.svg("alerta"), avisoTroca,
+          el("button", { type: "button", id: "aviso-troca-fechar", class: "mini", onclick: () => { avisoTroca = ""; renderizar(); } }, "Entendi")),
+        trocando && el("div", { class: "alerta info", id: "banner-troca" }, Icones.svg("trocar"),
+          `Trocar de lugar a dupla ${trocando.lado} de ${ROTULOS[trocando.chave]} (${nomesDupla(mm[trocando.chave][`dupla${trocando.lado}`] || [])}): `
+          + "escolha, na mesma rodada, a dupla com quem ela troca."),
         el("div", { class: "chave" },
           mm.rodadas.map((rodada, i) => el("div", { class: "coluna-chave", id: `rodada-${rodada.id}` },
             el("h3", {}, rodada.nome),
@@ -332,7 +399,8 @@
             rodada.id === "final" && mm.terceiro && [el("h3", {}, "Disputa de 3º lugar"), cartaoConfronto(mm.terceiro, tabela)])),
           el("div", { class: "coluna-chave" },
             el("h3", {}, "Pódio"),
-            podio(mm.podio, Boolean(mm.terceiro)))));
+            podio(mm.podio, Boolean(mm.terceiro)))),
+      ].filter(Boolean));
     }
 
     function aoMudarPlacarMM(ev) {
@@ -386,6 +454,8 @@
         rascunhosMM.clear();
         errosCampo.clear();
         editandoDupla = null;
+        trocando = null;
+        avisoTroca = "";
       },
     };
   }

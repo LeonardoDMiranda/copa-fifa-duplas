@@ -169,7 +169,7 @@
         irParaAba,
         proximoPasso: (texto, aba, rotulo) => Util.proximoPasso(texto, aba, rotulo, irParaAba),
         cadastroTravado: () => Regras.cadastroTravado(estado.atual().campeonato, estado.atual().jogos),
-        nomesDupla: (dupla) => dupla.map((id) => nomePorId.get(id)).join(" + "),
+        nomesDupla: (dupla) => dupla.map((id) => (id ? nomePorId.get(id) : "sem dupla")).join(" + "),
         botaoJogador: (id, idDom) => Util.botaoJogador(id, nomePorId.get(id), idDom, abrirFicha),
         verSemana: (n) => { semanasPedidas.push(n); },
         numerosNaSemana: Util.numerosNaSemana,
@@ -1330,6 +1330,66 @@
       clicar(raiz, "salvar-oitavas1-2");
       t.igual(estado.atual().mataMata.oitavas1.dupla2, [sobra, parceiro], "dupla completada");
       t.verdadeiro(buscar(raiz, "mm-oitavas1-0-gols1") && !buscar(raiz, "sem-parceiro-oitavas1"), "agora o placar abre e o aviso some");
+    });
+
+    // ---------- V12: trocar duplas de lugar no chaveamento ----------
+
+    caso("V12.1 Trocar de lugar: escolhe a dupla, depois a outra da mesma rodada; trocar de novo desfaz", (t) => {
+      const dados = dadosComCalendario({ mataMata: true });
+      const original = JSON.parse(JSON.stringify(dados.mataMata));
+      const { montar, estado } = criarAppFalso(dados);
+      const raiz = montar("mataMata");
+      verificarLimpeza(t, raiz, "mata-mata");
+      t.verdadeiro(buscar(raiz, "trocar-semi1-2") && !buscar(raiz, "trocar-final-1"), "botão de trocar em dupla definida; a final ainda não tem duplas");
+      clicar(raiz, "trocar-semi1-2");
+      t.verdadeiro(buscar(raiz, "banner-troca"), "aparece o aviso de que falta escolher com quem trocar");
+      t.verdadeiro(buscar(raiz, "trocar-cancelar") && buscar(raiz, "trocar-cancelar").getAttribute("aria-pressed") === "true", "a dupla escolhida mostra \"Cancelar troca\"");
+      t.igual([...raiz.querySelectorAll("[id^='trocar-com-']")].map((b) => b.id), ["trocar-com-semi2-1", "trocar-com-semi2-2"], "só as duplas da outra semifinal (mesma rodada) oferecem a troca");
+      verificarLimpeza(t, raiz, "mata-mata (escolhendo)");
+      const antes = [estado.atual().mataMata.semi1.dupla2, estado.atual().mataMata.semi2.dupla1];
+      clicar(raiz, "trocar-com-semi2-1");
+      const m = estado.atual().mataMata;
+      t.igual([m.semi1.dupla2, m.semi2.dupla1], [antes[1], antes[0]], "as duas duplas trocaram de lugar");
+      t.verdadeiro(m.semi1.duplaManual2 && m.semi2.duplaManual1 && !m.semi1.duplaManual1, "e ficaram marcadas como alteradas manualmente");
+      t.verdadeiro(!buscar(raiz, "banner-troca"), "a escolha termina");
+      t.igual(raiz.querySelectorAll(".tag-manual").length, 2, "a tela marca as duas");
+      t.igual(estado.atual().historico[estado.atual().historico.length - 1].descricao, "Semifinal 1, dupla 2 troca de lugar com Semifinal 2, dupla 1", "o desfazer descreve a troca");
+      clicar(raiz, "trocar-semi1-2");
+      clicar(raiz, "trocar-com-semi2-1");
+      t.igual(estado.atual().mataMata, original, "trocar de novo devolve o chaveamento ao estado de antes");
+    });
+
+    caso("V12.2 Trocar de lugar: confronto com placar fica bloqueado com explicação; cancelar não muda nada", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const raiz = montar("mataMata");
+      mudarCampo(buscar(raiz, "mm-semi1-0-gols1"), "2");
+      mudarCampo(buscar(raiz, "mm-semi1-0-gols2"), "1");
+      clicar(raiz, "trocar-semi1-1");
+      t.verdadeiro(!buscar(raiz, "banner-troca"), "não começa a troca");
+      const aviso = buscar(raiz, "aviso-troca");
+      t.verdadeiro(aviso && /placar lançado/.test(aviso.textContent) && /Limpe os placares/.test(aviso.textContent), "explica que é preciso limpar os placares");
+      clicar(raiz, "aviso-troca-fechar");
+      t.verdadeiro(!buscar(raiz, "aviso-troca"), "\"Entendi\" fecha o aviso");
+      clicar(raiz, "trocar-semi2-1");
+      t.verdadeiro(buscar(raiz, "troca-indisponivel-semi1-1") && !buscar(raiz, "trocar-com-semi1-1"), "escolhendo a outra semifinal, a que tem placar aparece como indisponível");
+      const antes = JSON.stringify(estado.atual().mataMata);
+      clicar(raiz, "trocar-cancelar");
+      t.verdadeiro(!buscar(raiz, "banner-troca") && buscar(raiz, "trocar-semi2-1"), "cancelar volta aos botões de trocar");
+      t.igual(JSON.stringify(estado.atual().mataMata), antes, "e não muda o chaveamento");
+    });
+
+    caso("V12.3 Trocar de lugar com 12 classificados: só entre confrontos da mesma rodada", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComFaseFinal(12));
+      const raiz = montar("mataMata");
+      const antes = JSON.parse(JSON.stringify(estado.atual().mataMata));
+      clicar(raiz, "trocar-quartas1-2");
+      t.igual([...raiz.querySelectorAll("[id^='trocar-com-']")].map((b) => b.id), ["trocar-com-quartas2-1", "trocar-com-quartas2-2"], "as quartas só oferecem a outra quartas");
+      clicar(raiz, "trocar-com-quartas2-1");
+      const depois = estado.atual().mataMata;
+      t.igual([depois.quartas1.dupla2, depois.quartas2.dupla1], [antes.quartas2.dupla1, antes.quartas1.dupla2], "as duas duplas trocaram de lugar");
+      t.verdadeiro(depois.quartas1.duplaManual2 && depois.quartas2.duplaManual1, "as duas duplas trocadas ficam marcadas");
+      clicar(raiz, "trocar-semi1-1");
+      t.igual([...raiz.querySelectorAll("[id^='trocar-com-']")].map((b) => b.id), [], "semifinais: a Semi 2 ainda espera os vencedores das quartas, então não há com quem trocar");
     });
 
     // ---------- execução e relatório ----------

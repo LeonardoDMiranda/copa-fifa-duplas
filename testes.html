@@ -729,6 +729,66 @@
       }
     });
 
+    // ---------- Chaveamento reorganizável (Fase 25) ----------
+
+    caso("MM9 Trocar duplas de lugar entre confrontos da mesma rodada", (t) => {
+      const tabela = tabelaDe(32);
+      const original = Regras.gerarMataMata(tabela, configCom(8));
+      const a = { chave: "semi1", lado: 2 }, b = { chave: "semi2", lado: 1 };
+      t.igual(Regras.erroDeTrocaDeLugar(original, tabela, a, b), null, "Semi 1 (dupla 2) com Semi 2 (dupla 1): pode");
+      const trocado = Regras.trocarDeLugar(original, tabela, a, b);
+      const r = Regras.resolverMataMata(trocado, tabela);
+      t.igual([r.semi1.dupla1, r.semi1.dupla2], [["j0", "j7"], ["j2", "j5"]], "Semi 1 = 1ª × 3ª dupla");
+      t.igual([r.semi2.dupla1, r.semi2.dupla2], [["j1", "j6"], ["j3", "j4"]], "Semi 2 = 2ª × 4ª dupla");
+      t.verdadeiro(r.semi1.lado2.manual && r.semi2.lado1.manual && !r.semi1.lado1.manual, "só as duas duplas trocadas ficam 'alteradas manualmente'");
+      t.igual(original.semi1.dupla2, ["j1", "j6"], "o mata-mata de entrada não é alterado");
+      const devolvido = Regras.trocarDeLugar(trocado, tabela, a, b);
+      t.igual(devolvido, original, "trocar de novo devolve cada dupla ao lugar e o estado fica igual ao do começo");
+      t.verdadeiro(Regras.resolverMataMata(devolvido, tabela).semi1.lado2.manual === false, "e a dupla deixa de ser manual");
+
+      let comPlacar = Regras.definirCampoPartida(Regras.definirCampoPartida(original, "semi1", 0, "gols1", 1), "semi1", 0, "gols2", 0);
+      t.verdadeiro(/placar lançado/.test(Regras.erroDeTrocaDeLugar(comPlacar, tabela, a, b)), "confronto com placar: bloqueado e explica");
+      t.verdadeiro(/placar lançado/.test(Regras.erroDeTrocaDeLugar(comPlacar, tabela, a, null)), "a primeira escolha também confere o placar");
+      t.verdadeiro(/placar lançado/.test(Regras.erroDeTrocaDeLugar(comPlacar, tabela, b, a)), "e vale para o outro lado da troca");
+      comPlacar = Regras.definirCampoPartida(Regras.definirCampoPartida(comPlacar, "semi1", 0, "gols1", null), "semi1", 0, "gols2", null);
+      t.igual(Regras.erroDeTrocaDeLugar(comPlacar, tabela, a, b), null, "limpando o placar, a troca volta a valer");
+
+      const com12 = Regras.gerarMataMata(tabela, configCom(12)); // as quartas e a Semi 1 (duplas que folgam) já têm duplas
+      t.verdadeiro(/mesma rodada/.test(Regras.erroDeTrocaDeLugar(com12, tabela, { chave: "quartas1", lado: 1 }, { chave: "semi1", lado: 1 }, configCom(12))), "rodadas diferentes: bloqueado");
+      t.verdadeiro(/ainda não está definida/.test(Regras.erroDeTrocaDeLugar(original, tabela, { chave: "final", lado: 1 }, null)), "dupla ainda não definida: bloqueado");
+      t.verdadeiro(/já se enfrentam/.test(Regras.erroDeTrocaDeLugar(original, tabela, { chave: "semi1", lado: 1 }, { chave: "semi1", lado: 2 })), "mesmo confronto: bloqueado");
+      t.verdadeiro(Regras.erroDeTrocaDeLugar(original, tabela, a, { chave: "terceiro", lado: 1 }), "o 3º lugar não troca com a semifinal");
+      t.verdadeiro(Regras.erroDeTrocaDeLugar(original, tabela, a, { chave: "inexistente", lado: 1 }), "confronto inexistente: bloqueado");
+      let erro = null;
+      try { Regras.trocarDeLugar(com12, tabela, { chave: "quartas1", lado: 1 }, { chave: "semi1", lado: 1 }); } catch (e) { erro = e; }
+      t.verdadeiro(erro, "trocarDeLugar lança erro quando a troca não vale");
+
+      const editado = Regras.definirDupla(original, "semi2", 1, ["j0", "j5"]); // j0 já está na Semi 1
+      t.verdadeiro(/não pode estar nas duas duplas/.test(Regras.erroDeTrocaDeLugar(editado, tabela, a, b)), "a troca que deixaria um jogador nas duas duplas do mesmo confronto é bloqueada");
+    });
+
+    caso("MM10 Trocar de lugar com folgas: o avanço dos vencedores segue a reorganização", (t) => {
+      const tabela = tabelaDe(14);
+      let mm = Regras.gerarMataMata(tabela, configCom(12));
+      // Quartas 1 = 3ª × 4ª dupla e Quartas 2 = 5ª × 6ª: troca a 4ª (quartas1, lado 2) com a 5ª (quartas2, lado 1).
+      mm = Regras.trocarDeLugar(mm, tabela, { chave: "quartas1", lado: 2 }, { chave: "quartas2", lado: 1 });
+      let r = Regras.resolverMataMata(mm, tabela);
+      t.igual([r.quartas1.dupla1, r.quartas1.dupla2], [["j2", "j9"], ["j4", "j7"]], "Quartas 1 = 3ª × 5ª dupla");
+      t.igual([r.quartas2.dupla1, r.quartas2.dupla2], [["j3", "j8"], ["j5", "j6"]], "Quartas 2 = 4ª × 6ª dupla");
+      mm = lancarMMVencedor(mm, "quartas1", 2, tabela); // a 5ª dupla (j4, j7) vence
+      mm = lancarMMVencedor(mm, "quartas2", 1, tabela); // a 4ª dupla (j3, j8) vence
+      r = Regras.resolverMataMata(mm, tabela);
+      t.igual([r.semi2.dupla1, r.semi2.dupla2], [["j4", "j7"], ["j3", "j8"]], "a Semi 2 recebe os vencedores dos confrontos reorganizados");
+      t.verdadeiro(/placar lançado/.test(Regras.erroDeTrocaDeLugar(mm, tabela, { chave: "quartas1", lado: 1 }, { chave: "quartas2", lado: 2 })), "depois dos placares das quartas, elas não trocam mais");
+
+      // Semifinais: a dupla que folgou (Semi 1) troca com a vencedora das quartas (Semi 2) já definida.
+      const semi = { chave: "semi1", lado: 1 }, outra = { chave: "semi2", lado: 2 };
+      t.igual(Regras.erroDeTrocaDeLugar(mm, tabela, semi, outra), null, "dupla que folgou × vencedora das quartas: pode");
+      const depois = Regras.resolverMataMata(Regras.trocarDeLugar(mm, tabela, semi, outra), tabela);
+      t.igual([depois.semi1.dupla1, depois.semi2.dupla2], [["j3", "j8"], ["j0", "j11"]], "as duplas trocaram de lugar entre as semifinais");
+      t.verdadeiro(depois.semi1.lado1.manual && depois.semi2.lado2.manual, "marcadas como alteradas manualmente");
+    });
+
     // 10
     function porSituacao(situacoes, tipo) {
       return situacoes.filter((s) => s.situacao === tipo).map((s) => s.nome);

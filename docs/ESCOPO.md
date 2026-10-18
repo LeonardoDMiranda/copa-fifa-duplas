@@ -59,6 +59,7 @@ Saldo = GP − GC. Jogo sem placar lançado não conta. Jogo anulado conta como 
 - Sem empate: cada jogo tem placar normal e, se empatar, **prorrogação** e, se ainda empatar, **pênaltis**.
 - Melhor de N: termina quando uma dupla chega à maioria das vitórias (na MD3, o 3º jogo só aparece com 1×1).
 - **Duplas editáveis**: qualquer dupla do mata-mata pode ser trocada à mão (a "surpresa antes da final") e voltar à dupla automática depois.
+- **Trocar duplas de lugar** (`Regras.erroDeTrocaDeLugar` / `trocarDeLugar`): troca as duplas de dois lados de confrontos diferentes da mesma rodada (não vale entre rodadas nem com o 3º lugar). Só em confrontos sem placar e com a dupla definida; não pode deixar o mesmo jogador nas duas duplas do confronto. As duas duplas ficam `duplaManual`; trocar de novo as devolve ao lugar e o estado volta a ser o de antes. Na tela: botão de trocar ao lado da dupla, depois "Trocar com esta" nas duplas elegíveis (as que não podem aparecem como "não pode trocar"); confronto com placar explica que é preciso limpar os placares.
 - **Duplas guardadas**: as que vêm da classificação (1ª rodada e duplas que folgam) ficam fixas desde a geração do chaveamento; as que vêm de resultados (vencedores e perdedores) ficam fixas a partir do primeiro placar lançado no confronto. Se a classificação ou o resultado de um confronto mudar depois, o app avisa e oferece trocar pelas duplas novas (os placares lançados continuam e passam a valer para elas).
 - Resultados do mata-mata **não** alteram a classificação.
 - Resultado final: 🥇 campeões (2 jogadores), 🥈 vice, 🥉 3º lugar.
@@ -217,6 +218,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 22 | Ficha do jogador: janela lateral aberta pelo nome (Rodadas, top 8, Classificação e Mata-mata), com números ao vivo, situação, fase final e todos os jogos. Sai a "Agenda do jogador" das Rodadas |
 | 23 | Remarcação de jogos: botão "Remarcar" no cartão (semana de 1 a N, aviso de conflito), marca "Remarcado da semana N" nas Rodadas, na ficha e nos Ajustes; `semanaOriginal` no jogo e regras em `Regras.remarcarJogo` |
 | 24 | Mata-mata com qualquer número de classificados (4 a 99): estrutura por rodadas com folgas, jogador sem dupla com número ímpar, 3º lugar e jogos por rodada configuráveis, formato guardado no chaveamento; "Top N" nos textos, PNG e telão acompanham as vagas |
+| 25 | Chaveamento reorganizável: trocar de lugar duas duplas de confrontos da mesma rodada (sem placar lançado), com os vencedores avançando pelo que ficou, e voltar ao lugar de origem trocando de novo |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -234,7 +236,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | C | Cadastro de jogadores |
 | S | Sorteio e confirmação do calendário |
 | R | Rodadas e classificação por semana |
-| MM | Mata-mata com N classificados: estrutura (rodadas, chaves, fontes), folgas, duplas com número ímpar, jogos por rodada e 3º lugar, duplas guardadas, salvar/importar (inclusive o formato de antes), PNG e telão |
+| MM | Mata-mata com N classificados: estrutura (rodadas, chaves, fontes), folgas, duplas com número ímpar, jogos por rodada e 3º lugar, duplas guardadas, salvar/importar (inclusive o formato de antes), PNG e telão; trocar duplas de lugar (bloqueios, volta ao lugar de origem, avanço dos vencedores) |
 | M | Remarcação: ordem e número do jogo, semana original, recusas, aviso de conflito, efeito nas semanas e na classificação, salvar/desfazer/importar |
 | T | PNG e telão com qualquer número de jogadores |
 | B | Lembrete e registro de backup |
@@ -243,7 +245,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
 | U | Base da interface: `plural`, `numero` (formato brasileiro), `rotuloDoJogo`, `botaoIcone` (nome acessível), ícones decorativos e atributos do erro junto do campo |
 
-`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata), V9 (ficha do jogador: números iguais aos da tabela, um jogo por linha do calendário, Esc/X/clique fora com o foco de volta ao nome, troca para o parceiro, fase final do campeão, ir para a semana e ficha aberta atualizando), V10 (remarcação: botão só em jogo sem resultado, semana atual desabilitada, remarcar e desfazer, aviso de conflito, marca nos Ajustes e na ficha com o calendário sorteado ainda avaliado como respeitado) e V11 (fase final: campos da Configuração e trava com o chaveamento gerado, mata-mata com 12, 17 classificados, sem 3º lugar e com jogos por rodada).
+`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata), V9 (ficha do jogador: números iguais aos da tabela, um jogo por linha do calendário, Esc/X/clique fora com o foco de volta ao nome, troca para o parceiro, fase final do campeão, ir para a semana e ficha aberta atualizando), V10 (remarcação: botão só em jogo sem resultado, semana atual desabilitada, remarcar e desfazer, aviso de conflito, marca nos Ajustes e na ficha com o calendário sorteado ainda avaliado como respeitado) V11 (fase final: campos da Configuração e trava com o chaveamento gerado, mata-mata com 12, 17 classificados, sem 3º lugar e com jogos por rodada) e V12 (trocar duplas de lugar: escolha em duas etapas, só a mesma rodada, confronto com placar bloqueado com explicação, cancelar e trocar de novo desfaz).
 
 ## 7. Pendências
 
