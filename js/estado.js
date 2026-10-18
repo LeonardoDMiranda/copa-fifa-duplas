@@ -182,11 +182,23 @@
     return Regras.formatoEhPadrao(formato) ? null : formato;
   }
 
+  // Listas de ids de jogadores guardadas no mata-mata (`ausentes`, `substituidos`): opcionais, sem repetição.
+  function validarListaDeJogadores(lista, idsJogadores, nome) {
+    if (lista === undefined || lista === null) return null;
+    if (!Array.isArray(lista) || new Set(lista).size !== lista.length || !lista.every((id) => idsJogadores.has(id))) {
+      throw new Error(`${nome} do mata-mata inválidos.`);
+    }
+    return lista.length ? lista.slice() : null;
+  }
+
   function validarMataMata(mm, idsJogadores) {
     if (mm === null) return null;
     if (typeof mm !== "object") throw new Error("mataMata inválido.");
     const formato = validarFormato(mm.formato);
+    const ausentes = validarListaDeJogadores(mm.ausentes, idsJogadores, "ausentes");
+    const substituidos = validarListaDeJogadores(mm.substituidos, idsJogadores, "substituídos");
     const valido = formato ? { formato } : {};
+    if (ausentes) valido.ausentes = ausentes;
     const estrutura = Regras.estruturaDoMataMata(formato || Regras.FORMATO_PADRAO);
     const ordemDeCriacao = [...estrutura.ordem.filter((c) => c !== "final"), "final"];
     for (const chave of ordemDeCriacao) {
@@ -222,7 +234,13 @@
         duplaManual2: Boolean(c.duplaManual2),
         partidas: Regras.normalizarPartidas(partidas, melhorDe),
       };
+      // W.O. (Fase 26): a dupla do lado `wo` não compareceu. Campo opcional.
+      if (c.wo !== undefined && c.wo !== null) {
+        if (c.wo !== 1 && c.wo !== 2) throw new Error(`W.O. inválido no confronto ${chave}.`);
+        valido[chave].wo = c.wo;
+      }
     }
+    if (substituidos) valido.substituidos = substituidos;
     return valido;
   }
 

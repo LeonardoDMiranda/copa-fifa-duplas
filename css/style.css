@@ -736,6 +736,19 @@ dialog.dialogo::backdrop { background: var(--veu); }
   font-weight: 700;
   cursor: help;
 }
+.tag-wo {
+  padding: 0 6px;
+  border-radius: var(--raio-pilula);
+  background: var(--alerta-fundo);
+  color: var(--alerta-texto);
+  font-size: var(--fonte-xs);
+  font-weight: 700;
+}
+.acoes-ausencia { display: flex; flex-wrap: wrap; gap: var(--esp-1) var(--esp-2); padding: 0 var(--esp-2); }
+.painel-ausencia { display: flex; flex-direction: column; gap: var(--esp-1); }
+.painel-ausencia .legenda { margin: 0; padding: 0 var(--esp-2); }
+.ausentes-previa { margin-bottom: var(--esp-3); }
+.ausentes-previa .editor-dupla { margin-bottom: var(--esp-1); }
 .tag-vence { display: inline-flex; align-items: center; gap: 2px; color: var(--sobe); font-size: var(--fonte-sm); font-weight: 700; }
 .editor-dupla { background: var(--superficie-2); }
 .editor-dupla select { font: inherit; font-size: var(--fonte-sm); padding: 2px var(--esp-1); max-width: 170px; }

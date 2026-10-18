@@ -842,11 +842,20 @@
   // Estrutura inicial do mata-mata. As duplas que vêm da classificação ficam congeladas na geração;
   // as que vêm dos resultados (vencedores e perdedores) começam em null = automática e ficam
   // congeladas quando o confronto ganha placar (ver fixarDuplasJogadas).
-  function gerarMataMata(classificacao, config = REGRAS_PADRAO) {
+  // A classificação sem os jogadores ausentes da fase final: quem vem depois sobe e ocupa a mesma
+  // posição (o 9º entra no lugar de um ausente do top 8; se ele também faltou, o 10º, e assim por diante).
+  function semAusentes(classificacao, ausentes) {
+    return ausentes && ausentes.length ? classificacao.filter((l) => !ausentes.includes(l.id)) : classificacao;
+  }
+
+  // `ausentes`: ids dos jogadores que não vão jogar a fase final, marcados antes de gerar o chaveamento.
+  // Ficam em `mataMata.ausentes` (campo opcional, ausente = ninguém) para a classificação ser lida sempre igual.
+  function gerarMataMata(classificacao, config = REGRAS_PADRAO, ausentes = []) {
     const formato = formatoDaConfig(config);
-    if (classificacao.length < formato.vagas) throw new Error(`o chaveamento precisa de ${formato.vagas} jogadores.`);
+    const disponiveis = semAusentes(classificacao, ausentes);
+    if (disponiveis.length < formato.vagas) throw new Error(`o chaveamento precisa de ${formato.vagas} jogadores.`);
     const estrutura = estruturaDoMataMata(formato);
-    const duplas = duplasIniciais(classificacao, formato.vagas);
+    const duplas = duplasIniciais(disponiveis, formato.vagas);
     const confronto = (chave) => {
       const [f1, f2] = estrutura.fontes[chave];
       const inicial = (f) => (f.dupla !== undefined ? duplas[f.dupla].slice() : null);
@@ -856,12 +865,13 @@
     const ultima = estrutura.ordem.filter((c) => c !== "final");
     const mataMata = {};
     if (!formatoEhPadrao(formato)) mataMata.formato = formato;
+    if (ausentes.length) mataMata.ausentes = ausentes.slice();
     for (const chave of [...ultima, "final"]) mataMata[chave] = confronto(chave);
     return mataMata;
   }
 
   // Motivos para confirmar antes de gerar o chaveamento (lista vazia = tudo certo).
-  function avisosParaGerarChaveamento(jogos, classificacao, config = REGRAS_PADRAO) {
+  function avisosParaGerarChaveamento(jogos, classificacao, config = REGRAS_PADRAO, ausentes = []) {
     const avisos = [];
     const pendentes = jogos.filter((j) => !efeitosDoResultado(j.resultado, config));
     if (pendentes.length) {
@@ -876,7 +886,7 @@
     }
     const nome = (id) => classificacao.find((l) => l.id === id).nome;
     const vistos = new Set();
-    for (const linha of classificacao.slice(0, config.vagasFaseFinal)) {
+    for (const linha of semAusentes(classificacao, ausentes).slice(0, config.vagasFaseFinal)) {
       const empate = linha.empateTecnico;
       if (!empate || empate.ordemManual) continue;
       const chave = empate.grupo.join("|");
@@ -975,6 +985,7 @@
   function definirCampoPartida(mataMata, chave, indice, campo, valor) {
     const novo = clonarMataMata(mataMata);
     const confronto = novo[chave];
+    if (confronto.wo) throw new Error(`${rotuloDoConfronto(chave)} está com W.O.: desfaça o W.O. antes de lançar placar.`);
     while (confronto.partidas.length <= indice) confronto.partidas.push({ gols1: null, gols2: null });
     confronto.partidas[indice][campo] = valor;
     confronto.partidas = normalizarPartidas(confronto.partidas, melhorDeDoConfronto(novo, chave));
@@ -996,6 +1007,7 @@
 
   // Troca manual de dupla (ex.: "SURPRESA antes da final").
   function definirDupla(mataMata, chave, lado, dupla) {
+    if (mataMata[chave].wo) throw new Error(`${rotuloDoConfronto(chave)} está com W.O.: desfaça o W.O. antes de trocar a dupla.`);
     const novo = clonarMataMata(mataMata);
     novo[chave][`dupla${lado}`] = dupla.slice();
     novo[chave][`duplaManual${lado}`] = true;
@@ -1008,7 +1020,8 @@
     const novo = clonarMataMata(mataMata);
     const formato = formatoDoMataMata(mataMata);
     const fonte = estruturaDoMataMata(formato).fontes[chave][lado - 1];
-    novo[chave][`dupla${lado}`] = fonte.dupla !== undefined ? duplasIniciais(classificacao, formato.vagas)[fonte.dupla].slice() : null;
+    novo[chave][`dupla${lado}`] = fonte.dupla !== undefined
+      ? duplasIniciais(semAusentes(classificacao, mataMata.ausentes), formato.vagas)[fonte.dupla].slice() : null;
     novo[chave][`duplaManual${lado}`] = false;
     return novo;
   }
@@ -1082,6 +1095,7 @@
     const origem = (x) => {
       if (!x || !fontes[x.chave] || (x.lado !== 1 && x.lado !== 2)) return "Confronto não encontrado.";
       const c = resolvido[x.chave];
+      if (c.wo) return `${rotuloDoConfronto(x.chave)} está com W.O. Desfaça o W.O. antes de trocar as duplas de lugar.`;
       if (c.partidas.length) return `${rotuloDoConfronto(x.chave)} já tem placar lançado. Limpe os placares dele antes de trocar as duplas de lugar.`;
       if (!c[`dupla${x.lado}`]) return `A dupla ${x.lado} de ${rotuloDoConfronto(x.chave)} ainda não está definida.`;
       return null;
@@ -1132,11 +1146,91 @@
     return novo;
   }
 
+  // ---------- Ausência durante o mata-mata ----------
+  // Dois caminhos, escolhidos pelo organizador (docs/REGULAMENTO.md, "Ausência na fase final"):
+  // substituir o jogador ausente pelo próximo da classificação que ainda não está no chaveamento, ou
+  // dar W.O. à dupla dele (a dupla adversária avança sem placar).
+
+  // O próximo da classificação que pode entrar no lugar de um ausente: fora do chaveamento, não marcado
+  // como ausente antes de gerar e nunca antes substituído. Null se a classificação acabou.
+  function proximoSubstituto(mataMata, classificacao, config = REGRAS_PADRAO) {
+    const ocupados = new Set([...(mataMata.ausentes || []), ...(mataMata.substituidos || [])]);
+    const resolvido = resolverMataMata(mataMata, classificacao, config);
+    for (const chave of resolvido.chaves) {
+      const c = resolvido[chave];
+      for (const dupla of [c.dupla1, c.dupla2, c.lado1.automatica, c.lado2.automatica]) {
+        for (const id of dupla || []) ocupados.add(id);
+      }
+    }
+    const proximo = classificacao.find((l) => !ocupados.has(l.id));
+    return proximo ? proximo.id : null;
+  }
+
+  // Por que não dá para substituir `jogadorId` na dupla `lado` do confronto, ou null se dá.
+  function erroDeSubstituicao(mataMata, classificacao, chave, lado, jogadorId, config = REGRAS_PADRAO) {
+    const resolvido = resolverMataMata(mataMata, classificacao, config);
+    if (!resolvido.estrutura.fontes[chave] || (lado !== 1 && lado !== 2)) return "Confronto não encontrado.";
+    const c = resolvido[chave];
+    const rotulo = rotuloDoConfronto(chave);
+    if (c.wo) return `${rotulo} está com W.O. Desfaça o W.O. antes de substituir um jogador.`;
+    if (c.serie.vencedor) return `${rotulo} já está decidido: não dá para substituir um jogador dele.`;
+    const dupla = c[`dupla${lado}`];
+    if (!dupla || !dupla.includes(jogadorId)) return "O jogador não está nessa dupla.";
+    if (proximoSubstituto(mataMata, classificacao, config) === null) {
+      return "Não há mais jogadores na classificação para entrar no lugar do ausente.";
+    }
+    return null;
+  }
+
+  // Novo mata-mata com o ausente trocado pelo próximo da classificação; a dupla segue (fica "alterada
+  // manualmente"). Lança Error se erroDeSubstituicao não for null.
+  function substituirJogador(mataMata, classificacao, chave, lado, jogadorId, config = REGRAS_PADRAO) {
+    const erro = erroDeSubstituicao(mataMata, classificacao, chave, lado, jogadorId, config);
+    if (erro) throw new Error(erro);
+    const entra = proximoSubstituto(mataMata, classificacao, config);
+    const dupla = resolverMataMata(mataMata, classificacao, config)[chave][`dupla${lado}`];
+    const novo = definirDupla(mataMata, chave, lado, dupla.map((id) => (id === jogadorId ? entra : id)));
+    novo.substituidos = [...(mataMata.substituidos || []), jogadorId];
+    return novo;
+  }
+
+  // Por que não dá para dar W.O. à dupla `lado` do confronto, ou null se dá. Só uma dupla por confronto:
+  // o W.O. das duas é decisão do organizador, fora do app.
+  function erroDeWO(mataMata, classificacao, chave, lado, config = REGRAS_PADRAO) {
+    const resolvido = resolverMataMata(mataMata, classificacao, config);
+    if (!resolvido.estrutura.fontes[chave] || (lado !== 1 && lado !== 2)) return "Confronto não encontrado.";
+    const c = resolvido[chave];
+    const rotulo = rotuloDoConfronto(chave);
+    if (c.wo === lado) return `A dupla ${lado} de ${rotulo} já está com W.O.`;
+    if (c.wo) return `${rotulo} já tem W.O. da dupla ${c.wo}. O W.O. das duas duplas é decisão do organizador: desfaça o W.O. antes.`;
+    if (!c.pronto) return `${rotulo} ainda não tem as duas duplas completas.`;
+    if (c.partidas.length) return `${rotulo} já tem placar lançado. Limpe os placares dele antes de dar W.O.`;
+    return null;
+  }
+
+  // Novo mata-mata com W.O. da dupla `lado`: a outra dupla vence o confronto sem placar. Lança Error se
+  // erroDeWO não for null.
+  function marcarWO(mataMata, classificacao, chave, lado, config = REGRAS_PADRAO) {
+    const erro = erroDeWO(mataMata, classificacao, chave, lado, config);
+    if (erro) throw new Error(erro);
+    const novo = clonarMataMata(mataMata);
+    novo[chave].wo = lado;
+    return novo;
+  }
+
+  // Novo mata-mata sem o W.O. do confronto (o confronto volta a aceitar placares).
+  function desfazerWO(mataMata, chave) {
+    const novo = clonarMataMata(mataMata);
+    delete novo[chave].wo;
+    return novo;
+  }
+
   // Resolve o mata-mata inteiro: duplas efetivas, séries, avanço de vencedores/perdedores e pódio.
   function resolverMataMata(mataMata, classificacao, config = REGRAS_PADRAO) {
     const formato = formatoDoMataMata(mataMata);
     const estrutura = estruturaDoMataMata(formato);
-    const iniciais = classificacao.length >= formato.vagas ? duplasIniciais(classificacao, formato.vagas) : [];
+    const disponiveis = semAusentes(classificacao, mataMata.ausentes);
+    const iniciais = disponiveis.length >= formato.vagas ? duplasIniciais(disponiveis, formato.vagas) : [];
     const resolvidos = {};
 
     // A dupla guardada vale no lugar da automática quando a automática vem da classificação (sempre)
@@ -1160,18 +1254,24 @@
       };
       const lado1 = lado(1), lado2 = lado(2);
       const melhorDe = melhorDeDoConfronto(mataMata, chave);
-      const serie = analisarSerie(c.partidas, melhorDe);
+      const pronto = duplaCompleta(lado1.dupla) && duplaCompleta(lado2.dupla);
+      // W.O.: a dupla do outro lado vence sem placar (só vale com as duas duplas definidas).
+      const wo = pronto && (c.wo === 1 || c.wo === 2) ? c.wo : null;
+      const serie = wo
+        ? { vencedor: 3 - wo, vitorias: [0, 0], necessarias: Math.floor(melhorDe / 2) + 1, analises: [], partidasVisiveis: 0, wo }
+        : analisarSerie(c.partidas, melhorDe);
       const vencedora = serie.vencedor ? [lado1, lado2][serie.vencedor - 1].dupla : null;
       const perdedora = serie.vencedor ? [lado1, lado2][2 - serie.vencedor].dupla : null;
       return {
         chave,
         melhorDe,
+        wo,
         dupla1: lado1.dupla,
         dupla2: lado2.dupla,
         lado1,
         lado2,
         origem: fontes.map((f) => origemDaDupla(f, formato.vagas)),
-        pronto: duplaCompleta(lado1.dupla) && duplaCompleta(lado2.dupla),
+        pronto,
         partidas: c.partidas,
         serie,
         vencedora,
@@ -1638,6 +1738,13 @@
     atualizarDuplasDasSemis,
     fixarDuplasJogadas,
     atualizarDuplasDasFinais,
+    semAusentes,
+    proximoSubstituto,
+    erroDeSubstituicao,
+    substituirJogador,
+    erroDeWO,
+    marcarWO,
+    desfazerWO,
     resolverMataMata,
     efeitosDoResultado,
     aplicarJogo,

@@ -78,7 +78,15 @@ Na fase de classificação o jogo pode terminar empatado (sem prorrogação nem 
 - **Jogos por rodada:** o padrão é jogo único em todas as rodadas e MD3 na final; o organizador pode escolher jogo único, melhor de 3 ou melhor de 5 para cada rodada e para o 3º lugar. Nos melhores de N termina quem chega à maioria das vitórias.
 - **Reorganizar o chaveamento:** a qualquer momento o organizador pode trocar de lugar duas duplas de confrontos da **mesma rodada** (ex.: a 2ª dupla da Semi 1 com a 1ª da Semi 2). Os vencedores avançam pelos confrontos como ficaram. Só vale para confrontos **sem placar lançado** (para trocar de um confronto já jogado, o organizador limpa os placares antes) e entre duplas já definidas. As duplas trocadas ficam marcadas como alteradas pela organização; trocar de novo as devolve ao lugar de origem.
 - A configuração vale até o chaveamento ser gerado. Depois, o chaveamento guarda o próprio formato.
-- W.O. na fase final continua não previsto (ver "Casos NÃO previstos").
+
+### Ausência na fase final
+
+> Regras decididas pelo organizador para os campeonatos conduzidos pelo app; o regulamento original não prevê ausência na fase final.
+
+- **Antes do chaveamento:** o jogador ausente é substituído pelo próximo da classificação, que entra na mesma posição.
+- **Durante a fase final:** o organizador escolhe entre (a) substituir o jogador ausente pelo próximo da classificação que ainda não esteja no chaveamento, mantendo a dupla; ou (b) dar W.O. à dupla do ausente, e a dupla adversária avança sem placar.
+- O W.O. só pode ser marcado em confronto sem placar lançado.
+- O W.O. das duas duplas no mesmo confronto continua sendo decisão do organizador (ver "Casos NÃO previstos").
 
 ## Regras de jogo (informativas, não afetam cálculos)
 
@@ -92,6 +100,5 @@ Na fase de classificação o jogo pode terminar empatado (sem prorrogação nem 
 
 O sistema não deve inventar regra para estes casos. Deve permitir que o organizador decida manualmente:
 
-- W.O. das duas duplas no mesmo jogo.
+- W.O. das duas duplas no mesmo jogo (na fase final, também no mesmo confronto).
 - Como aplicar o "confronto direto" entre jogadores individuais num campeonato em duplas.
-- W.O. na fase final.

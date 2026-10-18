@@ -26,6 +26,7 @@
   function resultadoNoConfronto(c, lado) {
     const s = c.serie;
     if (!c.pronto) return { texto: "aguardando a outra dupla", classe: "pendente" };
+    if (s.wo) return s.vencedor === lado ? { texto: "vitória por W.O.", classe: "vencedora" } : { texto: "derrota por W.O.", classe: "perdedora" };
     if (!s.vencedor) {
       if (!c.partidas.length) return { texto: "a jogar", classe: "pendente" };
       return { texto: c.melhorDe > 1 ? `em andamento, série ${s.vitorias[lado - 1]}×${s.vitorias[2 - lado]}` : "em andamento", classe: "pendente" };

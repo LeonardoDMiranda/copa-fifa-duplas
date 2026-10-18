@@ -40,6 +40,8 @@
     let avisoTroca = ""; // por que uma troca de lugar não pôde ser feita
     let mataMataAtual = null; // mata-mata resolvido do último desenho (a estrutura diz quais confrontos são da mesma rodada)
     let focarAposId = null; // após Enter num placar do mata-mata, foca o campo seguinte a este
+    let ausentesPrevia = []; // ids marcados como ausentes na prévia; só viram parte do estado quando o chaveamento é gerado
+    let ausenciaAberta = null; // { chave, jogador } do painel "Ausência" aberto num confronto
 
     // Depois de cada alteração, guarda as duplas que jogaram o 3º lugar e a final (ver
     // Regras.fixarDuplasJogadas): corrigir uma semi não passa esses placares para outra dupla.
@@ -56,9 +58,17 @@
       if (tabela.length < vagas) {
         return app.proximoPasso(`O chaveamento precisa de pelo menos ${vagas} jogadores cadastrados.`, "jogadores", "Ir para Jogadores");
       }
-      const avisos = Regras.avisosParaGerarChaveamento(atual.jogos, tabela, cfg);
+      ausentesPrevia = ausentesPrevia.filter((id) => tabela.some((l) => l.id === id));
+      const faltamJogadores = Regras.semAusentes(tabela, ausentesPrevia).length < vagas;
+      const painel = painelAusentesPrevia(tabela, vagas);
+      if (faltamJogadores) {
+        return el("div", { class: "gerar-chave" }, painel,
+          el("div", { class: "alerta", id: "aviso-ausentes-demais" }, Icones.svg("alerta"),
+            `Sem os ausentes, restam menos de ${vagas} jogadores para o chaveamento. Remova algum ausente.`));
+      }
+      const avisos = Regras.avisosParaGerarChaveamento(atual.jogos, tabela, cfg, ausentesPrevia);
       // A prévia é o próprio chaveamento que seria gerado agora: só a 1ª rodada e quem folga.
-      const previa = Regras.resolverMataMata(Regras.gerarMataMata(tabela, cfg), tabela, cfg);
+      const previa = Regras.resolverMataMata(Regras.gerarMataMata(tabela, cfg, ausentesPrevia), tabela, cfg);
       const primeira = previa.rodadas[0];
       const linhaPrevia = (c) => el("li", {},
         el("strong", {}, `${ROTULOS[c.chave]}: `),
@@ -66,6 +76,7 @@
         duplaComFicha(c.dupla2, `previa-${c.chave}-2`), ` (${c.origem[1]})`);
       const linhaFolga = (f, i) => el("li", {}, duplaComFicha(f.dupla, `previa-folga-${i}`), ` (${f.origem})`);
       return el("div", { class: "gerar-chave" },
+        painel,
         el("p", {}, `Prévia pela classificação atual (${vagas} classificados, ${primeira.nome.toLowerCase()}):`),
         el("ul", { class: "previa" }, primeira.confrontos.map(linhaPrevia)),
         previa.folgam.length > 0 && el("div", {},
@@ -80,14 +91,47 @@
         el("button", { type: "button", id: "btn-gerar-chave", class: "primario", onclick: gerarChaveamento }, "Gerar chaveamento"));
     }
 
+    // Jogadores que não vão jogar a fase final, marcados antes de gerar o chaveamento: quem vem depois
+    // na classificação sobe e entra na mesma posição (Regras.semAusentes).
+    function painelAusentesPrevia(tabela, vagas) {
+      const nome = (id) => app.nomePorId.get(id);
+      const disponiveis = Regras.semAusentes(tabela, ausentesPrevia);
+      const entram = disponiveis.slice(0, vagas).filter((l) => tabela.indexOf(l) >= vagas);
+      const candidatos = tabela.filter((l) => !ausentesPrevia.includes(l.id));
+      const seletor = el("select", { id: "sel-ausente-previa", "aria-label": "Jogador ausente na fase final" },
+        el("option", { value: "" }, "Jogador"),
+        candidatos.map((l) => el("option", { value: l.id }, `${l.posicao}º ${l.nome}`)));
+      const marcar = () => {
+        if (!seletor.value) return;
+        ausentesPrevia = [...ausentesPrevia, seletor.value];
+        app.focarDepois("sel-ausente-previa");
+        renderizar();
+      };
+      return el("div", { class: "ausentes-previa", id: "ausentes-previa" },
+        el("p", { class: "legenda" }, "Algum classificado não vai jogar a fase final? Marque o ausente: o próximo da classificação entra na mesma posição."),
+        el("div", { class: "editor-dupla" }, seletor,
+          el("button", { type: "button", id: "btn-marcar-ausente", class: "mini", onclick: marcar }, "Marcar ausente")),
+        ausentesPrevia.length > 0 && el("ul", { class: "previa", id: "lista-ausentes" },
+          ausentesPrevia.map((id) => el("li", {}, `${nome(id)} (ausente) `,
+            el("button", {
+              type: "button", id: `remover-ausente-${id}`, class: "discreto mini",
+              "aria-label": `Remover ${nome(id)} dos ausentes`,
+              onclick: () => { ausentesPrevia = ausentesPrevia.filter((x) => x !== id); renderizar(); },
+            }, "Remover")))),
+        ausentesPrevia.length > 0 && entram.length > 0 && el("p", { class: "legenda", id: "entram-no-lugar" },
+          `Entram no lugar: ${entram.map((l) => `${l.posicao}º ${l.nome}`).join(", ")}.`));
+    }
+
     // Recalcula na hora do clique: um placar digitado logo antes pode ter mudado a classificação.
     async function gerarChaveamento() {
-      const avisos = Regras.avisosParaGerarChaveamento(estado.atual().jogos, tabelaAtual(), app.config());
+      const ausentes = ausentesPrevia.slice();
+      const avisos = Regras.avisosParaGerarChaveamento(estado.atual().jogos, tabelaAtual(), app.config(), ausentes);
       if (avisos.length && !(await confirmar(`- ${avisos.join("\n- ")}`,
         { titulo: "Gerar o chaveamento mesmo assim?", acao: "Gerar mesmo assim", perigo: true }))) return;
       if (estado.atual().mataMata) return; // outra janela já gerou
       const tabela = tabelaAtual();
-      estado.modificar("gerar chaveamento", (s) => { s.mataMata = Regras.gerarMataMata(tabela, app.config()); });
+      ausentesPrevia = [];
+      estado.modificar("gerar chaveamento", (s) => { s.mataMata = Regras.gerarMataMata(tabela, app.config(), ausentes); });
     }
 
     async function apagarChaveamento() {
@@ -241,7 +285,7 @@
     }
 
     function linhaDupla(c, lado, tabela) {
-      if (editandoDupla && editandoDupla.chave === c.chave && editandoDupla.lado === lado) {
+      if (editandoDupla && editandoDupla.chave === c.chave && editandoDupla.lado === lado && !c.wo) {
         return editorDupla(c, lado, tabela);
       }
       const info = c[`lado${lado}`];
@@ -259,12 +303,83 @@
           class: "tag-manual",
           title: info.automatica ? `Automática seria: ${nomesDupla(info.automatica)}` : "Automática ainda indefinida",
         }, "alterada manualmente"),
-        vencedora && el("span", { class: "tag-vence" }, Icones.svg("confirmar"), "vence"),
-        botaoIcone({
+        c.wo === lado && el("span", { class: "tag-wo", title: "Esta dupla não compareceu" }, "W.O."),
+        vencedora && el("span", { class: "tag-vence" }, Icones.svg("confirmar"), c.wo ? "avança" : "vence"),
+        // Com W.O. a dupla não muda nem troca de lugar até o W.O. ser desfeito.
+        !c.wo && botaoIcone({
           icone: "editar", rotulo: `Trocar a dupla ${lado} (${ROTULOS[c.chave]})`, id: `editar-${c.chave}-${lado}`, class: "discreto mini",
           onclick: () => { editandoDupla = { chave: c.chave, lado }; renderizar(); },
         }),
-        controleDeTroca(c, lado, tabela));
+        !c.wo && controleDeTroca(c, lado, tabela));
+    }
+
+    // ---------- ausência de um jogador (Fase 26) ----------
+    // Duas saídas, escolhidas pelo organizador: substituir o ausente pelo próximo da classificação (a dupla
+    // segue) ou dar W.O. à dupla dele (a adversária avança sem placar). Regras em Regras.substituirJogador / marcarWO.
+
+    async function substituirAusente(c, lado, jogador, entra) {
+      const nome = (id) => app.nomePorId.get(id);
+      const ok = await confirmar(`${nome(jogador)} sai e ${nome(entra)} entra na dupla ${lado} de ${ROTULOS[c.chave]}. A dupla segue no mata-mata.`,
+        { titulo: "Substituir o jogador ausente?", acao: "Substituir" });
+      if (!ok) return;
+      ausenciaAberta = null;
+      modificarMataMata(`${ROTULOS[c.chave]}: ${nome(jogador)} substituído por ${nome(entra)}`,
+        (m) => Regras.substituirJogador(m, tabelaAtual(), c.chave, lado, jogador, app.config()));
+    }
+
+    async function darWO(c, lado) {
+      const ok = await confirmar(`A dupla ${lado} (${nomesDupla(c[`dupla${lado}`])}) não comparece e a dupla ${3 - lado} avança sem placar. `
+        + "Dá para voltar com \"Desfazer W.O.\".", { titulo: "Dar W.O. a esta dupla?", acao: "Dar W.O.", perigo: true });
+      if (!ok) return;
+      ausenciaAberta = null;
+      modificarMataMata(`${ROTULOS[c.chave]}: W.O. da dupla ${lado}`, (m) => Regras.marcarWO(m, tabelaAtual(), c.chave, lado, app.config()));
+    }
+
+    function desfazerWO(c) {
+      modificarMataMata(`${ROTULOS[c.chave]}: desfazer W.O.`, (m) => Regras.desfazerWO(m, c.chave));
+    }
+
+    function painelAusencia(c, tabela) {
+      const mm = estado.atual().mataMata, cfg = app.config();
+      const nome = (id) => app.nomePorId.get(id);
+      const jogadores = [...(c.dupla1 || []), ...(c.dupla2 || [])].filter(Boolean);
+      const escolhido = jogadores.includes(ausenciaAberta.jogador) ? ausenciaAberta.jogador : jogadores[0];
+      const lado = (c.dupla1 || []).includes(escolhido) ? 1 : 2;
+      const entra = Regras.proximoSubstituto(mm, tabela, cfg);
+      const erroSubstituir = Regras.erroDeSubstituicao(mm, tabela, c.chave, lado, escolhido, cfg);
+      const erroWO = Regras.erroDeWO(mm, tabela, c.chave, lado, cfg);
+      const seletor = el("select", {
+        id: `ausente-${c.chave}`, "aria-label": `Jogador ausente (${ROTULOS[c.chave]})`,
+        onchange: (ev) => { ausenciaAberta = { chave: c.chave, jogador: ev.target.value }; renderizar(); },
+      }, jogadores.map((id) => el("option", { value: id, selected: id === escolhido }, nome(id))));
+      const fechar = () => { ausenciaAberta = null; app.focarDepois(`ausencia-${c.chave}`); renderizar(); };
+      return el("div", { class: "painel-ausencia", id: `painel-ausencia-${c.chave}` },
+        el("div", { class: "editor-dupla" }, el("span", { class: "rotulo-lado" }, "Ausente"), seletor),
+        el("div", { class: "acoes-ausencia" },
+          el("button", {
+            type: "button", id: `substituir-${c.chave}`, class: "primario mini", disabled: Boolean(erroSubstituir),
+            onclick: () => substituirAusente(c, lado, escolhido, entra),
+          }, entra ? `Substituir por ${nome(entra)}` : "Substituir"),
+          el("button", {
+            type: "button", id: `wo-${c.chave}`, class: "perigo mini", disabled: Boolean(erroWO), onclick: () => darWO(c, lado),
+          }, `W.O. da dupla ${lado}`),
+          el("button", { type: "button", id: `ausencia-cancelar-${c.chave}`, class: "discreto mini", onclick: fechar }, "Cancelar")),
+        erroSubstituir && el("p", { class: "legenda", id: `erro-substituir-${c.chave}` }, `Substituir: ${erroSubstituir}`),
+        erroWO && el("p", { class: "legenda", id: `erro-wo-${c.chave}` }, `W.O.: ${erroWO}`));
+    }
+
+    function controleDeAusencia(c, tabela) {
+      if (c.wo) {
+        return el("div", { class: "acoes-ausencia" },
+          el("button", { type: "button", id: `desfazer-wo-${c.chave}`, class: "mini", onclick: () => desfazerWO(c) }, "Desfazer W.O."));
+      }
+      if (c.serie.vencedor || (!c.dupla1 && !c.dupla2)) return null;
+      if (ausenciaAberta && ausenciaAberta.chave === c.chave) return painelAusencia(c, tabela);
+      return el("div", { class: "acoes-ausencia" },
+        el("button", {
+          type: "button", id: `ausencia-${c.chave}`, class: "discreto mini",
+          onclick: () => { ausenciaAberta = { chave: c.chave, jogador: null }; app.focarDepois(`ausente-${c.chave}`); renderizar(); },
+        }, "Ausência"));
     }
 
     const idErroMM = (id) => `${id}-erro`;
@@ -336,6 +451,7 @@
       const serie = c.serie;
       let status = "A jogar";
       if (!c.pronto) status = "Aguardando duplas";
+      else if (c.wo) status = "Decidido por W.O.";
       else if (serie.vencedor) status = "Decidido";
       else if (c.partidas.length) status = "Em andamento";
       const erroDuplas = c.pronto ? Regras.validarDuplas(c.dupla1, c.dupla2) : null;
@@ -349,15 +465,19 @@
           el("span", { class: "status" }, status)),
         linhaDupla(c, 1, tabela),
         linhaDupla(c, 2, tabela),
+        controleDeAusencia(c, tabela),
         erroDuplas && el("div", { class: "alerta" }, Icones.svg("alerta"), erroDuplas),
         semParceiro && el("div", { class: "alerta", id: `sem-parceiro-${c.chave}` }, Icones.svg("alerta"),
           `${app.nomePorId.get(semParceiro[0])} está sem dupla: escolha o parceiro em "Trocar a dupla" para liberar os placares.`),
-        c.melhorDe > 1 && c.pronto && el("div", { class: "placar-serie" },
+        c.melhorDe > 1 && c.pronto && !c.wo && el("div", { class: "placar-serie" },
           `Série: ${serie.vitorias[0]} × ${serie.vitorias[1]}`,
           !serie.vencedor && el("span", { class: "legenda" }, ` (vence quem fizer ${serie.necessarias})`)),
-        c.pronto
-          ? partidasDoConfronto(c)
-          : el("p", { class: "legenda" }, "Os placares abrem quando as duas duplas estiverem definidas."));
+        c.wo
+          ? el("div", { class: "resultado-partida", id: `resultado-wo-${c.chave}` }, Icones.svg("confirmar"),
+            `W.O. da dupla ${c.wo}: a dupla ${3 - c.wo} avança sem placar.`)
+          : c.pronto
+            ? partidasDoConfronto(c)
+            : el("p", { class: "legenda" }, "Os placares abrem quando as duas duplas estiverem definidas."));
     }
 
     function podio(p, comTerceiro) {
@@ -456,6 +576,8 @@
         editandoDupla = null;
         trocando = null;
         avisoTroca = "";
+        ausentesPrevia = [];
+        ausenciaAberta = null;
       },
     };
   }

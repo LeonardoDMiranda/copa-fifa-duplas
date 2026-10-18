@@ -236,6 +236,7 @@
 
   // Número grande ao lado de cada dupla: gols (jogo único) ou vitórias na série (final).
   function valorDoLado(c, lado) {
+    if (c.serie.wo) return lado === c.serie.wo ? "W.O." : "–";
     if (c.melhorDe > 1) return c.pronto && c.partidas.length ? c.serie.vitorias[lado - 1] : "–";
     const gols = (c.partidas[0] || {})[`gols${lado}`];
     return gols != null ? gols : "–";
@@ -245,7 +246,9 @@
   function detalheDoConfronto(c) {
     const partida = c.partidas[0] || {};
     let detalhe = "";
-    if (c.melhorDe > 1) {
+    if (c.serie.wo) {
+      detalhe = `W.O. da dupla ${c.serie.wo} · a dupla ${3 - c.serie.wo} avança sem placar`;
+    } else if (c.melhorDe > 1) {
       detalhe = c.partidas.map((p, i) => {
         const extras = extrasDaPartida(p, c.serie.analises[i] || {});
         const gols = p.gols1 != null && p.gols2 != null ? placarTexto(p.gols1, p.gols2) : "em andamento";

@@ -819,6 +819,198 @@
       t.verdadeiro(depois.semi1.lado1.manual && depois.semi2.lado2.manual, "marcadas como alteradas manualmente");
     });
 
+    // ---------- Jogador ausente na fase final (Fase 26) ----------
+
+    caso("MM11 Ausente antes do chaveamento: o próximo da tabela entra na mesma posição", (t) => {
+      const tabela = tabelaDe(32);
+      const base = Regras.gerarMataMata(tabela, configCom(8));
+      t.igual(Object.keys(base), ["semi1", "semi2", "terceiro", "final"], "sem ausentes: o mesmo estado de antes (sem o campo 'ausentes')");
+      t.igual(Object.keys(Regras.gerarMataMata(tabela, configCom(8), [])), ["semi1", "semi2", "terceiro", "final"], "lista vazia também não grava o campo");
+
+      const mm = Regras.gerarMataMata(tabela, configCom(8), ["j2"]);
+      t.igual(mm.ausentes, ["j2"], "os ausentes ficam guardados no mata-mata");
+      const r = Regras.resolverMataMata(mm, tabela);
+      t.igual([r.semi1.dupla1, r.semi1.dupla2], [["j0", "j8"], ["j1", "j7"]], "o 3º (j2) falta: o 9º (j8) entra na posição do 8º e todos sobem");
+      t.igual([r.semi2.dupla1, r.semi2.dupla2], [["j3", "j6"], ["j4", "j5"]], "Semi 2 com o 4º ao 7º");
+      t.verdadeiro(!r.semi1.lado1.desatualizada && !r.semi2.lado2.desatualizada, "as duplas não aparecem como desatualizadas");
+      t.verdadeiro(!JSON.stringify(r.chaves.map((k) => [r[k].dupla1, r[k].dupla2])).includes("j2"), "o ausente não está em nenhum confronto");
+
+      const cadeia = Regras.resolverMataMata(Regras.gerarMataMata(tabela, configCom(8), ["j2", "j8"]), tabela);
+      t.igual([cadeia.semi1.dupla1, cadeia.semi1.dupla2], [["j0", "j9"], ["j1", "j7"]], "se o 9º também faltou, entra o 10º");
+
+      const ultimo = Regras.resolverMataMata(Regras.gerarMataMata(tabela, configCom(8), ["j0", "j1", "j2"]), tabela);
+      t.igual(ultimo.semi1.dupla1, ["j3", "j10"], "vários ausentes: o 1º do chaveamento passa a ser o 4º da tabela");
+
+      const antes = Regras.resolverMataMata(Regras.gerarMataMata(tabela, configCom(8), ["j2"]), tabela);
+      const volta = Regras.voltarDuplaAutomatica(Regras.definirDupla(mm, "semi1", 1, ["j3", "j9"]), "semi1", 1, tabela);
+      t.igual(Regras.resolverMataMata(volta, tabela).semi1.dupla1, antes.semi1.dupla1, "voltar à automática respeita os ausentes");
+      t.igual(Regras.resolverMataMata(Regras.atualizarDuplasDasSemis(mm, tabela), tabela).semi1.dupla1, ["j0", "j8"], "atualizar pela classificação também");
+
+      let erro = null;
+      try { Regras.gerarMataMata(tabelaDe(9), configCom(8), ["j0", "j1"]); } catch (e) { erro = e; }
+      t.verdadeiro(erro, "sem jogadores suficientes depois de tirar os ausentes: não gera");
+      t.igual(Regras.semAusentes(tabela, ["j0"]).length, 31, "semAusentes tira o jogador da classificação");
+      t.igual(Regras.semAusentes(tabela, undefined), tabela, "sem a lista, devolve a classificação como está");
+    });
+
+    caso("MM12 Substituir um ausente durante o mata-mata: entra o próximo da tabela que não está no chaveamento", (t) => {
+      const tabela = tabelaDe(32);
+      const original = Regras.gerarMataMata(tabela, configCom(8));
+      t.igual(Regras.proximoSubstituto(original, tabela), "j8", "o próximo é o 9º");
+      t.igual(Regras.proximoSubstituto(Regras.gerarMataMata(tabela, configCom(8), ["j2"]), tabela), "j9", "com j2 ausente antes do chaveamento, j8 já está no chaveamento: o próximo é o 10º");
+
+      t.igual(Regras.erroDeSubstituicao(original, tabela, "semi1", 2, "j6"), null, "j6 está na dupla 2 da Semi 1: pode");
+      const mm = Regras.substituirJogador(original, tabela, "semi1", 2, "j6");
+      const r = Regras.resolverMataMata(mm, tabela);
+      t.igual(r.semi1.dupla2, ["j1", "j8"], "a dupla segue com o 9º no lugar do ausente");
+      t.verdadeiro(r.semi1.lado2.manual, "e fica 'alterada manualmente' (reaproveita a troca de dupla)");
+      t.igual(mm.substituidos, ["j6"], "guarda quem saiu");
+      t.igual(original.semi1.dupla2, ["j1", "j6"], "o mata-mata de entrada não é alterado");
+      t.igual(Regras.proximoSubstituto(mm, tabela), "j9", "o próximo substituto agora é o 10º");
+
+      const outra = Regras.substituirJogador(mm, tabela, "semi1", 2, "j8");
+      t.igual(Regras.resolverMataMata(outra, tabela).semi1.dupla2, ["j1", "j9"], "o substituto também pode faltar: entra o seguinte");
+      t.igual(Regras.proximoSubstituto(outra, tabela), "j10", "e quem já foi substituído (j6, j8) não volta");
+
+      const vence = Regras.resolverMataMata(lancarMMVencedor(mm, "semi1", 2, tabela), tabela);
+      t.igual(vence.final.dupla1, ["j1", "j8"], "a dupla com o substituto avança para a final");
+
+      t.verdadeiro(/não está nessa dupla/.test(Regras.erroDeSubstituicao(original, tabela, "semi1", 2, "j0")), "jogador de outra dupla: bloqueado");
+      t.verdadeiro(/decidido/.test(Regras.erroDeSubstituicao(lancarMMVencedor(original, "semi1", 1, tabela), tabela, "semi1", 1, "j0")), "confronto já decidido: bloqueado");
+      t.verdadeiro(/W\.O\./.test(Regras.erroDeSubstituicao(Regras.marcarWO(original, tabela, "semi1", 1), tabela, "semi1", 2, "j6")), "confronto com W.O.: bloqueado");
+      t.verdadeiro(/não encontrado/.test(Regras.erroDeSubstituicao(original, tabela, "inexistente", 1, "j0")), "confronto inexistente: bloqueado");
+      const pequena = tabelaDe(8);
+      t.verdadeiro(/Não há mais jogadores/.test(Regras.erroDeSubstituicao(Regras.gerarMataMata(pequena, configCom(8)), pequena, "semi1", 1, "j0")), "classificação esgotada: bloqueado");
+      let erro = null;
+      try { Regras.substituirJogador(original, tabela, "semi1", 2, "j0"); } catch (e) { erro = e; }
+      t.verdadeiro(erro, "substituirJogador lança erro quando não vale");
+
+      const final = Regras.substituirJogador(lancarMMVencedor(lancarMMVencedor(original, "semi1", 1, tabela), "semi2", 1, tabela), tabela, "final", 2, "j2");
+      t.igual(Regras.resolverMataMata(final, tabela).final.dupla2, ["j8", "j5"], "na final, a dupla vinda das semis também aceita o substituto");
+    });
+
+    caso("MM13 W.O. de uma dupla no mata-mata: a adversária avança sem placar", (t) => {
+      const tabela = tabelaDe(32);
+      const original = Regras.gerarMataMata(tabela, configCom(8));
+      t.igual(Regras.erroDeWO(original, tabela, "semi1", 1), null, "Semi 1 sem placar e com as duas duplas: pode");
+      const mm = Regras.marcarWO(original, tabela, "semi1", 1);
+      let r = Regras.resolverMataMata(mm, tabela);
+      t.campos(r.semi1.serie, { vencedor: 2, wo: 1 }, "Semi 1");
+      t.igual([r.semi1.wo, r.semi1.vencedora, r.semi1.perdedora, r.semi1.partidas], [1, ["j1", "j6"], ["j0", "j7"], []], "a dupla 2 vence, sem placar");
+      t.igual([r.final.dupla1, r.terceiro.dupla1], [["j1", "j6"], ["j0", "j7"]], "a vencedora vai para a final e a dupla do W.O. para o 3º lugar");
+      t.igual(original.semi1.wo, undefined, "o mata-mata de entrada não é alterado");
+
+      let semDois = lancarMMVencedor(mm, "semi2", 1, tabela);
+      r = Regras.resolverMataMata(semDois, tabela);
+      t.igual([r.final.dupla1, r.final.dupla2, r.terceiro.dupla2], [["j1", "j6"], ["j2", "j5"], ["j3", "j4"]], "as duas semis resolvidas: final e 3º lugar prontos");
+
+      // W.O. na final (melhor de 3) e no 3º lugar: o pódio sai sem placar.
+      const nasFinais = Regras.marcarWO(Regras.marcarWO(semDois, tabela, "final", 2), tabela, "terceiro", 1);
+      r = Regras.resolverMataMata(nasFinais, tabela);
+      t.igual(r.final.melhorDe, 3, "a final continua em melhor de 3");
+      t.igual(r.podio, { campeoes: ["j1", "j6"], vice: ["j2", "j5"], terceiro: ["j3", "j4"] }, "pódio: W.O. da dupla 2 na final e da dupla 1 no 3º lugar");
+      t.igual(r.final.serie.partidasVisiveis, 0, "sem jogos a lançar");
+
+      // Bloqueios.
+      t.verdadeiro(/duas duplas completas/.test(Regras.erroDeWO(original, tabela, "final", 1)), "final sem as duas duplas: bloqueado");
+      const comPlacar = Regras.definirCampoPartida(original, "semi1", 0, "gols1", 1);
+      t.verdadeiro(/placar lançado/.test(Regras.erroDeWO(comPlacar, tabela, "semi1", 1)), "confronto com placar: bloqueado (limpe antes)");
+      t.verdadeiro(/decisão do organizador/.test(Regras.erroDeWO(mm, tabela, "semi1", 2)), "W.O. nas duas duplas do mesmo confronto: bloqueado");
+      t.verdadeiro(/já está com W\.O\./.test(Regras.erroDeWO(mm, tabela, "semi1", 1)), "W.O. repetido na mesma dupla: bloqueado");
+      t.verdadeiro(/não encontrado/.test(Regras.erroDeWO(original, tabela, "inexistente", 1)), "confronto inexistente: bloqueado");
+      t.verdadeiro(/não encontrado/.test(Regras.erroDeWO(original, tabela, "semi1", 3)), "lado inválido: bloqueado");
+      const incompleto = Regras.gerarMataMata(tabelaDe(20), configCom(17));
+      t.verdadeiro(/duas duplas completas/.test(Regras.erroDeWO(incompleto, tabelaDe(20), "oitavas1", 1)), "dupla sem parceiro (vagas ímpares): bloqueado");
+      const lanca = (fn) => { try { fn(); return null; } catch (e) { return e; } };
+      t.verdadeiro(lanca(() => Regras.marcarWO(mm, tabela, "semi1", 2)), "marcarWO lança erro quando não vale");
+      t.verdadeiro(/W\.O\./.test(lanca(() => Regras.definirCampoPartida(mm, "semi1", 0, "gols1", 1)).message), "com W.O., o confronto não aceita placar");
+      t.verdadeiro(/W\.O\./.test(lanca(() => Regras.definirDupla(mm, "semi1", 1, ["j9", "j10"])).message), "nem troca de dupla");
+      t.verdadeiro(/W\.O\./.test(Regras.erroDeTrocaDeLugar(mm, tabela, { chave: "semi1", lado: 2 }, { chave: "semi2", lado: 1 })), "nem troca de lugar");
+
+      // Desfazer.
+      t.igual(Regras.desfazerWO(mm, "semi1"), original, "desfazer devolve o confronto ao estado de antes");
+      t.igual(Regras.resolverMataMata(Regras.desfazerWO(mm, "semi1"), tabela).final.dupla1, null, "e a final volta a aguardar a Semi 1");
+
+      // Desfazer o W.O. depois de a final ter placar: a final avisa que a dupla guardada não bate mais.
+      let jogada = Regras.fixarDuplasJogadas(lancarMMVencedor(semDois, "final", 1, tabela), tabela);
+      t.igual(jogada.final.dupla1, ["j1", "j6"], "o placar da final guarda a dupla que jogou");
+      jogada = lancarMMVencedor(Regras.desfazerWO(jogada, "semi1"), "semi1", 1, tabela);
+      t.verdadeiro(Regras.resolverMataMata(jogada, tabela).final.lado1.desatualizada, "desfeito o W.O. e a Semi 1 jogada: a final avisa 'dupla desatualizada'");
+    });
+
+    caso("MM14 Ausentes, substituídos e W.O. são salvos, importados, validados e entram no desfazer", (t) => {
+      const base = classificar();
+      const est = criarEstado();
+      est.modificar("gerar com ausente", (s) => { s.mataMata = Regras.gerarMataMata(base, Regras.REGRAS_PADRAO, ["p23"]); });
+      t.igual(est.atual().mataMata.ausentes, ["p23"], "os ausentes ficam no estado");
+      const quemFalta = Regras.resolverMataMata(est.atual().mataMata, base).semi2.dupla2[0];
+      est.modificar("substituir", (s) => { s.mataMata = Regras.substituirJogador(s.mataMata, base, "semi2", 2, quemFalta); });
+      est.modificar("W.O.", (s) => { s.mataMata = Regras.marcarWO(s.mataMata, base, "semi1", 1); });
+      const mm = est.atual().mataMata;
+      t.verdadeiro(mm.substituidos.length === 1 && mm.semi1.wo === 1, "substituídos e W.O. também");
+
+      const reimportado = criarEstado();
+      reimportado.importarJSON(est.exportarJSON());
+      t.igual(reimportado.atual().mataMata, mm, "tudo sobrevive a exportar e importar");
+      t.igual(Regras.resolverMataMata(reimportado.atual().mataMata, base).semi1.serie.wo, 1, "e o W.O. continua valendo");
+
+      est.desfazer();
+      t.igual(est.atual().mataMata.semi1.wo, undefined, "desfazer tira o W.O.");
+      est.desfazer();
+      t.igual(est.atual().mataMata.substituidos, undefined, "desfazer a substituição");      t.igual(est.atual().mataMata.ausentes, ["p23"], "e os ausentes continuam");
+
+      // Backup antigo: sem os campos novos, continua igual.
+      const antigo = JSON.parse(est.exportarJSON());
+      delete antigo.mataMata.ausentes;
+      const veio = criarEstado();
+      veio.importarJSON(JSON.stringify(antigo));
+      t.verdadeiro(!("ausentes" in veio.atual().mataMata) && !("substituidos" in veio.atual().mataMata)
+        && !veio.atual().mataMata.semi1.wo, "backup sem os campos novos importa sem eles");
+
+      const tenta = (ajustar) => {
+        const json = JSON.parse(reimportado.exportarJSON());
+        ajustar(json.mataMata);
+        try { criarEstado().importarJSON(JSON.stringify(json)); return null; } catch (e) { return e; }
+      };
+      t.verdadeiro(tenta((m) => { m.ausentes = ["ninguem"]; }), "ausente desconhecido é recusado");
+      t.verdadeiro(tenta((m) => { m.ausentes = ["p23", "p23"]; }), "ausente repetido é recusado");
+      t.verdadeiro(tenta((m) => { m.substituidos = "p21"; }), "lista de substituídos que não é lista é recusada");
+      t.verdadeiro(tenta((m) => { m.semi1.wo = 3; }), "W.O. de um lado que não existe é recusado");
+    });
+
+    caso("MM15 PNG e telão mostram o W.O. no lugar do placar, sem mudar o tamanho da imagem", (t) => {
+      const tabela = tabelaDe(32);
+      const nomePorId = new Map(tabela.map((l) => [l.id, l.nome]));
+      const mm = Regras.marcarWO(Regras.gerarMataMata(tabela, configCom(8)), tabela, "semi1", 1);
+      const r = Regras.resolverMataMata(mm, tabela);
+      t.igual([Exportar.valorDoLado(r.semi1, 1), Exportar.valorDoLado(r.semi1, 2)], ["W.O.", "–"], "a dupla ausente mostra W.O. e a que avança, traço");
+      t.verdadeiro(/W\.O\. da dupla 1.*dupla 2 avança sem placar/.test(Exportar.detalheDoConfronto(r.semi1)), "a linha de detalhe explica o W.O.");
+      t.igual(Exportar.valorDoLado(r.semi2, 1), "–", "os outros confrontos seguem como antes");
+      const imagem = Exportar.desenharMataMata(r, nomePorId, { geradoEm: new Date(2026, 9, 2, 15, 30), nome: "Copa de teste" });
+      t.igual(imagem.height, 1458, "a imagem tem a mesma altura do chaveamento sem W.O.");
+
+      const dados = dadosV2((d) => { d.campeonato.config.vagasFaseFinal = 8; });
+      const tab = Regras.calcularClassificacao(Regras.baseDosJogadores(dados.campeonato.jogadores), dados.jogos, [], dados.campeonato.config);
+      dados.mataMata = Regras.marcarWO(Regras.gerarMataMata(tab, dados.campeonato.config), tab, "semi1", 2, dados.campeonato.config);
+      const est = Estado.criar(memoria({ [Estado.CHAVE]: JSON.stringify(dados) }));
+      const raiz = document.createElement("div");
+      raiz.id = "telao";
+      raiz.hidden = true;
+      document.body.appendChild(raiz);
+      const telao = Telao.criar(est);
+      try {
+        telao.abrir({ telaCheia: false });
+        raiz.querySelector("#telao-proxima").click();
+        raiz.querySelector("#telao-proxima").click();
+        const valores = [...raiz.querySelectorAll(".telao-confronto")[0].querySelectorAll(".valor")].map((v) => v.textContent);
+        t.igual(valores, ["–", "W.O."], "no telão, a Semi 1 mostra o W.O. da dupla 2");
+        t.verdadeiro(raiz.querySelector(".telao-confronto .detalhe").textContent.includes("sem placar"), "e o detalhe");
+      } finally {
+        telao.fechar();
+        raiz.remove();
+      }
+    });
+
     // 10
     function porSituacao(situacoes, tipo) {
       return situacoes.filter((s) => s.situacao === tipo).map((s) => s.nome);

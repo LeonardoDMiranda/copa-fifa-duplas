@@ -33,6 +33,10 @@
   <script src="js/campeonatos.js"></script>
   <script src="js/icones.js"></script>
   <script src="js/util.js"></script>
+  <script>
+    // Os casos que definem globalThis.respostaDaConfirmacao respondem a janela de confirmação sem abri-la (ver V13).
+    { const original = Util.confirmar; Util.confirmar = (mensagem, opcoes) => (globalThis.respostaDaConfirmacao === undefined ? original(mensagem, opcoes) : Promise.resolve(globalThis.respostaDaConfirmacao)); }
+  </script>
   <script src="js/telas/configuracao.js"></script>
   <script src="js/telas/jogadores.js"></script>
   <script src="js/telas/sorteio.js"></script>
@@ -1391,6 +1395,120 @@
       clicar(raiz, "trocar-semi1-1");
       t.igual([...raiz.querySelectorAll("[id^='trocar-com-']")].map((b) => b.id), [], "semifinais: a Semi 2 ainda espera os vencedores das quartas, então não há com quem trocar");
     });
+
+    // ---------- V13: jogador ausente na fase final (Fase 26) ----------
+
+    const esperar = (ms = 20) => new Promise((resolver) => setTimeout(resolver, ms));
+    // A janela de confirmação (Util.confirmar) é respondida pelo próprio teste: o fechamento real da janela
+    // não é confiável no Edge sem cabeça. Fora destes casos, a janela real continua valendo.
+    async function aceitandoConfirmacoes(fn) {
+      globalThis.respostaDaConfirmacao = true;
+      try { await fn(); } finally { globalThis.respostaDaConfirmacao = undefined; }
+    }
+    const confirmarDialogo = () => esperar();
+
+    caso("V13.1 Prévia: marcar um ausente faz o próximo da classificação entrar; remover desfaz; gerar guarda os ausentes", (t) => aceitandoConfirmacoes(async () => {
+      const ctx = criarAppFalso(dadosComFaseFinal(8, {}, { chave: false }));
+      const raiz = ctx.montar("mataMata");
+      const tabela = ctx.tabelaAtual();
+      const nome = (id) => ctx.app.nomePorId.get(id);
+      const previa = () => [...raiz.querySelectorAll("ul.previa")].filter((u) => u.id !== "lista-ausentes").map((u) => u.textContent).join(" ");
+      verificarLimpeza(t, raiz, "prévia com seletor de ausente");
+      t.verdadeiro(buscar(raiz, "sel-ausente-previa") && !buscar(raiz, "lista-ausentes"), "seletor de ausente e nenhum ausente marcado");
+      const terceiro = tabela[2].id;
+      mudarCampo(buscar(raiz, "sel-ausente-previa"), terceiro);
+      clicar(raiz, "btn-marcar-ausente");
+      t.igual(raiz.querySelectorAll("#lista-ausentes li").length, 1, "o ausente aparece na lista");
+      t.verdadeiro(texto(raiz, "entram-no-lugar").includes(nome(tabela[8].id)), "o 9º da classificação entra no lugar");
+      t.verdadeiro(!previa().includes(nome(terceiro)) && previa().includes(nome(tabela[8].id)), "a prévia não tem o ausente e tem quem entrou");
+      verificarLimpeza(t, raiz, "prévia com ausente");
+      clicar(raiz, `remover-ausente-${terceiro}`);
+      t.verdadeiro(!buscar(raiz, "lista-ausentes") && previa().includes(nome(terceiro)), "remover o ausente devolve a prévia de antes");
+      mudarCampo(buscar(raiz, "sel-ausente-previa"), terceiro);
+      clicar(raiz, "btn-marcar-ausente");
+      clicar(raiz, "btn-gerar-chave");
+      await confirmarDialogo();
+      const mm = ctx.estado.atual().mataMata;
+      t.verdadeiro(mm, "o chaveamento foi gerado");
+      t.igual(mm.ausentes, [terceiro], "os ausentes ficam guardados no mata-mata");
+      const r = Regras.resolverMataMata(mm, ctx.tabelaAtual());
+      t.verdadeiro(!JSON.stringify(r.chaves.map((k) => [r[k].dupla1, r[k].dupla2])).includes(terceiro), "o ausente não está em nenhum confronto");
+      t.verdadeiro(buscar(raiz, "mm-semi1") && !buscar(raiz, "lista-ausentes"), "a tela mostra o chaveamento no lugar da prévia");
+    }));
+
+    caso("V13.2 Ausência no confronto: substituir pelo próximo da classificação que não está no chaveamento", (t) => aceitandoConfirmacoes(async () => {
+      const ctx = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const { estado } = ctx;
+      const raiz = ctx.montar("mataMata");
+      t.verdadeiro(buscar(raiz, "ausencia-semi1") && !buscar(raiz, "ausencia-final"), "botão Ausência nos confrontos com dupla; a final ainda sem duplas não tem");
+      clicar(raiz, "ausencia-semi1");
+      t.verdadeiro(buscar(raiz, "painel-ausencia-semi1"), "abre o painel de ausência");
+      verificarLimpeza(t, raiz, "painel de ausência");
+      verificarAcessibilidade(t, raiz, "painel de ausência");
+      const antes = estado.atual().mataMata.semi1.dupla1.slice();
+      const entra = Regras.proximoSubstituto(estado.atual().mataMata, ctx.tabelaAtual());
+      t.verdadeiro(texto(raiz, "substituir-semi1").includes(ctx.app.nomePorId.get(entra)), "o botão diz quem entra");
+      clicar(raiz, "substituir-semi1");
+      await esperar();
+      const mm = estado.atual().mataMata;
+      t.igual(mm.semi1.dupla1, [entra, antes[1]], "o ausente sai e o próximo da classificação entra; a dupla segue");
+      t.verdadeiro(mm.semi1.duplaManual1 && mm.substituidos.includes(antes[0]), "dupla alterada manualmente e o substituído guardado");
+      t.verdadeiro(!buscar(raiz, "painel-ausencia-semi1") && raiz.querySelectorAll(".tag-manual").length === 1, "o painel fecha e a dupla aparece como alterada");
+      t.verdadeiro(/substituído por/.test(estado.atual().historico[estado.atual().historico.length - 1].descricao), "o desfazer descreve a substituição");
+    }));
+
+    caso("V13.3 Ausência no confronto: W.O. da dupla, sem placar, e desfazer", (t) => aceitandoConfirmacoes(async () => {
+      const ctx = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const { estado } = ctx;
+      const raiz = ctx.montar("mataMata");
+      clicar(raiz, "ausencia-semi2");
+      const dupla2 = estado.atual().mataMata.semi2.dupla2;
+      mudarCampo(buscar(raiz, "ausente-semi2"), dupla2[1]);
+      t.verdadeiro(texto(raiz, "wo-semi2").includes("dupla 2"), "o botão do W.O. acompanha a dupla do jogador escolhido");
+      clicar(raiz, "wo-semi2");
+      await confirmarDialogo();
+      const mm = estado.atual().mataMata;
+      t.igual(mm.semi2.wo, 2, "W.O. da dupla 2 guardado");
+      t.verdadeiro(buscar(raiz, "resultado-wo-semi2") && texto(raiz, "mm-semi2").includes("Decidido por W.O."), "o cartão mostra o W.O.");
+      t.verdadeiro(!buscar(raiz, "mm-semi2-0-gols1") && !buscar(raiz, "editar-semi2-1") && !buscar(raiz, "trocar-semi2-1") && !buscar(raiz, "ausencia-semi2"),
+        "sem campo de placar, sem trocar a dupla e sem novo pedido de ausência");
+      t.igual(raiz.querySelectorAll(".tag-wo").length, 1, "uma marca de W.O. na dupla ausente");
+      t.igual(Regras.resolverMataMata(mm, ctx.tabelaAtual()).final.dupla2, mm.semi2.dupla1, "a dupla adversária avança para a final");
+      verificarLimpeza(t, raiz, "confronto com W.O.");
+      verificarAcessibilidade(t, raiz, "confronto com W.O.");
+      clicar(raiz, "desfazer-wo-semi2");
+      t.verdadeiro(estado.atual().mataMata.semi2.wo === undefined && buscar(raiz, "mm-semi2-0-gols1") && !buscar(raiz, "desfazer-wo-semi2"), "desfazer o W.O. devolve o campo de placar");
+      t.verdadeiro(estado.atual().historico[estado.atual().historico.length - 1].descricao.includes("desfazer W.O."), "e o desfazer do app descreve");
+    }));
+
+    caso("V13.4 Ausência: com placar o W.O. fica bloqueado com explicação; confronto decidido não tem o botão", async (t) => {
+      const ctx = criarAppFalso(dadosComCalendario({ mataMata: true }));
+      const raiz = ctx.montar("mataMata");
+      mudarCampo(buscar(raiz, "mm-semi1-0-gols1"), "1");
+      clicar(raiz, "ausencia-semi1");
+      t.verdadeiro(buscar(raiz, "wo-semi1").disabled && /placar lançado/.test(texto(raiz, "erro-wo-semi1")), "W.O. desabilitado e explica o placar lançado");
+      t.verdadeiro(!buscar(raiz, "substituir-semi1").disabled, "substituir continua possível enquanto o confronto não termina");
+      clicar(raiz, "ausencia-cancelar-semi1");
+      t.verdadeiro(!buscar(raiz, "painel-ausencia-semi1") && buscar(raiz, "ausencia-semi1"), "cancelar fecha o painel sem mudar nada");
+      mudarCampo(buscar(raiz, "mm-semi1-0-gols2"), "0");
+      t.verdadeiro(!buscar(raiz, "ausencia-semi1"), "confronto decidido: sem o botão Ausência");
+    });
+
+    caso("V13.5 Ficha do jogador mostra vitória e derrota por W.O. no confronto", (t) => comAreaVisivel(() => {
+      const dados = dadosComCalendario({ mataMata: true });
+      dados.mataMata.semi1.wo = 2;
+      const ctx = criarAppFalso(dados);
+      ctx.montar("mataMata");
+      const raiz = ctx.montar("ficha");
+      const resultado = (id) => {
+        ctx.app.botaoJogador(id, `teste-ficha-${id}`).click();
+        const r = buscar(raiz, "ficha-fase-final").querySelector(".resultado-jogo").textContent;
+        buscar(raiz, "ficha-jogador").close();
+        return r;
+      };
+      t.igual(resultado(dados.mataMata.semi1.dupla2[0]), "derrota por W.O.", "quem faltou");
+      t.igual(resultado(dados.mataMata.semi1.dupla1[0]), "vitória por W.O.", "quem avançou");
+    }));
 
     // ---------- execução e relatório ----------
 

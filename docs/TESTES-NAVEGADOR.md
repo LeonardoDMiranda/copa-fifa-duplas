@@ -217,6 +217,13 @@ Coluna "Situação" da Classificação, só ao vivo (no lugar do antigo painel "
 | 7.15 | "Apagar chaveamento". | Janela "Apagar o chaveamento?"; aceitando, apaga tudo do mata-mata; "Desfazer" traz de volta. |
 | 7.16 | Com o chaveamento gerado, "Baixar imagem" (à esquerda; "Apagar chaveamento" à direita). Sem chaveamento. | Baixa `...-mata-mata-<data>.png`. Sem chaveamento, o botão não aparece. |
 | 7.17 | Leitor de tela no editor de dupla e no pódio. | Os seletores dizem o confronto ("Final, dupla 1, jogador 2"); as medalhas do pódio não são lidas. |
+| 7.18 | Antes de gerar, na prévia, escolher um jogador do top 8 em "Marcar ausente". | Aparece "<nome> (ausente)" com "Remover" e "Entram no lugar: 9º <nome>." A prévia não tem o ausente e quem entrou ocupa a mesma posição (os de baixo sobem). Marcar também o 9º: entra o 10º. "Remover" devolve a prévia de antes. O foco volta ao seletor. |
+| 7.19 | Com ausentes marcados, "Gerar chaveamento". | O chaveamento sai sem o ausente. Exportar o backup e importar: continua igual (`mataMata.ausentes`). Marcar tantos ausentes que sobrem menos jogadores que as vagas: aviso e sem botão de gerar. |
+| 7.20 | Num confronto sem vencedor, "Ausência". | O painel traz o seletor de jogador ausente (só os jogadores do confronto), "Substituir por <próximo da tabela>", "W.O. da dupla N" e "Cancelar". Cancelar fecha sem mudar nada. |
+| 7.21 | "Substituir por ...". | Janela "Substituir o jogador ausente?"; aceitando, o ausente sai, o próximo da classificação que não está no chaveamento entra, a dupla fica "alterada manualmente". Substituir de novo (o substituto também falta) traz o seguinte; ninguém volta. "Desfazer" devolve. |
+| 7.22 | "W.O. da dupla N". | Janela "Dar W.O. a esta dupla?" (botão vermelho); aceitando, o confronto fica "Decidido por W.O.", a dupla ausente leva a marca "W.O.", a outra "avança" e já aparece na rodada seguinte; os campos de placar, o lápis e o botão de trocar de lugar somem. No 3º lugar entra quem perdeu a semi. |
+| 7.23 | "Desfazer W.O.". Depois, W.O. na final (MD3) e no 3º lugar. | O confronto volta a aceitar placar. Com W.O. na final e no 3º lugar, o pódio sai sem placar. Com placar lançado no confronto, "W.O. da dupla N" fica desabilitado e a linha embaixo explica ("já tem placar lançado"); com a série decidida, não há botão "Ausência". |
+| 7.24 | W.O. num confronto e depois "Baixar imagem", Modo telão e abrir a ficha de um dos jogadores. | PNG e telão mostram "W.O." no lugar do placar da dupla ausente, "–" na que avança e uma linha "W.O. da dupla N · a dupla M avança sem placar". A ficha diz "derrota por W.O." / "vitória por W.O.". |
 
 ## 8. Desfazer
 
@@ -367,6 +374,19 @@ Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
 ---
 
 ## Última execução
+
+**Fase 26 (ausência no mata-mata), 2026-10-18**, Edge sem cabeça (`testes.html` e `testes-telas.html`) e
+Playwright (Chromium) por um servidor local temporário, antes do commit da fase.
+
+- `testes.html`: 122 passaram, 0 falharam (MM11 a MM15 novos). `testes-telas.html`: 69 passaram, 0 falharam
+  (V13.1 a V13.5 novos; neles a janela de confirmação é respondida pelo teste).
+- **Conferido no navegador com a janela de confirmação de verdade:** 7.18 (marcar ausente, "Entram no lugar",
+  foco no seletor), 7.19 (gerar com ausente, sem ele em nenhum confronto), 7.21 (substituir), 7.22 (W.O. com a
+  marca, "avança", campos de placar sumindo e a final com a dupla que avançou) e o telão com "W.O." (7.24, só o telão).
+- **Ainda não conferidos à mão:** 7.20 (cancelar), 7.23 (desfazer W.O. na tela e W.O. na final/3º lugar), PNG baixado e
+  ficha em 7.24, backup exportado/importado em 7.19 e Lighthouse. Cobertos só pelos testes automáticos.
+
+---
 
 **Fase 22 (ficha do jogador), 2026-10-13**, Playwright (Chromium 155) e Lighthouse (Chrome DevTools) via
 servidor local, antes do commit da fase. Massa: 32 jogadores fictícios com calendário confirmado e 7 semanas
