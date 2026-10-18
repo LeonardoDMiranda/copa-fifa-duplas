@@ -950,11 +950,19 @@ body.telao-ativo { overflow: hidden; }
 .telao-chave h2:not(:first-child) { margin-top: 2.4vh; }
 /* Mais (ou menos) rodadas que o padrão de 3 colunas, e muitos confrontos numa coluna: tudo menor para caber. */
 .telao-chave.varias { grid-template-columns: repeat(var(--colunas), minmax(0, 1fr)); gap: 1.4vw; }
+.telao-chave.varias .telao-confronto .linha { font-size: 2.4vh; }
+.telao-chave.varias .telao-confronto .valor { font-size: 3.2vh; }
 .telao-chave.compacta h2 { font-size: 1.6vh; margin: .2vh 0 .6vh; }
 .telao-chave.compacta .telao-confronto { padding: .5vh .6vw; margin-bottom: .8vh; }
 .telao-chave.compacta .telao-confronto .linha { font-size: 2vh; padding: .2vh .4vw; }
 .telao-chave.compacta .telao-confronto .valor { font-size: 2.4vh; }
 .telao-chave.compacta .telao-confronto .rotulo, .telao-chave.compacta .telao-confronto .detalhe { font-size: 1.3vh; margin: 0; padding-left: 0; }
+/* Mais de 5 confrontos numa coluna (ex.: oitavas): sem o detalhe, e as fontes encolhem com o número de confrontos para caber na altura. */
+.telao-chave.muitos .telao-confronto { padding: .3vh .6vw; margin-bottom: .6vh; }
+.telao-chave.muitos .telao-confronto .detalhe { display: none; }
+.telao-chave.muitos .telao-confronto .rotulo { font-size: min(1.3vh, calc(12vh / var(--n))); }
+.telao-chave.muitos .telao-confronto .linha { font-size: min(2vh, calc(52vh / var(--n) / 3.6)); padding: .1vh .4vw; }
+.telao-chave.muitos .telao-confronto .valor { font-size: min(2.4vh, calc(52vh / var(--n) / 3.2)); }
 .telao-confronto {
   padding: 1.3vh 1.2vw 1.4vh;
   margin-bottom: 1.8vh;

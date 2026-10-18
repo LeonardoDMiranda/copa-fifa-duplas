@@ -1205,7 +1205,7 @@
   function origemDaDupla(fonte, vagas) {
     if (fonte.dupla !== undefined) {
       const i = fonte.dupla;
-      return i < Math.floor(vagas / 2) ? `${i + 1}º + ${vagas - i}º` : `${(vagas + 1) / 2}º (sem dupla)`;
+      return i < Math.floor(vagas / 2) ? `${i + 1}º + ${vagas - i}º` : `${(vagas + 1) / 2}º, sem dupla`;
     }
     return fonte.vencedor ? `Vencedor ${rotuloCurtoDoConfronto(fonte.vencedor)}` : `Perdedor ${rotuloCurtoDoConfronto(fonte.perdedor)}`;
   }

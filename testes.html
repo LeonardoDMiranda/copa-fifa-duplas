@@ -587,7 +587,7 @@
       const mm = Regras.gerarMataMata(tabela, configCom(17));
       const r = Regras.resolverMataMata(mm, tabela);
       t.igual(r.folgam.length, 7, "17 vagas: 9 duplas, 7 folgam");
-      t.igual(r.oitavas1.origem, ["8º + 10º", "9º (sem dupla)"], "a origem da dupla do meio diz que está sem dupla");
+      t.igual(r.oitavas1.origem, ["8º + 10º", "9º, sem dupla"], "a origem da dupla do meio diz que está sem dupla");
       t.verdadeiro(!r.oitavas1.pronto, "o confronto dele aguarda a dupla ser completada");
       t.igual(r.oitavas1.dupla2, ["j8", null], "dupla guardada com o parceiro vazio");
       const completo = Regras.definirDupla(mm, "oitavas1", 2, ["j8", "j19"]);
@@ -727,6 +727,36 @@
         telao.fechar();
         raiz.remove();
       }
+    });
+
+    caso("MM8b Telão: com mais de 5 confrontos numa coluna (oitavas), a grade usa o modo compacto que cabe na tela", (t) => {
+      const montarTelao = (vagas) => {
+        const dados = dadosV2((d) => { d.campeonato.config.vagasFaseFinal = vagas; });
+        const tabela = Regras.calcularClassificacao(Regras.baseDosJogadores(dados.campeonato.jogadores), dados.jogos, [], dados.campeonato.config);
+        dados.mataMata = Regras.gerarMataMata(tabela, dados.campeonato.config);
+        const est = Estado.criar(memoria({ [Estado.CHAVE]: JSON.stringify(dados) }));
+        const raiz = document.createElement("div");
+        raiz.id = "telao";
+        raiz.hidden = true;
+        document.body.appendChild(raiz);
+        const telao = Telao.criar(est);
+        telao.abrir({ telaCheia: false });
+        raiz.querySelector("#telao-proxima").click();
+        raiz.querySelector("#telao-proxima").click();
+        const chave = raiz.querySelector(".telao-chave");
+        const resultado = { classes: chave.className, estilo: chave.getAttribute("style"), confrontos: raiz.querySelectorAll(".telao-confronto").length };
+        telao.fechar();
+        raiz.remove();
+        return resultado;
+      };
+      const oito = montarTelao(8);
+      t.igual([oito.classes, oito.confrontos], ["telao-chave", 4], "8 classificados: o telão de sempre (3 colunas, sem modo compacto)");
+      const doze = montarTelao(12);
+      t.igual(doze.classes, "telao-chave varias", "12 classificados: 4 colunas, ainda sem compactar");
+      const trintaEDois = montarTelao(32);
+      t.verdadeiro(trintaEDois.classes.includes("compacta") && trintaEDois.classes.includes("muitos"), `32 classificados: ${trintaEDois.classes}`);
+      t.verdadeiro(trintaEDois.estilo.includes("--colunas: 5") && trintaEDois.estilo.includes("--n: 8"), `5 colunas e 8 confrontos na maior (${trintaEDois.estilo})`);
+      t.igual(trintaEDois.confrontos, 16, "16 confrontos no telão (15 jogos + 3º lugar)");
     });
 
     // ---------- Chaveamento reorganizável (Fase 25) ----------

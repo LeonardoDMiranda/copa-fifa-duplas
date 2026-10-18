@@ -202,7 +202,7 @@
       const maior = Math.max(...mm.rodadas.map((r) => r.confrontos.length + (r.id === "final" && mm.terceiro ? 1 : 0)));
       const colunas = mm.rodadas.length + 1;
       return el("div", {
-        class: `telao-chave${colunas !== 3 ? " varias" : ""}${maior > 3 ? " compacta" : ""}`,
+        class: `telao-chave${colunas !== 3 ? " varias" : ""}${maior > 3 ? " compacta" : ""}${maior > 5 ? " muitos" : ""}`,
         style: `--colunas: ${colunas}; --n: ${maior}`,
       },
         mm.rodadas.map((rodada) => el("div", { class: "coluna" },
