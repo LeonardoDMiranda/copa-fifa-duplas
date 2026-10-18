@@ -6,7 +6,7 @@ Regras que o app implementa. Só vale o que está aqui.
 
 - Jogos em **duplas**; a classificação é **individual**. Cada jogador recebe o resultado da partida da sua dupla (V/E/D, gols pró e gols contra).
 - Fase de classificação: cada inscrito joga 6 jogos, com duplas pré-definidas pelo calendário.
-- Os **8 primeiros** vão para a fase final.
+- Os **N primeiros** vão para a fase final. O padrão é **8**; o organizador pode configurar de 4 a 99 classificados (ver "Fase final").
 
 ## Sorteio do calendário (campeonatos conduzidos pelo app)
 
@@ -63,8 +63,21 @@ Na fase de classificação o jogo pode terminar empatado (sem prorrogação nem 
 | Final | **Melhor de 3 (MD3)** | Vencedor Semi 1 × Vencedor Semi 2 |
 
 - Na fase final **não há empate**: prorrogação e, se necessário, pênaltis.
-- A final é a única fase em MD3.
+- Com o padrão (8 classificados), a final é a única fase em MD3.
 - "Teremos uma SURPRESA antes da final": as duplas da final podem ser alteradas pela organização.
+
+### Fase final com outro número de classificados
+
+> Regras decididas pelo organizador para os campeonatos conduzidos pelo app; o regulamento original só trata de 8 classificados.
+
+- **Duplas:** formam-se pela classificação final: 1º + último, 2º + penúltimo, e assim por diante (com 12 classificados: 1º+12º, 2º+11º, ...). As duplas vizinhas se enfrentam (dupla 1 × dupla 2, dupla 3 × dupla 4...) e os vencedores avançam na mesma ordem.
+- **Número ímpar:** o jogador do meio da tabela (ex.: o 9º com 17 classificados) fica **sem dupla**. O app não escolhe o parceiro dele: o organizador o define pela troca de dupla, e o confronto só abre para placar quando a dupla estiver completa.
+- **Folgas:** se o número de duplas não é potência de 2 (6, 9, 10...), as **melhores duplas** pulam a 1ª rodada e esperam na seguinte; o organizador pode trocar quem folga à mão. As duplas que folgam e os vencedores da 1ª rodada formam a rodada seguinte, na ordem (folgas primeiro, depois os vencedores), com as vizinhas se enfrentando.
+- **Rodadas:** Final, Semifinais, Quartas de final, Oitavas de final e, antes disso, "Rodada N". Com 4 classificados há só a final.
+- **3º lugar:** a disputa (perdedores das duas semifinais) é opcional. Só existe quando há duas semifinais; com 4 ou 6 classificados a opção não se aplica.
+- **Jogos por rodada:** o padrão é jogo único em todas as rodadas e MD3 na final; o organizador pode escolher jogo único, melhor de 3 ou melhor de 5 para cada rodada e para o 3º lugar. Nos melhores de N termina quem chega à maioria das vitórias.
+- A configuração vale até o chaveamento ser gerado. Depois, o chaveamento guarda o próprio formato.
+- W.O. na fase final continua não previsto (ver "Casos NÃO previstos").
 
 ## Regras de jogo (informativas, não afetam cálculos)
 

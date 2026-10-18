@@ -62,6 +62,74 @@
       }
     }
 
+    // ---------- fase final ----------
+    // Não mexem no sorteio (só no mata-mata) e valem até o chaveamento ser gerado: depois disso ele
+    // guarda o próprio formato, e mudar aqui não o alteraria.
+
+    const OPCOES_JOGOS = [[1, "Jogo único"], [3, "Melhor de 3"], [5, "Melhor de 5"]];
+
+    function mudarFaseFinal(descricao, alterar) {
+      if (estado.atual().mataMata) return;
+      const nova = alterar({ ...app.config() });
+      if (!estado.modificar(descricao, (s) => { s.campeonato.config = nova; })) renderizar();
+    }
+
+    function mudarVagas(texto) {
+      const t = texto.trim();
+      const vagas = /^\d+$/.test(t) ? Number(t) : NaN;
+      const nova = { ...app.config(), vagasFaseFinal: vagas };
+      const erro = Regras.validarConfig(nova);
+      if (erro) {
+        marcarErro("config-vagas", comMaiuscula(erro), texto);
+        return;
+      }
+      errosCampo.delete("config-vagas");
+      mudarFaseFinal(`classificados para a fase final: ${vagas}`, (c) => ({ ...c, vagasFaseFinal: vagas }));
+    }
+
+    function mudarJogosDaRodada(id, nome, jogos) {
+      mudarFaseFinal(`${nome}: ${OPCOES_JOGOS.find(([n]) => n === jogos)[1].toLowerCase()}`, (c) => {
+        const melhorDe = { ...c.melhorDe, [id]: jogos };
+        if (jogos === (id === "final" ? 3 : 1)) delete melhorDe[id]; // o padrão não precisa ficar guardado
+        return { ...c, melhorDe };
+      });
+    }
+
+    function blocoFaseFinal(atual) {
+      const cfg = atual.campeonato.config;
+      const gerado = Boolean(atual.mataMata);
+      const formato = Regras.formatoDaConfig(cfg);
+      const estrutura = Regras.estruturaDoMataMata(formato);
+      const temSemifinais = Regras.estruturaDoMataMata({ ...formato, terceiroLugar: true }).terceiro !== null;
+      const jogosDe = (id, padrao) => cfg.melhorDe[id] || padrao;
+      const seletor = (id, nome, padrao) => campoConfig("fase-final-jogos", `Jogos: ${nome}`, el("select", {
+        id: `config-jogos-${id}`, disabled: gerado,
+        onchange: (ev) => mudarJogosDaRodada(id, `jogos (${nome})`, Number(ev.target.value)),
+      }, OPCOES_JOGOS.map(([n, rotulo]) => el("option", { value: String(n), selected: n === jogosDe(id, padrao) }, rotulo))));
+
+      return el("div", { class: "fase-final", id: "fase-final" },
+        el("span", { class: "rotulo-aparencia" }, "Fase final"),
+        el("div", { class: "config-campeonato" },
+          campoConfig("numero", "Classificados", el("input", {
+            id: "config-vagas", type: "text", inputmode: "numeric", maxlength: "2", autocomplete: "off",
+            value: valorDo("config-vagas", String(cfg.vagasFaseFinal)), disabled: gerado, ...atributosDeErro("config-vagas"),
+            onchange: (ev) => mudarVagas(ev.target.value),
+            onkeydown: (ev) => { if (ev.key === "Enter") { ev.preventDefault(); ev.target.blur(); } },
+            onfocus: (ev) => ev.target.select(),
+          })),
+          el("label", { class: "campo-aparencia", title: temSemifinais ? null : "A disputa de 3º lugar precisa de duas semifinais" },
+            el("input", {
+              id: "config-terceiro", type: "checkbox", checked: cfg.terceiroLugar && temSemifinais, disabled: gerado || !temSemifinais,
+              onchange: (ev) => mudarFaseFinal(`disputa de 3º lugar: ${ev.target.checked ? "sim" : "não"}`, (c) => ({ ...c, terceiroLugar: ev.target.checked })),
+            }), "Disputa de 3º lugar"),
+          estrutura.rodadas.map((r) => seletor(r.id, r.nome, r.id === "final" ? 3 : 1)),
+          estrutura.terceiro ? seletor("terceiro", "3º lugar", 1) : null),
+        el("span", { class: "legenda" }, gerado
+          ? "Chaveamento já gerado: para mudar a fase final, apague o chaveamento na aba Mata-mata."
+          : `${plural(Math.ceil(cfg.vagasFaseFinal / 2), "dupla", "duplas")} no mata-mata`
+            + (cfg.vagasFaseFinal % 2 ? "; com número ímpar, um jogador fica sem dupla e você escolhe o parceiro dele." : ".")));
+    }
+
     // Cor e logo valem na hora e ficam fora do desfazer (ver Estado.definirAparencia).
     function definirAparencia(parcial, mensagem) {
       if (estado.definirAparencia({ ...(estado.aparencia() || {}), ...parcial })) avisar(mensagem);
@@ -156,6 +224,7 @@
           campoConfig("numero", "Jogos por jogador", numero("config-jogos", "jogosPorJogador", "Jogos por jogador")),
           campoConfig("numero", "Semanas", numero("config-semanas", "semanas", "Semanas"))),
         blocoAparencia(),
+        blocoFaseFinal(atual),
         el("p", { class: "diagnostico", id: "diagnostico" },
           `${plural(diag.jogadores, "jogador", "jogadores")} × ${plural(camp.config.jogosPorJogador, "jogo", "jogos")} ÷ 4 = ${plural(diag.totalJogos, "jogo", "jogos")} · ${porSemana} por semana em ${plural(camp.config.semanas, "semana", "semanas")}`),
         travado

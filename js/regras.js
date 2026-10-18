@@ -9,16 +9,24 @@
   // Parâmetros do campeonato. Tudo que pode mudar de uma edição para outra fica aqui
   // e é passado às funções por `config` (opcional: sem ele vale o padrão abaixo).
   //   pontosEmpateSemGols: o 0x0 conta como empate (E), mas vale esse tanto de pontos.
-  //   vagasFaseFinal: só 8 é suportado (o chaveamento 1º+8º × 2º+7º é fixo).
+  //   vagasFaseFinal: quantos jogadores vão para o mata-mata (de 4 a 99; padrão 8).
+  //   terceiroLugar: disputa de 3º lugar (só existe quando há duas semifinais).
+  //   melhorDe: jogos de cada rodada do mata-mata, só o que foge do padrão (jogo único; a final
+  //     em melhor de 3). Chaves: "final", "semifinais", "quartas", "oitavas", "rodada1"... e "terceiro".
   const REGRAS_PADRAO = Object.freeze({
     pontosVitoria: 3,
     pontosEmpate: 1,
     pontosEmpateSemGols: 0,
     vagasFaseFinal: 8,
+    terceiroLugar: true,
+    melhorDe: Object.freeze({}),
     jogosPorJogador: 6,
     semanas: 8,
   });
   const VAGAS_FASE_FINAL = REGRAS_PADRAO.vagasFaseFinal;
+  const MIN_VAGAS_FASE_FINAL = 4;
+  const MAX_VAGAS_FASE_FINAL = 99;
+  const OPCOES_MELHOR_DE = Object.freeze([1, 3, 5]);
 
   // "O que está em jogo" enumera todos os cenários dos jogos pendentes (desfechos^pendentes).
   // Acima de 65.536 cenários não calcula: com a pontuação padrão (4 desfechos), 8 jogos.
@@ -40,8 +48,18 @@
     for (const campo of ["jogosPorJogador", "semanas"]) {
       if (!Number.isInteger(c[campo]) || c[campo] < 1) return `${campo} precisa ser um inteiro ≥ 1.`;
     }
-    if (c.vagasFaseFinal !== VAGAS_FASE_FINAL) {
-      return `só ${VAGAS_FASE_FINAL} vagas na fase final é suportado (o chaveamento é fixo).`;
+    if (!Number.isInteger(c.vagasFaseFinal) || c.vagasFaseFinal < MIN_VAGAS_FASE_FINAL || c.vagasFaseFinal > MAX_VAGAS_FASE_FINAL) {
+      return `vagas na fase final precisa ser um inteiro de ${MIN_VAGAS_FASE_FINAL} a ${MAX_VAGAS_FASE_FINAL}.`;
+    }
+    if (typeof c.terceiroLugar !== "boolean") return "terceiroLugar precisa ser verdadeiro ou falso.";
+    return erroDeMelhorDe(c.melhorDe);
+  }
+
+  // Jogos por rodada do mata-mata: { chave: 1 | 3 | 5 }. Erro em português ou null.
+  function erroDeMelhorDe(melhorDe) {
+    if (!melhorDe || typeof melhorDe !== "object" || Array.isArray(melhorDe)) return "melhorDe precisa ser um objeto.";
+    for (const [chave, n] of Object.entries(melhorDe)) {
+      if (!OPCOES_MELHOR_DE.includes(n)) return `melhorDe de "${chave}" precisa ser 1, 3 ou 5.`;
     }
     return null;
   }
@@ -725,36 +743,121 @@
   // Semis e 3º lugar em jogo único; final em melhor de 3. Sem empate: tempo normal,
   // prorrogação (gols só da prorrogação) e pênaltis. Não altera a classificação.
 
+  // Com 8 vagas e a configuração padrão (o formato de antes da Fase 24, que continua valendo
+  // para os chaveamentos já gerados): semi1, semi2, terceiro e final.
   const CONFRONTOS = ["semi1", "semi2", "terceiro", "final"];
   const MELHOR_DE = { semi1: 1, semi2: 1, terceiro: 1, final: 3 };
+  const FORMATO_PADRAO = Object.freeze({ vagas: VAGAS_FASE_FINAL, terceiroLugar: true, melhorDe: Object.freeze({}) });
 
-  // Semi 1 = 1º+8º × 2º+7º; Semi 2 = 3º+6º × 4º+5º.
-  function duplasDasSemis(classificacao) {
-    const id = (pos) => classificacao[pos - 1].id;
-    return {
-      semi1: [[id(1), id(8)], [id(2), id(7)]],
-      semi2: [[id(3), id(6)], [id(4), id(5)]],
-    };
+  // Formato do mata-mata: { vagas, terceiroLugar, melhorDe }. É copiado da configuração quando o
+  // chaveamento é gerado e guardado nele (só se fugir do padrão), então mudar a configuração depois
+  // não mexe num chaveamento que já existe. Sem `formato`, vale o padrão.
+  function formatoDaConfig(config = REGRAS_PADRAO) {
+    return { vagas: config.vagasFaseFinal, terceiroLugar: config.terceiroLugar !== false, melhorDe: { ...(config.melhorDe || {}) } };
   }
 
-  // Estrutura inicial do mata-mata. As duplas das semis ficam congeladas na geração;
-  // as do 3º lugar e da final saem dos resultados das semis (null = automática) e ficam
+  function formatoDoMataMata(mataMata) {
+    return (mataMata && mataMata.formato) || FORMATO_PADRAO;
+  }
+
+  function formatoEhPadrao(formato) {
+    return JSON.stringify(formato) === JSON.stringify(FORMATO_PADRAO);
+  }
+
+  // Quantas duplas o mata-mata tem: duas por par de classificados e, com número ímpar, mais uma
+  // incompleta (o jogador do meio da tabela, ainda sem parceiro).
+  function numeroDeDuplas(vagas) {
+    return Math.ceil(vagas / 2);
+  }
+
+  // As duplas pela classificação: 1º+último, 2º+penúltimo... Com vagas ímpares, a última dupla é
+  // [jogador do meio, null]: o organizador escolhe o parceiro dele (ver definirDupla).
+  function duplasIniciais(classificacao, vagas) {
+    const ids = classificacao.slice(0, vagas).map((l) => l.id);
+    const duplas = [];
+    for (let i = 0; i < Math.floor(vagas / 2); i++) duplas.push([ids[i], ids[vagas - 1 - i]]);
+    if (vagas % 2) duplas.push([ids[(vagas - 1) / 2], null]);
+    return duplas;
+  }
+
+  // Estrutura do chaveamento para um formato (só depende do formato, não dos jogadores).
+  //   duplas: quantas duplas entram; folgas: índices das que pulam a 1ª rodada (as melhores, quando o
+  //   número de duplas não é potência de 2); rodadas: [{ id, nome, chaves }]; terceiro: chave ou null;
+  //   ordem: todas as chaves, com o 3º lugar por último; fontes: de onde vem cada dupla de um
+  //   confronto, { dupla: i } (pela classificação), { vencedor: chave } ou { perdedor: chave }.
+  // As duplas vizinhas se enfrentam (D1×D2, D3×D4...) e os vencedores avançam na mesma ordem.
+  const NOMES_DA_RODADA = [["final", "Final"], ["semifinais", "Semifinais"], ["quartas", "Quartas de final"], ["oitavas", "Oitavas de final"]];
+  const PREFIXO_DA_CHAVE = { final: "final", semifinais: "semi", quartas: "quartas", oitavas: "oitavas" };
+
+  function estruturaDoMataMata(formato) {
+    const duplas = numeroDeDuplas(formato.vagas);
+    let tamanho = 1;
+    while (tamanho < duplas) tamanho *= 2;
+    const totalRodadas = Math.round(Math.log2(tamanho));
+    const folgas = Array.from({ length: tamanho - duplas }, (_, i) => i);
+    const fontes = {};
+    const rodadas = [];
+
+    let jogam = Array.from({ length: duplas - folgas.length }, (_, i) => ({ dupla: folgas.length + i }));
+    const esperando = folgas.map((i) => ({ dupla: i }));
+    for (let r = 0; r < totalRodadas; r++) {
+      const doFim = totalRodadas - 1 - r;
+      const [id, nome] = NOMES_DA_RODADA[doFim] || [`rodada${r + 1}`, `Rodada ${r + 1}`];
+      const prefixo = PREFIXO_DA_CHAVE[id] || `r${r + 1}-`;
+      const total = jogam.length / 2;
+      const chaves = Array.from({ length: total }, (_, i) => (id === "final" ? "final" : `${prefixo}${i + 1}`));
+      chaves.forEach((chave, i) => { fontes[chave] = [jogam[2 * i], jogam[2 * i + 1]]; });
+      rodadas.push({ id, nome, chaves });
+      jogam = [...esperando.splice(0), ...chaves.map((chave) => ({ vencedor: chave }))];
+    }
+
+    const semis = rodadas.find((r) => r.id === "semifinais");
+    const terceiro = formato.terceiroLugar && semis && semis.chaves.length === 2 ? "terceiro" : null;
+    if (terceiro) fontes.terceiro = semis.chaves.map((chave) => ({ perdedor: chave }));
+    const rodadaDe = {};
+    for (const rodada of rodadas) for (const chave of rodada.chaves) rodadaDe[chave] = rodada.id;
+    const todas = rodadas.flatMap((r) => r.chaves);
+    return { duplas, folgas, rodadas, terceiro, fontes, rodadaDe, ordem: terceiro ? [...todas, terceiro] : todas };
+  }
+
+  // Quantos jogos tem o confronto: o escolhido na configuração, ou o padrão (final em melhor de 3,
+  // o resto em jogo único).
+  function melhorDeDoConfronto(mataMata, chave) {
+    const formato = formatoDoMataMata(mataMata);
+    const estrutura = estruturaDoMataMata(formato);
+    const id = chave === "terceiro" ? "terceiro" : estrutura.rodadaDe[chave];
+    return formato.melhorDe[id] || (id === "final" ? 3 : 1);
+  }
+
+  // Semi 1 = 1º+8º × 2º+7º; Semi 2 = 3º+6º × 4º+5º (o formato padrão).
+  function duplasDasSemis(classificacao) {
+    const d = duplasIniciais(classificacao, VAGAS_FASE_FINAL);
+    return { semi1: [d[0], d[1]], semi2: [d[2], d[3]] };
+  }
+
+  function duplaCompleta(dupla) {
+    return Array.isArray(dupla) && dupla.length === 2 && Boolean(dupla[0]) && Boolean(dupla[1]);
+  }
+
+  // Estrutura inicial do mata-mata. As duplas que vêm da classificação ficam congeladas na geração;
+  // as que vêm dos resultados (vencedores e perdedores) começam em null = automática e ficam
   // congeladas quando o confronto ganha placar (ver fixarDuplasJogadas).
-  function gerarMataMata(classificacao) {
-    const semis = duplasDasSemis(classificacao);
-    const confronto = (duplas) => ({
-      dupla1: duplas ? duplas[0].slice() : null,
-      dupla2: duplas ? duplas[1].slice() : null,
-      duplaManual1: false,
-      duplaManual2: false,
-      partidas: [],
-    });
-    return {
-      semi1: confronto(semis.semi1),
-      semi2: confronto(semis.semi2),
-      terceiro: confronto(null),
-      final: confronto(null),
+  function gerarMataMata(classificacao, config = REGRAS_PADRAO) {
+    const formato = formatoDaConfig(config);
+    if (classificacao.length < formato.vagas) throw new Error(`o chaveamento precisa de ${formato.vagas} jogadores.`);
+    const estrutura = estruturaDoMataMata(formato);
+    const duplas = duplasIniciais(classificacao, formato.vagas);
+    const confronto = (chave) => {
+      const [f1, f2] = estrutura.fontes[chave];
+      const inicial = (f) => (f.dupla !== undefined ? duplas[f.dupla].slice() : null);
+      return { dupla1: inicial(f1), dupla2: inicial(f2), duplaManual1: false, duplaManual2: false, partidas: [] };
     };
+    // Ordem das chaves como no formato de antes: o 3º lugar antes da final.
+    const ultima = estrutura.ordem.filter((c) => c !== "final");
+    const mataMata = {};
+    if (!formatoEhPadrao(formato)) mataMata.formato = formato;
+    for (const chave of [...ultima, "final"]) mataMata[chave] = confronto(chave);
+    return mataMata;
   }
 
   // Motivos para confirmar antes de gerar o chaveamento (lista vazia = tudo certo).
@@ -779,7 +882,7 @@
       const chave = empate.grupo.join("|");
       if (vistos.has(chave)) continue;
       vistos.add(chave);
-      avisos.push(`Empate técnico sem ordem manual no top 8: ${empate.grupo.map(nome).join(", ")}.`);
+      avisos.push(`Empate técnico sem ordem manual no top ${config.vagasFaseFinal}: ${empate.grupo.map(nome).join(", ")}.`);
     }
     return avisos;
   }
@@ -874,7 +977,7 @@
     const confronto = novo[chave];
     while (confronto.partidas.length <= indice) confronto.partidas.push({ gols1: null, gols2: null });
     confronto.partidas[indice][campo] = valor;
-    confronto.partidas = normalizarPartidas(confronto.partidas, MELHOR_DE[chave]);
+    confronto.partidas = normalizarPartidas(confronto.partidas, melhorDeDoConfronto(novo, chave));
     return novo;
   }
 
@@ -903,17 +1006,21 @@
   // final, a que sai dos resultados das semis.
   function voltarDuplaAutomatica(mataMata, chave, lado, classificacao) {
     const novo = clonarMataMata(mataMata);
-    const semis = duplasDasSemis(classificacao);
-    novo[chave][`dupla${lado}`] = semis[chave] ? semis[chave][lado - 1].slice() : null;
+    const formato = formatoDoMataMata(mataMata);
+    const fonte = estruturaDoMataMata(formato).fontes[chave][lado - 1];
+    novo[chave][`dupla${lado}`] = fonte.dupla !== undefined ? duplasIniciais(classificacao, formato.vagas)[fonte.dupla].slice() : null;
     novo[chave][`duplaManual${lado}`] = false;
     return novo;
   }
 
-  // Atualiza as duplas não manuais das semis para a classificação atual.
+  // Atualiza as duplas não manuais que vêm da classificação (a 1ª rodada, e as duplas que folgam)
+  // para a classificação atual.
   function atualizarDuplasDasSemis(mataMata, classificacao) {
+    const estrutura = estruturaDoMataMata(formatoDoMataMata(mataMata));
     let novo = mataMata;
-    for (const chave of ["semi1", "semi2"]) {
+    for (const chave of estrutura.ordem) {
       for (const lado of [1, 2]) {
+        if (estrutura.fontes[chave][lado - 1].dupla === undefined) continue;
         if (!mataMata[chave][`duplaManual${lado}`]) novo = voltarDuplaAutomatica(novo, chave, lado, classificacao);
       }
     }
@@ -927,9 +1034,10 @@
   function fixarDuplasJogadas(mataMata, classificacao, config = REGRAS_PADRAO) {
     const resolvido = resolverMataMata(mataMata, classificacao, config);
     const novo = clonarMataMata(mataMata);
-    for (const chave of ["terceiro", "final"]) {
+    for (const chave of resolvido.estrutura.ordem) {
       const c = novo[chave];
       for (const lado of [1, 2]) {
+        if (resolvido.estrutura.fontes[chave][lado - 1].dupla !== undefined) continue;
         if (c[`duplaManual${lado}`]) continue;
         if (!c.partidas.length) {
           c[`dupla${lado}`] = null;
@@ -946,8 +1054,10 @@
   // Os placares já lançados continuam e passam a valer para as novas duplas.
   function atualizarDuplasDasFinais(mataMata, classificacao, config = REGRAS_PADRAO) {
     const novo = clonarMataMata(mataMata);
-    for (const chave of ["terceiro", "final"]) {
+    const estrutura = estruturaDoMataMata(formatoDoMataMata(mataMata));
+    for (const chave of estrutura.ordem) {
       for (const lado of [1, 2]) {
+        if (estrutura.fontes[chave][lado - 1].dupla !== undefined) continue;
         if (!novo[chave][`duplaManual${lado}`]) novo[chave][`dupla${lado}`] = null;
       }
     }
@@ -961,32 +1071,44 @@
 
   // Resolve o mata-mata inteiro: duplas efetivas, séries, avanço de vencedores/perdedores e pódio.
   function resolverMataMata(mataMata, classificacao, config = REGRAS_PADRAO) {
-    const semisAtuais = classificacao.length >= config.vagasFaseFinal ? duplasDasSemis(classificacao) : {};
+    const formato = formatoDoMataMata(mataMata);
+    const estrutura = estruturaDoMataMata(formato);
+    const iniciais = classificacao.length >= formato.vagas ? duplasIniciais(classificacao, formato.vagas) : [];
+    const resolvidos = {};
 
-    // congelada: a dupla guardada vale no lugar da automática (semis sempre; 3º lugar e final
-    // depois do primeiro placar, se a dupla foi guardada por fixarDuplasJogadas).
-    function resolver(chave, automaticas, congelada) {
+    // A dupla guardada vale no lugar da automática quando a automática vem da classificação (sempre)
+    // ou dos resultados de outros confrontos (depois do primeiro placar, se a dupla foi guardada por
+    // fixarDuplasJogadas).
+    function resolver(chave) {
       const c = mataMata[chave];
+      const fontes = estrutura.fontes[chave];
       const lado = (n) => {
+        const fonte = fontes[n - 1];
+        let automatica = null;
+        let congelada = c.partidas.length > 0;
+        if (fonte.dupla !== undefined) { automatica = iniciais[fonte.dupla] || null; congelada = true; }
+        else if (fonte.vencedor) automatica = resolvidos[fonte.vencedor].vencedora;
+        else automatica = resolvidos[fonte.perdedor].perdedora;
         const manual = Boolean(c[`duplaManual${n}`]);
-        const automatica = automaticas[n - 1] || null;
         const guardada = c[`dupla${n}`];
         const usaGuardada = manual || (congelada && Boolean(guardada));
         const dupla = usaGuardada ? guardada : automatica;
         return { dupla, manual, automatica, desatualizada: usaGuardada && !manual && !mesmaDupla(dupla, automatica) };
       };
       const lado1 = lado(1), lado2 = lado(2);
-      const serie = analisarSerie(c.partidas, MELHOR_DE[chave]);
+      const melhorDe = melhorDeDoConfronto(mataMata, chave);
+      const serie = analisarSerie(c.partidas, melhorDe);
       const vencedora = serie.vencedor ? [lado1, lado2][serie.vencedor - 1].dupla : null;
       const perdedora = serie.vencedor ? [lado1, lado2][2 - serie.vencedor].dupla : null;
       return {
         chave,
-        melhorDe: MELHOR_DE[chave],
+        melhorDe,
         dupla1: lado1.dupla,
         dupla2: lado2.dupla,
         lado1,
         lado2,
-        pronto: Boolean(lado1.dupla && lado2.dupla),
+        origem: fontes.map((f) => origemDaDupla(f, formato.vagas)),
+        pronto: duplaCompleta(lado1.dupla) && duplaCompleta(lado2.dupla),
         partidas: c.partidas,
         serie,
         vencedora,
@@ -994,14 +1116,53 @@
       };
     }
 
-    const semi1 = resolver("semi1", semisAtuais.semi1 || [], true);
-    const semi2 = resolver("semi2", semisAtuais.semi2 || [], true);
-    const terceiro = resolver("terceiro", [semi1.perdedora, semi2.perdedora], mataMata.terceiro.partidas.length > 0);
-    const final = resolver("final", [semi1.vencedora, semi2.vencedora], mataMata.final.partidas.length > 0);
+    for (const chave of estrutura.ordem) resolvidos[chave] = resolver(chave);
+    const final = resolvidos.final;
+    const terceiro = resolvidos.terceiro || null;
+    const daClassificacao = (chave) => estrutura.fontes[chave].some((f) => f.dupla !== undefined);
     return {
-      semi1, semi2, terceiro, final,
-      podio: { campeoes: final.vencedora, vice: final.perdedora, terceiro: terceiro.vencedora },
+      ...resolvidos,
+      terceiro,
+      formato,
+      estrutura,
+      vagas: formato.vagas,
+      // Em ordem de leitura: as rodadas, a final por último na última, e o 3º lugar depois.
+      rodadas: estrutura.rodadas.map((r) => ({ id: r.id, nome: r.nome, confrontos: r.chaves.map((chave) => resolvidos[chave]) })),
+      chaves: estrutura.ordem,
+      // Confrontos com duplas que vêm da classificação, e os que dependem de resultados.
+      daClassificacao: estrutura.ordem.filter(daClassificacao).map((chave) => resolvidos[chave]),
+      dosResultados: estrutura.ordem.filter((chave) => estrutura.fontes[chave].some((f) => f.dupla === undefined)).map((chave) => resolvidos[chave]),
+      folgam: estrutura.folgas.map((i) => ({ dupla: iniciais[i] || null, origem: origemDaDupla({ dupla: i }, formato.vagas) })),
+      podio: { campeoes: final.vencedora, vice: final.perdedora, terceiro: terceiro ? terceiro.vencedora : null },
     };
+  }
+
+  // De onde vem uma dupla do confronto: a posição na classificação ("1º + 8º") ou o resultado de
+  // outro confronto ("Vencedor da Semi 1").
+  function origemDaDupla(fonte, vagas) {
+    if (fonte.dupla !== undefined) {
+      const i = fonte.dupla;
+      return i < Math.floor(vagas / 2) ? `${i + 1}º + ${vagas - i}º` : `${(vagas + 1) / 2}º (sem dupla)`;
+    }
+    return fonte.vencedor ? `Vencedor ${rotuloCurtoDoConfronto(fonte.vencedor)}` : `Perdedor ${rotuloCurtoDoConfronto(fonte.perdedor)}`;
+  }
+
+  // "da Semi 1", "das Quartas 2": o confronto dentro de uma frase ("Vencedor da Semi 1").
+  function rotuloCurtoDoConfronto(chave) {
+    const m = /^(semi|quartas|oitavas)(\d+)$/.exec(chave);
+    if (m) return m[1] === "semi" ? `da Semi ${m[2]}` : `das ${m[1] === "quartas" ? "Quartas" : "Oitavas"} ${m[2]}`;
+    const r = /^r(\d+)-(\d+)$/.exec(chave);
+    if (r) return `da Rodada ${r[1]}, jogo ${r[2]}`;
+    return chave === "terceiro" ? "do 3º lugar" : "da Final";
+  }
+
+  // Nome do confronto na tela: "Semifinal 1", "Quartas de final 2", "Final", "3º lugar".
+  function rotuloDoConfronto(chave) {
+    const m = /^(semi|quartas|oitavas)(\d+)$/.exec(chave);
+    if (m) return `${m[1] === "semi" ? "Semifinal" : m[1] === "quartas" ? "Quartas de final" : "Oitavas de final"} ${m[2]}`;
+    const r = /^r(\d+)-(\d+)$/.exec(chave);
+    if (r) return `Rodada ${r[1]}, jogo ${r[2]}`;
+    return chave === "terceiro" ? "3º lugar" : "Final";
   }
 
   // ---------- Semanas (rodadas) ----------
@@ -1338,6 +1499,19 @@
     calcularSituacoes,
     CONFRONTOS,
     MELHOR_DE,
+    FORMATO_PADRAO,
+    OPCOES_MELHOR_DE,
+    MIN_VAGAS_FASE_FINAL,
+    MAX_VAGAS_FASE_FINAL,
+    erroDeMelhorDe,
+    formatoDaConfig,
+    formatoDoMataMata,
+    formatoEhPadrao,
+    duplasIniciais,
+    duplaCompleta,
+    estruturaDoMataMata,
+    melhorDeDoConfronto,
+    rotuloDoConfronto,
     REGRAS_PADRAO,
     VAGAS_FASE_FINAL,
     MAX_PENDENTES_SITUACOES,

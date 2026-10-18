@@ -254,9 +254,9 @@
     // Painel ao lado dos jogos: top 8 ao vivo e quem vem logo atrás, para acompanhar sem trocar de aba.
     const PERSEGUIDORES = 2;
     function painelTop(painel, tabela) {
-      const vagas = Regras.VAGAS_FASE_FINAL;
+      const vagas = estado.atual().campeonato.config.vagasFaseFinal;
       painel.replaceChildren(
-        el("h3", {}, "Top 8 ao vivo"),
+        el("h3", {}, `Top ${vagas} ao vivo`),
         el("table", { class: "tabela-top" },
           el("thead", {}, el("tr", {},
             el("th", { scope: "col", class: "col-pos" }, el("abbr", { title: "Posição" }, "Pos")),

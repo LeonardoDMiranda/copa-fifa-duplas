@@ -226,7 +226,8 @@
   }
 
   // Nome de cada confronto do mata-mata (tela do Mata-mata e ficha do jogador).
-  const ROTULOS_MATA_MATA = { semi1: "Semifinal 1", semi2: "Semifinal 2", terceiro: "3º lugar", final: "Final" };
+  // Nome do confronto na tela, para qualquer chave do chaveamento ("semi1", "quartas3", "final"...).
+  const ROTULOS_MATA_MATA = new Proxy({}, { get: (_, chave) => (typeof chave === "string" ? Regras.rotuloDoConfronto(chave) : undefined) });
 
   // Nome de um jogador que abre a ficha dele (js/telas/ficha.js). `idDom` precisa ser único na tela:
   // o mesmo jogador pode aparecer em vários lugares (top 8, cartão do jogo...).

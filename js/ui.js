@@ -174,7 +174,7 @@
       sorteio: travado ? { icone: "confirmar", leitor: "calendário confirmado" }
         : camp.sorteio && camp.sorteio.rascunho ? { texto: "rascunho", leitor: "sorteio ainda não confirmado" } : null,
       rodadas: atual.jogos.length ? { texto: `${lancados}/${atual.jogos.length}`, leitor: `${lancados} de ${atual.jogos.length} jogos lançados` } : null,
-      classificacao: empatePendente ? { icone: "empate", leitor: "empate técnico no top 8 sem ordem definida" } : null,
+      classificacao: empatePendente ? { icone: "empate", leitor: `empate técnico no top ${camp.config.vagasFaseFinal} sem ordem definida` } : null,
       "mata-mata": campeoes ? { icone: "trofeu", leitor: "campeões definidos" } : null,
     };
     const visiveis = abasDaFase(atual);
@@ -334,6 +334,7 @@
         semana,
         lancados: jogos.filter((j) => j.resultado).length,
         totalJogos: jogos.length,
+        vagas: cfg.vagasFaseFinal,
         ...visual,
       });
       prefixo = `${base}-classificacao${semana === null ? "" : `-semana-${semana}`}`;

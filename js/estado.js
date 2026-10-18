@@ -168,21 +168,41 @@
 
   const CAMPOS_PARTIDA = ["gols1", "gols2", "prorrogacao1", "prorrogacao2", "penaltis1", "penaltis2"];
 
+  // Formato do chaveamento guardado em mataMata.formato (ausente = padrão de antes, 8 vagas).
+  function validarFormato(f) {
+    if (f === undefined || f === null) return null;
+    if (typeof f !== "object" || !Number.isInteger(f.vagas)
+        || f.vagas < Regras.MIN_VAGAS_FASE_FINAL || f.vagas > Regras.MAX_VAGAS_FASE_FINAL) {
+      throw new Error("formato do mata-mata inválido.");
+    }
+    const melhorDe = f.melhorDe ?? {};
+    const erro = Regras.erroDeMelhorDe(melhorDe);
+    if (erro) throw new Error(`formato do mata-mata inválido: ${erro}`);
+    const formato = { vagas: f.vagas, terceiroLugar: f.terceiroLugar !== false, melhorDe: { ...melhorDe } };
+    return Regras.formatoEhPadrao(formato) ? null : formato;
+  }
+
   function validarMataMata(mm, idsJogadores) {
     if (mm === null) return null;
     if (typeof mm !== "object") throw new Error("mataMata inválido.");
-    const valido = {};
-    for (const chave of Regras.CONFRONTOS) {
+    const formato = validarFormato(mm.formato);
+    const valido = formato ? { formato } : {};
+    const estrutura = Regras.estruturaDoMataMata(formato || Regras.FORMATO_PADRAO);
+    const ordemDeCriacao = [...estrutura.ordem.filter((c) => c !== "final"), "final"];
+    for (const chave of ordemDeCriacao) {
       const c = mm[chave];
       if (!c || typeof c !== "object") throw new Error(`mata-mata sem o confronto ${chave}.`);
+      // Dupla incompleta ([id, null]) = o jogador que sobrou com vagas ímpares, ainda sem parceiro.
       const dupla = (d) => {
         if (d === null || d === undefined) return null;
-        if (!Array.isArray(d) || d.length !== 2 || !d.every((id) => idsJogadores.has(id))) {
+        const incompleta = Array.isArray(d) && d.length === 2 && d[1] === null;
+        if (!Array.isArray(d) || d.length !== 2 || !d.every((id, i) => idsJogadores.has(id) || (incompleta && i === 1))) {
           throw new Error(`dupla inválida no confronto ${chave}.`);
         }
         return d.slice();
       };
-      if (!Array.isArray(c.partidas) || c.partidas.length > Regras.MELHOR_DE[chave]) {
+      const melhorDe = Regras.melhorDeDoConfronto({ formato: formato || undefined }, chave);
+      if (!Array.isArray(c.partidas) || c.partidas.length > melhorDe) {
         throw new Error(`partidas inválidas no confronto ${chave}.`);
       }
       const partidas = c.partidas.map((p) => {
@@ -200,7 +220,7 @@
         dupla2: dupla(c.dupla2),
         duplaManual1: Boolean(c.duplaManual1),
         duplaManual2: Boolean(c.duplaManual2),
-        partidas: Regras.normalizarPartidas(partidas, Regras.MELHOR_DE[chave]),
+        partidas: Regras.normalizarPartidas(partidas, melhorDe),
       };
     }
     return valido;

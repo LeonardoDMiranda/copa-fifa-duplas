@@ -105,10 +105,11 @@
     }
 
     function subtitulo(linha) {
+      const vagas = app.estado.atual().campeonato.config.vagasFaseFinal;
       const empate = linha.empateTecnico;
       const outros = empate && empate.grupo.filter((id) => id !== linha.id).map((id) => nomePorId.get(id));
       return el("p", { class: "legenda", id: "ficha-subtitulo" },
-        `Classificação ao vivo: ${linha.posicao <= Regras.VAGAS_FASE_FINAL ? "dentro" : "fora"} do top 8.`,
+        `Classificação ao vivo: ${linha.posicao <= vagas ? "dentro" : "fora"} do top ${vagas}.`,
         empate && ` Empate técnico com ${outros.join(", ")}.`);
     }
 
@@ -123,7 +124,7 @@
         conteudo = el("p", { id: "ficha-situacao", class: "legenda" },
           `Disponível quando faltarem até ${Regras.limitePendentesSituacoes(atual.campeonato.config)} jogos (faltam ${pendentes}).`);
       }
-      return el("section", { class: "ficha-secao" }, el("h3", {}, "Situação para o top 8"), conteudo);
+      return el("section", { class: "ficha-secao" }, el("h3", {}, `Situação para o top ${atual.campeonato.config.vagasFaseFinal}`), conteudo);
     }
 
     // "com Parceiro × Adversário + Adversário", com os nomes que trocam a ficha. `outra` pode faltar
@@ -160,7 +161,7 @@
     function faseFinal(atual, tabela) {
       if (!atual.mataMata) return null;
       const mm = Regras.resolverMataMata(atual.mataMata, tabela, atual.campeonato.config);
-      const confrontos = ["semi1", "semi2", "final", "terceiro"].map((chave) => mm[chave])
+      const confrontos = mm.chaves.map((chave) => mm[chave])
         .filter((c) => (c.dupla1 || []).includes(jogadorId) || (c.dupla2 || []).includes(jogadorId));
       if (!confrontos.length) return null;
       const p = mm.podio;

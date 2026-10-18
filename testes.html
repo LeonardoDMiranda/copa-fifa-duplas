@@ -314,7 +314,7 @@
         "semana inválida": JSON.stringify(dadosV2((d) => { d.jogos[0].semana = 0; })),
         "semana além das semanas do campeonato": JSON.stringify(dadosV2((d) => { d.jogos[0].semana = 9; })),
         "jogador repetido": JSON.stringify(dadosV2((d) => { d.campeonato.jogadores.push({ id: "p20", nome: "Outro Jogador 20" }); })),
-        "vagas diferentes de 8": JSON.stringify(dadosV2((d) => { d.campeonato.config.vagasFaseFinal = 4; })),
+        "vagas abaixo de 4": JSON.stringify(dadosV2((d) => { d.campeonato.config.vagasFaseFinal = 3; })),
       };
       for (const [nome, texto] of Object.entries(tentativas)) {
         let erro = null;
@@ -526,6 +526,207 @@
       const limpo = fixar(Regras.definirCampoPartida(Regras.definirCampoPartida(mm, "final", 0, "gols1", null), "final", 0, "gols2", null));
       t.igual([limpo.final.partidas, limpo.final.dupla1], [[], null], "apagar o placar da final descarta as duplas guardadas");
       t.igual(Regras.resolverMataMata(limpo, tabela).final.dupla1, ["p17", "p28"], "e ela volta a seguir as semis");
+    });
+
+    // ---------- Mata-mata com qualquer número de classificados (Fase 24) ----------
+
+    // Classificação sintética com `n` jogadores (j0 é o 1º) e a config com `vagas` vagas.
+    const tabelaDe = (n) => Regras.calcularClassificacao(Regras.baseDosJogadores(
+      Array.from({ length: n }, (_, i) => ({ id: `j${i}`, nome: `Jogador ${String(i + 1).padStart(2, "0")}` }))), []);
+    const configCom = (vagas, extra = {}) => ({ ...Regras.REGRAS_PADRAO, vagasFaseFinal: vagas, ...extra });
+    const estruturaDe = (vagas, extra = {}) => Regras.estruturaDoMataMata(Regras.formatoDaConfig(configCom(vagas, extra)));
+    function lancarMMVencedor(mm, chave, lado, tabela) {
+      const gols = lado === 1 ? [1, 0] : [0, 1];
+      let novo = Regras.definirCampoPartida(mm, chave, 0, "gols1", gols[0]);
+      novo = Regras.definirCampoPartida(novo, chave, 0, "gols2", gols[1]);
+      return Regras.fixarDuplasJogadas(novo, tabela);
+    }
+
+    caso("MM1 Estrutura do chaveamento: rodadas, chaves e de onde vem cada dupla", (t) => {
+      const oito = estruturaDe(8);
+      t.igual(oito.ordem, ["semi1", "semi2", "final", "terceiro"], "8 vagas: as mesmas chaves de antes");
+      t.igual(oito.fontes.semi1, [{ dupla: 0 }, { dupla: 1 }], "Semi 1 = 1ª × 2ª dupla (1º+8º × 2º+7º)");
+      t.igual(oito.fontes.semi2, [{ dupla: 2 }, { dupla: 3 }], "Semi 2 = 3ª × 4ª dupla (3º+6º × 4º+5º)");
+      t.igual(oito.fontes.final, [{ vencedor: "semi1" }, { vencedor: "semi2" }], "final = vencedores das semis");
+      t.igual(oito.fontes.terceiro, [{ perdedor: "semi1" }, { perdedor: "semi2" }], "3º lugar = perdedores das semis");
+      const quatro = estruturaDe(4);
+      t.igual([quatro.ordem, quatro.terceiro], [["final"], null], "4 vagas: só a final, sem 3º lugar (não há semifinais)");
+      const dezesseis = estruturaDe(16);
+      t.igual(dezesseis.rodadas.map((r) => [r.id, r.chaves.length]), [["quartas", 4], ["semifinais", 2], ["final", 1]], "16 vagas: quartas, semis e final");
+      t.igual(dezesseis.fontes.quartas3, [{ dupla: 4 }, { dupla: 5 }], "duplas vizinhas se enfrentam");
+      t.igual(dezesseis.fontes.semi2, [{ vencedor: "quartas3" }, { vencedor: "quartas4" }], "os vencedores avançam na mesma ordem");
+      const trintaEDois = estruturaDe(32);
+      t.igual(trintaEDois.rodadas.map((r) => r.id), ["oitavas", "quartas", "semifinais", "final"], "32 vagas: começa nas oitavas");
+      const quarenta = estruturaDe(40);
+      t.igual(quarenta.rodadas.map((r) => r.id), ["rodada1", "oitavas", "quartas", "semifinais", "final"], "40 vagas (20 duplas): uma rodada anterior às oitavas");
+      t.igual(estruturaDe(8, { terceiroLugar: false }).terceiro, null, "3º lugar desligado na configuração");
+    });
+
+    caso("MM2 Folgas: as melhores duplas pulam a 1ª rodada quando o número de duplas não é potência de 2", (t) => {
+      const doze = estruturaDe(12); // 6 duplas, chaveamento de 8
+      t.igual(doze.folgas, [0, 1], "12 vagas: a 1ª e a 2ª dupla folgam");
+      t.igual(doze.rodadas.map((r) => [r.id, r.chaves]), [["quartas", ["quartas1", "quartas2"]], ["semifinais", ["semi1", "semi2"]], ["final", ["final"]]], "só 2 jogos de quartas");
+      t.igual(doze.fontes.quartas1, [{ dupla: 2 }, { dupla: 3 }], "quartas 1 = 3ª × 4ª dupla");
+      t.igual(doze.fontes.semi1, [{ dupla: 0 }, { dupla: 1 }], "as duplas que folgam entram nas semis");
+      t.igual(doze.fontes.semi2, [{ vencedor: "quartas1" }, { vencedor: "quartas2" }], "e os vencedores das quartas na outra semi");
+      const dez = estruturaDe(10); // 5 duplas
+      t.igual(dez.folgas, [0, 1, 2], "10 vagas: 3 duplas folgam");
+      t.igual(dez.fontes.semi2, [{ dupla: 2 }, { vencedor: "quartas1" }], "a dupla que folga enfrenta o vencedor da quartas");
+      const seis = estruturaDe(6); // 3 duplas
+      t.igual(seis.ordem, ["semi1", "final"], "6 vagas: uma semifinal e a final");
+      t.igual(seis.terceiro, null, "sem duas semifinais, não há 3º lugar");
+      t.igual(seis.fontes.final, [{ dupla: 0 }, { vencedor: "semi1" }], "a melhor dupla vai direto à final");
+    });
+
+    caso("MM3 Duplas pela classificação, com número ímpar de classificados", (t) => {
+      const tabela = tabelaDe(20);
+      t.igual(Regras.duplasIniciais(tabela, 8), [["j0", "j7"], ["j1", "j6"], ["j2", "j5"], ["j3", "j4"]], "8: 1º+8º, 2º+7º, 3º+6º, 4º+5º");
+      const impar = Regras.duplasIniciais(tabela, 17);
+      t.igual([impar.length, impar[0], impar[7], impar[8]], [9, ["j0", "j16"], ["j7", "j9"], ["j8", null]], "17: 8 duplas e o 9º (j8) sem parceiro");
+      t.verdadeiro(!Regras.duplaCompleta(impar[8]) && Regras.duplaCompleta(impar[0]), "dupla incompleta não conta como dupla");
+      const mm = Regras.gerarMataMata(tabela, configCom(17));
+      const r = Regras.resolverMataMata(mm, tabela);
+      t.igual(r.folgam.length, 7, "17 vagas: 9 duplas, 7 folgam");
+      t.igual(r.oitavas1.origem, ["8º + 10º", "9º (sem dupla)"], "a origem da dupla do meio diz que está sem dupla");
+      t.verdadeiro(!r.oitavas1.pronto, "o confronto dele aguarda a dupla ser completada");
+      t.igual(r.oitavas1.dupla2, ["j8", null], "dupla guardada com o parceiro vazio");
+      const completo = Regras.definirDupla(mm, "oitavas1", 2, ["j8", "j19"]);
+      t.verdadeiro(Regras.resolverMataMata(completo, tabela).oitavas1.pronto, "depois de escolher o parceiro, o confronto abre");
+    });
+
+    caso("MM4 Mata-mata com 12 vagas: quartas só com 4 duplas, as outras 2 esperam", (t) => {
+      const tabela = tabelaDe(14);
+      let mm = Regras.gerarMataMata(tabela, configCom(12));
+      t.igual(Object.keys(mm), ["formato", "quartas1", "quartas2", "semi1", "semi2", "terceiro", "final"], "formato guardado e as chaves do chaveamento");
+      let r = Regras.resolverMataMata(mm, tabela);
+      t.igual([r.quartas1.dupla1, r.quartas1.dupla2], [["j2", "j9"], ["j3", "j8"]], "quartas 1 = 3º+10º × 4º+9º");
+      t.igual([r.semi1.dupla1, r.semi1.dupla2, r.semi1.pronto], [["j0", "j11"], ["j1", "j10"], true], "as duplas que folgam já esperam na Semi 1");
+      t.igual([r.semi2.dupla1, r.semi2.pronto], [null, false], "a Semi 2 aguarda os vencedores das quartas");
+      mm = lancarMMVencedor(mm, "quartas1", 2, tabela);
+      mm = lancarMMVencedor(mm, "quartas2", 1, tabela);
+      r = Regras.resolverMataMata(mm, tabela);
+      t.igual([r.semi2.dupla1, r.semi2.dupla2, r.semi2.pronto], [["j3", "j8"], ["j4", "j7"], true], "vencedores das quartas entram na Semi 2");
+      t.igual(r.rodadas.map((x) => x.nome), ["Quartas de final", "Semifinais", "Final"], "nomes das rodadas");
+      t.igual(r.semi2.origem, ["Vencedor das Quartas 1", "Vencedor das Quartas 2"], "origem das duplas");
+      t.igual(Regras.rotuloDoConfronto("quartas2"), "Quartas de final 2", "rótulo do confronto");
+      t.igual(Regras.rotuloDoConfronto("r1-3"), "Rodada 1, jogo 3", "rótulo de rodada sem nome");
+    });
+
+    caso("MM5 Configuração do mata-mata: padrão não grava formato; jogos por rodada e 3º lugar", (t) => {
+      const tabela = tabelaDe(10);
+      const padrao = Regras.gerarMataMata(tabela, configCom(8));
+      t.igual(Object.keys(padrao), ["semi1", "semi2", "terceiro", "final"], "8 vagas e padrão: o mesmo formato de antes (sem 'formato')");
+      const mm = Regras.gerarMataMata(tabela, configCom(8, { terceiroLugar: false, melhorDe: { semifinais: 3, final: 5 } }));
+      const r = Regras.resolverMataMata(mm, tabela);
+      t.igual([r.semi1.melhorDe, r.final.melhorDe, r.terceiro], [3, 5, null], "melhor de 3 nas semis, de 5 na final, sem 3º lugar");
+      t.igual(Object.keys(mm), ["formato", "semi1", "semi2", "final"], "sem o confronto do 3º lugar");
+      t.igual(r.podio.terceiro, null, "pódio sem 3º lugar");
+      let m = mm;
+      for (let i = 0; i < 4; i++) m = Regras.definirCampoPartida(m, "semi1", i, "gols1", 1);
+      t.igual(m.semi1.partidas.length, 3, "a série da semi vai até 3 jogos");
+      t.igual(Regras.melhorDeDoConfronto(padrao, "final"), 3, "padrão: final em melhor de 3");
+      t.igual(Regras.melhorDeDoConfronto(padrao, "semi1"), 1, "padrão: semi em jogo único");
+      t.igual(Regras.melhorDeDoConfronto(Regras.gerarMataMata(tabela, configCom(8, { melhorDe: { terceiro: 3 } })), "terceiro"), 3, "3º lugar em melhor de 3");
+      const mudou = Regras.resolverMataMata(mm, tabela, configCom(8));
+      t.igual(mudou.semi1.melhorDe, 3, "mudar a configuração depois de gerar não mexe no chaveamento");
+    });
+
+    caso("MM6 Duplas da 1ª rodada seguem a classificação; as que vêm dos resultados são guardadas", (t) => {
+      const tabela = tabelaDe(14);
+      let mm = Regras.gerarMataMata(tabela, configCom(12));
+      mm = lancarMMVencedor(mm, "quartas1", 1, tabela);
+      mm = lancarMMVencedor(mm, "quartas2", 1, tabela);
+      mm = lancarMMVencedor(mm, "semi2", 1, tabela);
+      t.igual(mm.semi2.dupla1, ["j2", "j9"], "o primeiro placar da Semi 2 guarda as duplas que jogaram");
+      const virada = lancarMMVencedor(mm, "quartas1", 2, tabela); // corrige as quartas 1
+      const r = Regras.resolverMataMata(virada, tabela);
+      t.verdadeiro(r.semi2.lado1.desatualizada, "a Semi 2 avisa que a dupla guardada não bate mais com as quartas");
+      t.verdadeiro(r.dosResultados.includes(r.semi2) && r.daClassificacao.includes(r.quartas1), "grupos: o que vem da classificação e o que vem dos resultados");
+      const nova = Regras.resolverMataMata(Regras.atualizarDuplasDasFinais(virada, tabela), tabela);
+      t.igual(nova.semi2.dupla1, ["j3", "j8"], "atualizar troca pela dupla que sai das quartas");
+      t.igual(nova.semi2.partidas.length, 1, "e mantém o placar");
+      const mudou = tabelaDe(14).slice().reverse().map((l, i) => ({ ...l, posicao: i + 1 }));
+      const velho = Regras.resolverMataMata(mm, mudou);
+      t.verdadeiro(velho.quartas1.lado1.desatualizada && velho.semi1.lado1.desatualizada, "classificação mudada: 1ª rodada e duplas que folgam ficam desatualizadas");
+      const atual = Regras.resolverMataMata(Regras.atualizarDuplasDasSemis(mm, mudou), mudou);
+      t.verdadeiro(!atual.quartas1.lado1.desatualizada && !atual.semi1.lado1.desatualizada, "atualizar usa a classificação nova");
+      t.igual(Regras.resolverMataMata(Regras.voltarDuplaAutomatica(Regras.definirDupla(mm, "semi1", 1, ["j1", "j2"]), "semi1", 1, tabela), tabela).semi1.dupla1, ["j0", "j11"], "voltar à automática numa dupla que folga");
+    });
+
+    caso("MM7 Mata-mata novo é salvo, importado e validado (inclusive o formato de antes)", (t) => {
+      const arm = memoria2026();
+      const est = criarEstado(arm);
+      const base = classificar();
+      est.modificar("gerar 4 vagas", (s) => { s.mataMata = Regras.gerarMataMata(base, configCom(4)); });
+      t.igual(Object.keys(est.atual().mataMata), ["formato", "final"], "4 vagas: só a final");
+      est.modificar("final", (s) => { s.mataMata = Regras.definirCampoPartida(s.mataMata, "final", 0, "gols1", 2); });
+      t.igual(Estado.criar(arm).atual().mataMata.final.partidas, [{ gols1: 2, gols2: null }], "reabrir recupera o mata-mata");
+      est.modificar("gerar 17 vagas", (s) => { s.mataMata = Regras.gerarMataMata(base, configCom(17)); });
+      const reimportado = criarEstado();
+      reimportado.importarJSON(est.exportarJSON());
+      t.igual(reimportado.atual().mataMata, est.atual().mataMata, "17 vagas (com dupla incompleta) sobrevive a exportar e importar");
+      // Backup de antes da Fase 24: sem 'formato', quatro confrontos.
+      const antigo = JSON.parse(est.exportarJSON());
+      antigo.mataMata = { semi1: { dupla1: ["p23", "p05"], dupla2: ["p17", "p28"], duplaManual1: false, duplaManual2: false, partidas: [{ gols1: 1, gols2: 0 }] },
+        semi2: { dupla1: ["p12", "p30"], dupla2: ["p24", "p21"], duplaManual1: false, duplaManual2: false, partidas: [] },
+        terceiro: { dupla1: null, dupla2: null, duplaManual1: false, duplaManual2: false, partidas: [] },
+        final: { dupla1: null, dupla2: null, duplaManual1: false, duplaManual2: false, partidas: [] } };
+      const veio = criarEstado();
+      veio.importarJSON(JSON.stringify(antigo));
+      t.igual(Object.keys(veio.atual().mataMata), ["semi1", "semi2", "terceiro", "final"], "backup antigo importa sem 'formato' e sem perder nada");
+      t.igual(veio.atual().mataMata.semi1.partidas, [{ gols1: 1, gols2: 0 }], "com os placares");
+      t.verdadeiro(Regras.resolverMataMata(veio.atual().mataMata, base).semi1.serie.vencedor === 1, "e resolve como antes");
+      const tenta = (ajustar) => {
+        const json = JSON.parse(est.exportarJSON());
+        ajustar(json.mataMata);
+        try { criarEstado().importarJSON(JSON.stringify(json)); return null; } catch (e) { return e; }
+      };
+      t.verdadeiro(tenta((mm) => { mm.formato.vagas = 3; }), "formato com menos de 4 vagas é recusado");
+      t.verdadeiro(tenta((mm) => { mm.formato.melhorDe = { final: 2 }; }), "melhor de 2 é recusado");
+      t.verdadeiro(tenta((mm) => { delete mm.oitavas1; }), "falta um confronto do chaveamento");
+      t.verdadeiro(tenta((mm) => { mm.oitavas1.dupla2 = ["j8", "ninguem"]; }), "dupla com jogador desconhecido");
+      t.verdadeiro(tenta((mm) => { mm.final.partidas = [1, 2, 3, 4].map(() => ({ gols1: 1, gols2: 0 })); }), "mais jogos do que o melhor de N (final em melhor de 3)");
+    });
+
+    caso("MM8 PNG e telão do mata-mata acompanham o chaveamento (rodadas, 3º lugar, dupla sem parceiro)", (t) => {
+      const tabela = tabelaDe(32);
+      const nomePorId = new Map(tabela.map((l) => [l.id, l.nome]));
+      const imagem = (vagas, extra = {}) => {
+        const config = configCom(vagas, extra);
+        const mm = Regras.resolverMataMata(Regras.gerarMataMata(tabela, config), tabela, config);
+        return Exportar.desenharMataMata(mm, nomePorId, { geradoEm: new Date(2026, 9, 2, 15, 30), nome: "Copa de teste" });
+      };
+      t.igual(imagem(8).height, 1458, "8 vagas: a mesma altura de antes (semis, final, 3º lugar e pódio)");
+      t.igual(imagem(4).height, 770, "4 vagas: só a final e o pódio sem 3º lugar");
+      t.igual(imagem(8, { terceiroLugar: false }).height, 1064, "8 vagas sem 3º lugar");
+      t.igual(imagem(32).height, 2998, "32 vagas: oitavas, quartas, semis, final, 3º lugar e pódio");
+      t.verdadeiro(imagem(17).width === 1080, "17 vagas (dupla sem parceiro) também desenha");
+      const classificacao = Exportar.desenharClassificacao(tabela, { geradoEm: new Date(), nome: "Copa de teste", semana: null, lancados: 0, totalJogos: 0, vagas: 16 });
+      t.igual(classificacao.height, Exportar.desenharClassificacao(tabela, { geradoEm: new Date(), nome: "Copa de teste", semana: null, lancados: 0, totalJogos: 0 }).height, "a classificação com 16 vagas tem o mesmo tamanho");
+
+      const dados = dadosV2((d) => { d.campeonato.config.vagasFaseFinal = 12; });
+      const jogadores = dados.campeonato.jogadores;
+      const tabela12 = Regras.calcularClassificacao(Regras.baseDosJogadores(jogadores), dados.jogos, [], dados.campeonato.config);
+      dados.mataMata = Regras.gerarMataMata(tabela12, dados.campeonato.config);
+      const est = Estado.criar(memoria({ [Estado.CHAVE]: JSON.stringify(dados) }));
+      const raiz = document.createElement("div");
+      raiz.id = "telao";
+      raiz.hidden = true;
+      document.body.appendChild(raiz);
+      const telao = Telao.criar(est);
+      try {
+        telao.abrir({ telaCheia: false });
+        raiz.querySelector("#telao-proxima").click();
+        raiz.querySelector("#telao-proxima").click();
+        const chave = raiz.querySelector(".telao-chave");
+        t.verdadeiro(chave, "o telão chega ao mata-mata");
+        t.verdadeiro(chave.getAttribute("style").includes("--colunas: 4") && chave.classList.contains("varias"), "4 colunas: quartas, semis, final e pódio");
+        t.igual(raiz.querySelectorAll(".telao-confronto").length, 6, "6 confrontos no telão");
+        t.igual([...raiz.querySelectorAll(".telao-chave h2")].map((h) => h.textContent), ["Quartas de final", "Semifinais", "Final", "Disputa de 3º lugar", "Pódio"], "títulos das colunas");
+      } finally {
+        telao.fechar();
+        raiz.remove();
+      }
     });
 
     // 10
@@ -851,7 +1052,11 @@
 
     caso("N5 Config: validação, padrão e base dos jogadores", (t) => {
       t.igual(Regras.validarConfig(Regras.REGRAS_PADRAO), null, "padrão é válido");
-      t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, vagasFaseFinal: 4 }), "só 8 vagas é aceito");
+      for (const vagas of [4, 8, 17, 32]) t.igual(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, vagasFaseFinal: vagas }), null, `${vagas} vagas na fase final é aceito`);
+      for (const vagas of [3, 8.5, 100, "8"]) t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, vagasFaseFinal: vagas }), `${JSON.stringify(vagas)} vagas é recusado`);
+      t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, terceiroLugar: "sim" }), "terceiroLugar precisa ser booleano");
+      t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, melhorDe: { final: 2 } }), "jogos por rodada só 1, 3 ou 5");
+      t.igual(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, melhorDe: { final: 5, semifinais: 3 } }), null, "jogos por rodada válidos");
       t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, pontosVitoria: -1 }), "pontos negativos recusados");
       t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, semanas: 0 }), "0 semanas recusado");
       t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, jogosPorJogador: 2.5 }), "jogos por jogador precisa ser inteiro");

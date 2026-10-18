@@ -9,12 +9,6 @@
   const itemAlerta = (texto) => el("li", {}, Icones.svg("alerta"), el("span", {}, texto));
 
   const ROTULOS = Util.ROTULOS_MATA_MATA;
-  const ORIGEM_DUPLA = {
-    semi1: ["1º + 8º", "2º + 7º"],
-    semi2: ["3º + 6º", "4º + 5º"],
-    terceiro: ["Perdedor da Semi 1", "Perdedor da Semi 2"],
-    final: ["Vencedor da Semi 1", "Vencedor da Semi 2"],
-  };
   const NOMES_CAMPO = {
     gols: "tempo normal", prorrogacao: "prorrogação", penaltis: "pênaltis",
   };
@@ -22,16 +16,20 @@
   function criar(app, raiz) {
     const { estado, renderizar, tabelaAtual, nomesDupla } = app;
 
-    // "Nome + Nome", cada nome abrindo a ficha. `local` deixa os ids únicos na tela.
-    const duplaComFicha = (dupla, local) => dupla.map((id, i) => [i ? " + " : null, app.botaoJogador(id, `ver-${local}-${id}`)]);
+    // "Nome + Nome", cada nome abrindo a ficha. `local` deixa os ids únicos na tela. Dupla incompleta
+    // (vagas ímpares): o jogador que sobrou aparece com "sem dupla" no lugar do parceiro.
+    const duplaComFicha = (dupla, local) => dupla.map((id, i) => [
+      i ? " + " : null,
+      id ? app.botaoJogador(id, `ver-${local}-${id}`) : el("em", { class: "sem-dupla" }, "sem dupla"),
+    ]);
 
     const alvo = el("div", { id: "conteudo-mata-mata" });
     raiz.append(el("section", { id: "tela-mata-mata", class: "tela" },
       el("div", { class: "tela-cabecalho" },
         el("h2", {}, "Mata-mata"),
         el("p", { class: "legenda" },
-          "Semi 1 = 1º+8º × 2º+7º · Semi 2 = 3º+6º × 4º+5º · sem empate: prorrogação e, se preciso, pênaltis"
-          + " · final em melhor de 3 · ", Icones.svg("editar"), " troca uma dupla (surpresa da final). Não altera a classificação.")),
+          "Duplas vizinhas se enfrentam e os vencedores avançam · sem empate: prorrogação e, se preciso, pênaltis · ",
+          Icones.svg("editar"), " troca uma dupla (surpresa da final). Não altera a classificação.")),
       alvo));
 
     const rascunhosMM = new Map(); // id do campo do mata-mata -> texto inválido digitado
@@ -50,21 +48,32 @@
     }
 
     function painelGerar(atual, tabela) {
-      if (tabela.length < Regras.VAGAS_FASE_FINAL) {
-        return app.proximoPasso(`O chaveamento precisa de pelo menos ${Regras.VAGAS_FASE_FINAL} jogadores cadastrados.`, "jogadores", "Ir para Jogadores");
+      const cfg = atual.campeonato.config;
+      const vagas = cfg.vagasFaseFinal;
+      if (tabela.length < vagas) {
+        return app.proximoPasso(`O chaveamento precisa de pelo menos ${vagas} jogadores cadastrados.`, "jogadores", "Ir para Jogadores");
       }
-      const avisos = Regras.avisosParaGerarChaveamento(atual.jogos, tabela, atual.campeonato.config);
-      const semis = Regras.duplasDasSemis(tabela);
-      const previa = (chave) => el("li", {},
-        el("strong", {}, `${ROTULOS[chave]}: `),
-        duplaComFicha(semis[chave][0], `previa-${chave}-1`), ` (${ORIGEM_DUPLA[chave][0]}) × `,
-        duplaComFicha(semis[chave][1], `previa-${chave}-2`), ` (${ORIGEM_DUPLA[chave][1]})`);
+      const avisos = Regras.avisosParaGerarChaveamento(atual.jogos, tabela, cfg);
+      // A prévia é o próprio chaveamento que seria gerado agora: só a 1ª rodada e quem folga.
+      const previa = Regras.resolverMataMata(Regras.gerarMataMata(tabela, cfg), tabela, cfg);
+      const primeira = previa.rodadas[0];
+      const linhaPrevia = (c) => el("li", {},
+        el("strong", {}, `${ROTULOS[c.chave]}: `),
+        duplaComFicha(c.dupla1, `previa-${c.chave}-1`), ` (${c.origem[0]}) × `,
+        duplaComFicha(c.dupla2, `previa-${c.chave}-2`), ` (${c.origem[1]})`);
+      const linhaFolga = (f, i) => el("li", {}, duplaComFicha(f.dupla, `previa-folga-${i}`), ` (${f.origem})`);
       return el("div", { class: "gerar-chave" },
-        el("p", {}, "Prévia pela classificação atual:"),
-        el("ul", { class: "previa" }, previa("semi1"), previa("semi2")),
+        el("p", {}, `Prévia pela classificação atual (${vagas} classificados, ${primeira.nome.toLowerCase()}):`),
+        el("ul", { class: "previa" }, primeira.confrontos.map(linhaPrevia)),
+        previa.folgam.length > 0 && el("div", {},
+          el("p", { class: "legenda" }, `Folgam nesta rodada e entram na seguinte (${previa.folgam.length}):`),
+          el("ul", { class: "previa", id: "previa-folgas" }, previa.folgam.map(linhaFolga))),
+        vagas % 2 === 1 && el("p", { class: "legenda", id: "aviso-vagas-impares" }, Icones.svg("alerta"),
+          `Com ${vagas} classificados, o ${(vagas + 1) / 2}º colocado fica sem dupla. Depois de gerar, escolha o parceiro dele em "Trocar a dupla"; `
+          + "o confronto dele só abre quando a dupla estiver completa."),
         avisos.length
           ? el("ul", { class: "avisos-chave" }, avisos.map(itemAlerta))
-          : el("p", { class: "tudo-certo" }, Icones.svg("ok"), "Todos os jogos lançados e nenhum empate técnico pendente no top 8."),
+          : el("p", { class: "tudo-certo" }, Icones.svg("ok"), `Todos os jogos lançados e nenhum empate técnico pendente no top ${vagas}.`),
         el("button", { type: "button", id: "btn-gerar-chave", class: "primario", onclick: gerarChaveamento }, "Gerar chaveamento"));
     }
 
@@ -75,7 +84,7 @@
         { titulo: "Gerar o chaveamento mesmo assim?", acao: "Gerar mesmo assim", perigo: true }))) return;
       if (estado.atual().mataMata) return; // outra janela já gerou
       const tabela = tabelaAtual();
-      estado.modificar("gerar chaveamento", (s) => { s.mataMata = Regras.gerarMataMata(tabela); });
+      estado.modificar("gerar chaveamento", (s) => { s.mataMata = Regras.gerarMataMata(tabela, app.config()); });
     }
 
     async function apagarChaveamento() {
@@ -96,14 +105,14 @@
     }
 
     function barraMataMata(mm) {
-      const semis = [mm.semi1, mm.semi2];
-      const finais = [mm.final, mm.terceiro];
+      const semis = mm.daClassificacao; // duplas que vêm da classificação (1ª rodada e quem folga)
+      const finais = mm.dosResultados; // duplas que vêm dos vencedores/perdedores
       const desatualizado = semis.some((c) => c.lado1.desatualizada || c.lado2.desatualizada);
       const finaisDesatualizadas = finais.some((c) => c.lado1.desatualizada || c.lado2.desatualizada);
       return el("div", { class: "barra-mata-mata" },
         desatualizado && el("div", { class: "alerta" },
           Icones.svg("alerta"),
-          "A classificação mudou depois de gerar o chaveamento: as duplas automáticas das semis não batem mais com ela. ",
+          "A classificação mudou depois de gerar o chaveamento: as duplas automáticas da classificação não batem mais com ela. ",
           el("button", {
             type: "button", id: "btn-atualizar-semis",
             onclick: async () => {
@@ -113,15 +122,15 @@
           }, "Usar duplas da classificação atual")),
         finaisDesatualizadas && el("div", { class: "alerta" },
           Icones.svg("alerta"),
-          "O resultado de uma semifinal mudou depois de lançar placares da final ou do 3º lugar: "
-          + "as duplas que jogaram não são mais as que saem das semis. ",
+          "O resultado de um confronto mudou depois de lançar placares dos seguintes: "
+          + "as duplas que jogaram não são mais as que saem dos resultados. ",
           el("button", {
             type: "button", id: "btn-atualizar-finais",
             onclick: async () => {
               if (!(await confirmarTrocaComPlacar(finais))) return;
               modificarMataMata("atualizar duplas da final e do 3º lugar", (m) => Regras.atualizarDuplasDasFinais(m, tabelaAtual(), app.config()));
             },
-          }, "Usar duplas que saem das semis")),
+          }, "Usar duplas que saem dos resultados")),
         el("div", { class: "barra-tela" },
           el("button", { type: "button", id: "btn-png-mata-mata", onclick: () => app.exportarPNG("mata-mata") },
             Icones.svg("imagem"), "Baixar imagem"),
@@ -144,7 +153,9 @@
 
       const salvar = () => {
         const dupla = [sel1.value, sel2.value];
-        const outra = c[`dupla${3 - lado}`];
+        // A outra dupla pode estar incompleta (jogador sem parceiro): ela só vale na checagem se estiver inteira.
+        const outraDupla = c[`dupla${3 - lado}`];
+        const outra = Regras.duplaCompleta(outraDupla) ? outraDupla : null;
         const erroDupla = lado === 1 ? Regras.validarDuplas(dupla, outra) : Regras.validarDuplas(outra, dupla);
         if (erroDupla) {
           errosCampo.set(chaveErro, erroDupla);
@@ -184,8 +195,8 @@
       return el("div", { class: classe },
         el("span", { class: "rotulo-lado" }, `Dupla ${lado}`),
         el("span", { class: info.dupla ? "nomes" : "nomes a-definir" },
-          info.dupla ? duplaComFicha(info.dupla, `${c.chave}-${lado}`) : ORIGEM_DUPLA[c.chave][lado - 1]),
-        info.dupla && !info.manual && el("span", { class: "origem-dupla" }, ORIGEM_DUPLA[c.chave][lado - 1]),
+          info.dupla ? duplaComFicha(info.dupla, `${c.chave}-${lado}`) : c.origem[lado - 1]),
+        info.dupla && !info.manual && el("span", { class: "origem-dupla" }, c.origem[lado - 1]),
         info.manual && el("span", {
           class: "tag-manual",
           title: info.automatica ? `Automática seria: ${nomesDupla(info.automatica)}` : "Automática ainda indefinida",
@@ -269,6 +280,8 @@
       else if (serie.vencedor) status = "Decidido";
       else if (c.partidas.length) status = "Em andamento";
       const erroDuplas = c.pronto ? Regras.validarDuplas(c.dupla1, c.dupla2) : null;
+      // Vagas ímpares: o jogador que sobrou precisa de parceiro antes de jogar.
+      const semParceiro = [c.dupla1, c.dupla2].find((d) => d && !Regras.duplaCompleta(d));
 
       return el("article", { class: `confronto${serie.vencedor ? " decidido" : ""}`, id: `mm-${c.chave}` },
         el("div", { class: "jogo-topo" },
@@ -278,6 +291,8 @@
         linhaDupla(c, 1, tabela),
         linhaDupla(c, 2, tabela),
         erroDuplas && el("div", { class: "alerta" }, Icones.svg("alerta"), erroDuplas),
+        semParceiro && el("div", { class: "alerta", id: `sem-parceiro-${c.chave}` }, Icones.svg("alerta"),
+          `${app.nomePorId.get(semParceiro[0])} está sem dupla: escolha o parceiro em "Trocar a dupla" para liberar os placares.`),
         c.melhorDe > 1 && c.pronto && el("div", { class: "placar-serie" },
           `Série: ${serie.vitorias[0]} × ${serie.vitorias[1]}`,
           !serie.vencedor && el("span", { class: "legenda" }, ` (vence quem fizer ${serie.necessarias})`)),
@@ -286,7 +301,7 @@
           : el("p", { class: "legenda" }, "Os placares abrem quando as duas duplas estiverem definidas."));
     }
 
-    function podio(p) {
+    function podio(p, comTerceiro) {
       const degrau = (classe, icone, titulo, dupla) => el("div", { class: `degrau ${classe}${dupla ? "" : " vazio"}` },
         el("span", { class: "medalha", "aria-hidden": "true" }, Icones.svg(icone)),
         el("div", {},
@@ -297,7 +312,7 @@
       return el("div", { class: "podio", id: "podio" },
         degrau("ouro", "trofeu", "Campeões", p.campeoes),
         degrau("prata", "medalha", "Vice", p.vice),
-        degrau("bronze", "medalha", "3º lugar", p.terceiro));
+        comTerceiro && degrau("bronze", "medalha", "3º lugar", p.terceiro));
     }
 
     function renderizarMataMata(atual, tabela) {
@@ -309,18 +324,15 @@
       alvo.replaceChildren(
         barraMataMata(mm),
         el("div", { class: "chave" },
-          el("div", { class: "coluna-chave" },
-            el("h3", {}, "Semifinais"),
-            cartaoConfronto(mm.semi1, tabela),
-            cartaoConfronto(mm.semi2, tabela)),
-          el("div", { class: "coluna-chave" },
-            el("h3", {}, "Final"),
-            cartaoConfronto(mm.final, tabela),
-            el("h3", {}, "Disputa de 3º lugar"),
-            cartaoConfronto(mm.terceiro, tabela)),
+          mm.rodadas.map((rodada, i) => el("div", { class: "coluna-chave", id: `rodada-${rodada.id}` },
+            el("h3", {}, rodada.nome),
+            i === 0 && mm.folgam.length > 0 && el("p", { class: "legenda folgas-rodada", id: "folgas-rodada" },
+              `Folgam e entram na seguinte: ${mm.folgam.map((f) => f.origem).join(", ")}.`),
+            rodada.confrontos.map((c) => cartaoConfronto(c, tabela)),
+            rodada.id === "final" && mm.terceiro && [el("h3", {}, "Disputa de 3º lugar"), cartaoConfronto(mm.terceiro, tabela)])),
           el("div", { class: "coluna-chave" },
             el("h3", {}, "Pódio"),
-            podio(mm.podio))));
+            podio(mm.podio, Boolean(mm.terceiro)))));
     }
 
     function aoMudarPlacarMM(ev) {
@@ -337,7 +349,7 @@
       rascunhosMM.delete(campoEl.id);
       errosCampo.delete(campoEl.id);
       const valor = g.vazio ? null : g.valor;
-      const jogo = Regras.MELHOR_DE[chave] > 1 ? ` jogo ${indice + 1}` : "";
+      const jogo = Regras.melhorDeDoConfronto(estado.atual().mataMata, chave) > 1 ? ` jogo ${indice + 1}` : "";
       const etapa = NOMES_CAMPO[campo.slice(0, -1)];
       modificarMataMata(
         `${ROTULOS[chave]}${jogo}: ${etapa} da dupla ${campo.slice(-1)} = ${valor === null ? "vazio" : valor}`,

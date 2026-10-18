@@ -5,7 +5,6 @@
   "use strict";
 
   const { el, formatarSaldo, botaoIcone } = Util;
-  const { VAGAS_FASE_FINAL } = Regras;
 
   function criar(app, raiz) {
     const { estado, nomePorId, renderizar } = app;
@@ -25,6 +24,7 @@
     const cabecalho = ([texto, extenso, classe]) => el("th", { scope: "col", class: classe },
       !texto ? el("span", { class: "so-leitor" }, extenso)
         : extenso ? el("abbr", { title: extenso }, texto) : texto);
+    const legendaVagas = el("span", { id: "legenda-vagas" }, "Top 8");
     raiz.append(el("section", { id: "tela-classificacao", class: "tela" },
       el("div", { class: "tela-cabecalho" },
         el("h2", {}, "Classificação ", rotulo),
@@ -35,7 +35,7 @@
             onclick: () => app.exportarPNG("classificacao"),
           }, Icones.svg("imagem"), "Baixar imagem")),
         el("p", { class: "legenda" },
-          el("span", { class: "amostra-classificado" }), " Top 8 vai para a fase final"),
+          el("span", { class: "amostra-classificado" }), " ", legendaVagas, " vai para a fase final"),
         el("details", { class: "como-ler" },
           el("summary", {}, "Como ler"),
           el("ul", {},
@@ -147,10 +147,11 @@
           app.proximoPasso("Nenhum jogador cadastrado ainda.", "jogadores", "Ir para Jogadores"))));
         return;
       }
+      const vagas = estado.atual().campeonato.config.vagasFaseFinal;
       corpo.replaceChildren(
         ...tabela.map((linha) => {
-          let classe = linha.posicao <= VAGAS_FASE_FINAL ? "classificado" : "";
-          if (linha.posicao === VAGAS_FASE_FINAL) classe += " linha-corte";
+          let classe = linha.posicao <= vagas ? "classificado" : "";
+          if (linha.posicao === vagas) classe += " linha-corte";
           if (linha.empateTecnico) classe += " em-empate";
           return el("tr", { class: classe.trim() || null, id: `linha-${linha.id}` },
             el("td", { class: "col-pos" }, `${linha.posicao}º`),
@@ -179,6 +180,7 @@
         ? tabela
         : Regras.classificacaoPorSemana(app.base(), atual.jogos, atual.desempatesManuais, cfg, semanaClassificacao);
       const situacoes = aoVivo && atual.jogos.length ? Util.situacoes(app.base(), atual) : null;
+      legendaVagas.textContent = `Top ${cfg.vagasFaseFinal}`;
       controleClassificacao(ultimaSemana);
       rotulo.textContent = aoVivo ? "" : `após a semana ${semanaClassificacao}`;
       renderizarResumoSituacao(atual, situacoes);

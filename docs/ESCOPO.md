@@ -8,7 +8,7 @@ Aplicação local (HTML + CSS + JavaScript puro) para o organizador conduzir um 
 2. Sortear o calendário inteiro de uma vez, ajustar à mão se precisar e confirmar.
 3. Lançar os placares (ou W.O., ou anular) semana a semana.
 4. Ver a classificação individual ao vivo ou ao fim de cada semana, e **o que está em jogo** (coluna "Situação": garantidos, em disputa, eliminados).
-5. Gerar e conduzir o mata-mata: semifinais, 3º lugar e final MD3.
+5. Gerar e conduzir o mata-mata com o número de classificados escolhido (padrão 8: semifinais, 3º lugar e final MD3).
 6. Exportar imagens (PNG) para mandar no grupo e exibir tudo num **modo telão**.
 
 Várias edições (campeonatos) ficam guardadas no app; só uma está aberta por vez.
@@ -51,12 +51,15 @@ Saldo = GP − GC. Jogo sem placar lançado não conta. Jogo anulado conta como 
 
 ### 2.3 Mata-mata
 
-- As duplas se formam pela classificação final: **Semi 1 = 1º+8º × 2º+7º**, **Semi 2 = 3º+6º × 4º+5º**. Só 8 vagas na fase final são suportadas.
-- 3º lugar = perdedores das semis. Final = vencedores das semis, em **MD3**.
+- **Quantos classificados** (`config.vagasFaseFinal`): de 4 a 99, padrão 8. As duplas se formam pela classificação final: 1º + último, 2º + penúltimo... No padrão, **Semi 1 = 1º+8º × 2º+7º**, **Semi 2 = 3º+6º × 4º+5º**. Regras completas (ímpar, folgas, rodadas, 3º lugar) em `docs/REGULAMENTO.md`, "Fase final com outro número de classificados".
+- **Estrutura** (`Regras.estruturaDoMataMata(formato)`): o número de duplas é `⌈vagas ÷ 2⌉`. As duplas vizinhas se enfrentam e os vencedores avançam; se o número de duplas não é potência de 2, as melhores pulam a 1ª rodada (folgas). Cada confronto tem uma chave (`semi1`, `quartas3`, `oitavas2`, `r1-4`, `final`, `terceiro`) e duas **fontes**: `{ dupla: i }` (classificação), `{ vencedor: chave }` ou `{ perdedor: chave }`. O nome da rodada vem da posição contando a partir da final (Final, Semifinais, Quartas, Oitavas, "Rodada N").
+- **Número ímpar de classificados**: o jogador do meio vira uma dupla incompleta (`[id, null]`, "sem dupla"); o confronto dele não abre para placar até o organizador completar a dupla pela troca de dupla.
+- **3º lugar** (`config.terceiroLugar`): perdedores das duas semifinais; só existe quando há duas semifinais. **Jogos por rodada** (`config.melhorDe`): jogo único por padrão e MD3 na final; cada rodada e o 3º lugar podem ser jogo único, melhor de 3 ou melhor de 5.
+- **Formato guardado**: ao gerar o chaveamento, o formato (`vagas`, `terceiroLugar`, `melhorDe`) é copiado para `mataMata.formato`, e mudar a configuração depois não mexe nele. Com 8 vagas e a configuração padrão o `formato` é omitido: é exatamente o estado de antes da Fase 24 (`semi1`, `semi2`, `terceiro`, `final`), então backups antigos continuam valendo sem migração.
 - Sem empate: cada jogo tem placar normal e, se empatar, **prorrogação** e, se ainda empatar, **pênaltis**.
-- Final MD3: termina quando uma dupla chega a 2 vitórias (o 3º jogo só aparece com 1×1).
+- Melhor de N: termina quando uma dupla chega à maioria das vitórias (na MD3, o 3º jogo só aparece com 1×1).
 - **Duplas editáveis**: qualquer dupla do mata-mata pode ser trocada à mão (a "surpresa antes da final") e voltar à dupla automática depois.
-- **Duplas guardadas**: as das semis ficam fixas desde a geração do chaveamento; as do 3º lugar e da final ficam fixas a partir do primeiro placar lançado. Se a classificação ou o resultado de uma semi mudar depois, o app avisa e oferece trocar pelas duplas novas (os placares lançados continuam e passam a valer para elas).
+- **Duplas guardadas**: as que vêm da classificação (1ª rodada e duplas que folgam) ficam fixas desde a geração do chaveamento; as que vêm de resultados (vencedores e perdedores) ficam fixas a partir do primeiro placar lançado no confronto. Se a classificação ou o resultado de um confronto mudar depois, o app avisa e oferece trocar pelas duplas novas (os placares lançados continuam e passam a valer para elas).
 - Resultados do mata-mata **não** alteram a classificação.
 - Resultado final: 🥇 campeões (2 jogadores), 🥈 vice, 🥉 3º lugar.
 
@@ -144,14 +147,16 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
   versao: 2,
   campeonato: {
     nome: "Copa FIFA em Duplas",
-    config: { pontosVitoria, pontosEmpate, pontosEmpateSemGols, vagasFaseFinal, jogosPorJogador, semanas },
+    config: { pontosVitoria, pontosEmpate, pontosEmpateSemGols, vagasFaseFinal, terceiroLugar, melhorDe: { <rodada>: 1|3|5 }, jogosPorJogador, semanas },
     jogadores: [ { id, nome, estrelas: 1..5 | null } ],   // null = nível ainda não definido
     sorteio: null | { semente, confirmado, rascunho?: [ { semana, dupla1, dupla2 } ] }
   },
   jogos: [ { id, semana, semanaOriginal?, dupla1: [id, id], dupla2: [id, id],   // semanaOriginal: só se remarcado
              resultado: null | { tipo: "placar", gols1, gols2 } | { tipo: "wo", vencedor: 1 | 2 } | { tipo: "anulado" } } ],
   desempatesManuais: [ { jogadores: [id, ...] } ],
-  mataMata: null | { semi1, semi2, terceiro, final },  // cada um: { dupla1, dupla2, duplaManual1?, duplaManual2?, partidas: [Partida] }
+  mataMata: null | { formato?, <chave>: confronto, ... },   // chaves: semi1, semi2, terceiro, final (padrão) ou quartas1..., oitavas1..., r1-1... (ver 2.3)
+                                                           // formato?: { vagas, terceiroLugar, melhorDe } só quando foge do padrão (8 vagas)
+                                                           // confronto: { dupla1, dupla2, duplaManual1?, duplaManual2?, partidas: [Partida] }; dupla pode ser [id, null] (sem parceiro)
   ultimoBackup: null | { em, semanasCompletas },
   aparencia: null | { cor: "#rrggbb" | null, logo: "data:image/...;base64,..." | null },
   historico: [ /* até 30 estados anteriores para o "desfazer" */ ]
@@ -171,7 +176,7 @@ Uma aba por etapa (Alt+1, Alt+2...; a aba ativa fica no endereço, ex.: `index.h
 
 **Preparação** (calendário ainda não confirmado), em 3 passos numerados, cada um com o seu indicador de completo:
 
-1. **Configuração** (`#configuracao`): nome, jogos por jogador, semanas, aparência (cor e logo) e a conta "N jogadores × J jogos ÷ 4 = ...".
+1. **Configuração** (`#configuracao`): nome, jogos por jogador, semanas, aparência (cor e logo), **fase final** (classificados, disputa de 3º lugar e jogos de cada rodada; editável até o chaveamento ser gerado, sem refazer o sorteio) e a conta "N jogadores × J jogos ÷ 4 = ...".
 2. **Jogadores** (`#jogadores`): diagnóstico do cadastro e cadastro (um nome por linha; renomear, remover e nível de 1 a 5 estrelas).
 3. **Sorteio** (`#sorteio`): sortear, conferir as restrições e o equilíbrio por nível, trocar jogadores à mão e confirmar.
 
@@ -179,7 +184,7 @@ Uma aba por etapa (Alt+1, Alt+2...; a aba ativa fica no endereço, ex.: `index.h
 
 4. **Rodadas**: navegação por semana (◀ S1…Sn ▶, com o progresso na cor de cada botão, e "Semana atual"), cartões dos jogos com placar, "W.O." (escolhendo a dupla presente pelos nomes), "Anular", "Remarcar" (escolhe a semana no próprio cartão, com aviso se alguém já joga nela; ver 2.5.1) e "Limpar"; quem descansa na semana; top 8 ao vivo ao lado.
 5. **Classificação**: ao vivo ou ao fim de uma semana, na largura toda; top 8 em verde, ▲▼ em relação à semana anterior, empate técnico com controle de ordem manual; explicação em "Como ler". Ao vivo, com até 8 jogos pendentes (pontuação padrão), a coluna **Situação** (ver 2.4); antes disso, uma linha diz quando ela aparece. "Baixar imagem" gera o PNG da classificação vista (ao vivo ou da semana escolhida).
-6. **Mata-mata**: chaveamento, placares com prorrogação e pênaltis, troca de duplas e pódio. Com o chaveamento gerado, "Baixar imagem" gera o PNG do mata-mata.
+6. **Mata-mata**: prévia (1ª rodada e quem folga) e, depois de gerado, uma coluna por rodada (a final leva o 3º lugar embaixo) e o pódio; placares com prorrogação e pênaltis, troca de duplas e aviso de jogador sem dupla. Com o chaveamento gerado, "Baixar imagem" gera o PNG do mata-mata.
 7. **Ajustes** (`#campeonato`): Configuração, Jogadores e o calendário completo, só para ver (o nome, a aparência e o renomear continuam editáveis), e a **zona de perigo** com "Reiniciar campeonato". Os endereços dos passos da preparação (e o antigo `#calendario`) levam para cá depois da confirmação.
 
 **Ficha do jogador** (`js/telas/ficha.js`): o nome de cada jogador nas Rodadas (cartões, "Descansam" e top 8), na Classificação e no Mata-mata (prévia, confrontos e pódio) abre uma janela lateral. Ela mostra os números ao vivo (posição, pontos, saldo, V/E/D e jogos disputados), a situação para o top 8 (como na coluna, ou quando ela fica disponível), a fase final de quem entrou no chaveamento (conquista e resultado de cada confronto) e todos os jogos do calendário, com parceiro, adversários e resultado. O nome do parceiro ou de um adversário troca a ficha; "Semana N · Jogo M" leva àquela semana nas Rodadas. Esc, o X ou um clique fora fecham, e o foco volta ao nome clicado. Os números são sempre os ao vivo, mesmo com a Classificação "após a semana N". O telão e os PNGs não mudam.
@@ -211,6 +216,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 21 | Rodadas com a navegação ◀ S1…Sn ▶ e "Semana atual" (sai o seletor de semana), W.O. com os nomes das duplas e título em cada cartão; Classificação na largura toda, com a coluna "Situação" no lugar do painel "O que está em jogo" e "Como ler"; "Baixar imagem" na Classificação e no Mata-mata |
 | 22 | Ficha do jogador: janela lateral aberta pelo nome (Rodadas, top 8, Classificação e Mata-mata), com números ao vivo, situação, fase final e todos os jogos. Sai a "Agenda do jogador" das Rodadas |
 | 23 | Remarcação de jogos: botão "Remarcar" no cartão (semana de 1 a N, aviso de conflito), marca "Remarcado da semana N" nas Rodadas, na ficha e nos Ajustes; `semanaOriginal` no jogo e regras em `Regras.remarcarJogo` |
+| 24 | Mata-mata com qualquer número de classificados (4 a 99): estrutura por rodadas com folgas, jogador sem dupla com número ímpar, 3º lugar e jogos por rodada configuráveis, formato guardado no chaveamento; "Top N" nos textos, PNG e telão acompanham as vagas |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -228,6 +234,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | C | Cadastro de jogadores |
 | S | Sorteio e confirmação do calendário |
 | R | Rodadas e classificação por semana |
+| MM | Mata-mata com N classificados: estrutura (rodadas, chaves, fontes), folgas, duplas com número ímpar, jogos por rodada e 3º lugar, duplas guardadas, salvar/importar (inclusive o formato de antes), PNG e telão |
 | M | Remarcação: ordem e número do jogo, semana original, recusas, aviso de conflito, efeito nas semanas e na classificação, salvar/desfazer/importar |
 | T | PNG e telão com qualquer número de jogadores |
 | B | Lembrete e registro de backup |
@@ -236,10 +243,10 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
 | U | Base da interface: `plural`, `numero` (formato brasileiro), `rotuloDoJogo`, `botaoIcone` (nome acessível), ícones decorativos e atributos do erro junto do campo |
 
-`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata), V9 (ficha do jogador: números iguais aos da tabela, um jogo por linha do calendário, Esc/X/clique fora com o foco de volta ao nome, troca para o parceiro, fase final do campeão, ir para a semana e ficha aberta atualizando) e V10 (remarcação: botão só em jogo sem resultado, semana atual desabilitada, remarcar e desfazer, aviso de conflito, marca nos Ajustes e na ficha com o calendário sorteado ainda avaliado como respeitado).
+`testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata), V9 (ficha do jogador: números iguais aos da tabela, um jogo por linha do calendário, Esc/X/clique fora com o foco de volta ao nome, troca para o parceiro, fase final do campeão, ir para a semana e ficha aberta atualizando), V10 (remarcação: botão só em jogo sem resultado, semana atual desabilitada, remarcar e desfazer, aviso de conflito, marca nos Ajustes e na ficha com o calendário sorteado ainda avaliado como respeitado) e V11 (fase final: campos da Configuração e trava com o chaveamento gerado, mata-mata com 12, 17 classificados, sem 3º lugar e com jogos por rodada).
 
 ## 7. Pendências
 
 - Revisar a regra do sorteio quando o regulamento do próximo campeonato sair.
-- A fase final só aceita 8 classificados (o chaveamento 1º+8º × 2º+7º é fixo).
+- Emparelhamento com folgas (número de duplas que não é potência de 2): as duplas que folgam entram na rodada seguinte na frente dos vencedores e as vizinhas se enfrentam; isso foi decidido na Fase 24 sem regra do regulamento original. Revisar se o organizador preferir que as duplas que folgam enfrentem os vencedores (e não se enfrentem entre si).
 - Confronto direto entre jogadores num campeonato em duplas continua sendo decisão manual do organizador.

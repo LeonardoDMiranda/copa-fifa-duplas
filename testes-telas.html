@@ -1226,6 +1226,112 @@
       t.igual(ficha.querySelectorAll("#ficha-lista-jogos .marca-remarcado").length, 1, "a ficha do jogador marca o jogo remarcado");
     }));
 
+    // ---------- V11: mata-mata com qualquer número de classificados ----------
+
+    // Todos os jogos lançados e a fase final configurada com `vagas` (e `extra` na config). Com
+    // `chave: true`, o chaveamento também já está gerado.
+    function dadosComFaseFinal(vagas, extra = {}, { chave = true } = {}) {
+      const dados = dadosComCalendario({ semanasLancadas: 8 });
+      Object.assign(dados.campeonato.config, { vagasFaseFinal: vagas, ...extra });
+      if (chave) {
+        const tabela = Regras.calcularClassificacao(Regras.baseDosJogadores(dados.campeonato.jogadores), dados.jogos, [], dados.campeonato.config);
+        dados.mataMata = Regras.gerarMataMata(tabela, dados.campeonato.config);
+      }
+      return dados;
+    }
+    const alternar = (campo, valor) => { campo.checked = valor; campo.dispatchEvent(new Event("change", { bubbles: true })); };
+
+    caso("V11.1 Configuração: classificados, 3º lugar e jogos por rodada; mudar não refaz o sorteio", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComCalendario({ semanasLancadas: 0 }));
+      const raiz = montar("configuracao");
+      verificarLimpeza(t, raiz, "configuração");
+      t.igual(buscar(raiz, "config-vagas").value, "8", "começa com 8 classificados");
+      t.igual([...raiz.querySelectorAll("#fase-final select")].map((s) => s.id), ["config-jogos-semifinais", "config-jogos-final", "config-jogos-terceiro"], "jogos por rodada: semifinais, final e 3º lugar");
+      t.verdadeiro(buscar(raiz, "config-terceiro").checked, "3º lugar ligado");
+      mudarCampo(buscar(raiz, "config-vagas"), "12");
+      t.igual(estado.atual().campeonato.config.vagasFaseFinal, 12, "12 classificados guardado");
+      t.igual([...raiz.querySelectorAll("#fase-final select")].map((s) => s.id), ["config-jogos-quartas", "config-jogos-semifinais", "config-jogos-final", "config-jogos-terceiro"], "12 classificados: aparecem as quartas");
+      t.verdadeiro(estado.atual().campeonato.sorteio && estado.atual().campeonato.sorteio.confirmado, "o sorteio confirmado continua");
+      t.verdadeiro(raiz.textContent.includes("6 duplas no mata-mata"), "diz quantas duplas entram");
+      mudarCampo(buscar(raiz, "config-jogos-semifinais"), "3");
+      t.igual(estado.atual().campeonato.config.melhorDe, { semifinais: 3 }, "semifinais em melhor de 3");
+      mudarCampo(buscar(raiz, "config-jogos-final"), "3");
+      t.igual(estado.atual().campeonato.config.melhorDe, { semifinais: 3 }, "a final em melhor de 3 é o padrão e não fica guardada");
+      alternar(buscar(raiz, "config-terceiro"), false);
+      t.igual(estado.atual().campeonato.config.terceiroLugar, false, "3º lugar desligado");
+      t.verdadeiro(!buscar(raiz, "config-jogos-terceiro"), "sem o seletor de jogos do 3º lugar");
+      mudarCampo(buscar(raiz, "config-vagas"), "6");
+      t.verdadeiro(buscar(raiz, "config-terceiro").disabled && !buscar(raiz, "config-terceiro").checked, "6 classificados: só uma semifinal, sem opção de 3º lugar");
+      mudarCampo(buscar(raiz, "config-vagas"), "3");
+      t.verdadeiro(erroDoCampo(raiz, buscar(raiz, "config-vagas")), "3 classificados: erro junto do campo");
+      t.igual(estado.atual().campeonato.config.vagasFaseFinal, 6, "e o valor guardado não muda");
+      estado.desfazer();
+      t.igual(estado.atual().campeonato.config.vagasFaseFinal, 12, "desfazer volta os classificados");
+    });
+
+    caso("V11.2 Configuração: com o chaveamento gerado, a fase final fica travada", (t) => {
+      const { montar } = criarAppFalso(dadosComFaseFinal(8));
+      const raiz = montar("configuracao");
+      t.verdadeiro([...raiz.querySelectorAll("#fase-final input, #fase-final select")].every((c) => c.disabled), "todos os campos da fase final desabilitados");
+      t.verdadeiro(raiz.querySelector("#fase-final .legenda").textContent.includes("apague o chaveamento"), "explica como mudar");
+    });
+
+    caso("V11.3 Mata-mata com 12 classificados: prévia com folgas e uma coluna por rodada", (t) => {
+      const sem = criarAppFalso(dadosComFaseFinal(12, {}, { chave: false }));
+      const previa = sem.montar("mataMata");
+      verificarLimpeza(t, previa, "prévia");
+      t.igual(previa.querySelectorAll(".previa li").length, 4, "prévia: 2 jogos das quartas e as 2 duplas que folgam");
+      t.verdadeiro(buscar(previa, "previa-folgas"), "lista as duplas que folgam");
+      const { montar, estado } = criarAppFalso(dadosComFaseFinal(12));
+      const raiz = montar("mataMata");
+      verificarLimpeza(t, raiz, "mata-mata");
+      t.igual([...raiz.querySelectorAll(".coluna-chave h3")].map((h) => h.textContent), ["Quartas de final", "Semifinais", "Final", "Disputa de 3º lugar", "Pódio"], "colunas: quartas, semis, final (com o 3º lugar) e pódio");
+      t.igual(raiz.querySelectorAll(".confronto").length, 6, "2 quartas, 2 semis, final e 3º lugar");
+      t.verdadeiro(buscar(raiz, "folgas-rodada"), "a 1ª coluna diz quem folga");
+      t.verdadeiro(buscar(raiz, "mm-semi1-0-gols1"), "a Semi 1 já tem as duas duplas que folgaram e abre o placar");
+      t.verdadeiro(!buscar(raiz, "mm-semi2-0-gols1"), "a Semi 2 espera os vencedores das quartas");
+      mudarCampo(buscar(raiz, "mm-quartas1-0-gols1"), "2");
+      mudarCampo(buscar(raiz, "mm-quartas1-0-gols2"), "0");
+      t.igual(estado.atual().mataMata.quartas1.partidas, [{ gols1: 2, gols2: 0 }], "placar das quartas guardado");
+      t.igual(texto(raiz, "mm-quartas1").includes("Decidido"), true, "e o confronto fica decidido");
+    });
+
+    caso("V11.4 Mata-mata sem 3º lugar, com jogos por rodada configurados", (t) => {
+      const { montar, estado } = criarAppFalso(dadosComFaseFinal(8, { terceiroLugar: false, melhorDe: { semifinais: 3 } }));
+      const raiz = montar("mataMata");
+      t.igual(raiz.querySelectorAll(".confronto").length, 3, "2 semis e a final");
+      t.verdadeiro(!buscar(raiz, "mm-terceiro") && !raiz.textContent.includes("Disputa de 3º lugar"), "sem o confronto do 3º lugar");
+      t.igual(raiz.querySelectorAll(".podio .degrau").length, 2, "pódio só com campeões e vice");
+      t.verdadeiro(texto(raiz, "mm-semi1").includes("Melhor de 3"), "semifinal em melhor de 3");
+      t.verdadeiro(texto(raiz, "mm-final").includes("Melhor de 3"), "final em melhor de 3 (padrão)");
+      mudarCampo(buscar(raiz, "mm-semi1-0-gols1"), "1");
+      mudarCampo(buscar(raiz, "mm-semi1-0-gols2"), "0");
+      t.verdadeiro(buscar(raiz, "mm-semi1-1-gols1"), "a série da semi mostra o jogo 2");
+      t.igual(estado.atual().historico[estado.atual().historico.length - 1].descricao.includes("Semifinal 1 jogo 1"), true, "o desfazer diz o jogo da série");
+    });
+
+    caso("V11.5 Mata-mata com 17 classificados: o jogador do meio fica sem dupla até o organizador escolher o parceiro", (t) => {
+      const antes = criarAppFalso(dadosComFaseFinal(17, {}, { chave: false })).montar("mataMata");
+      t.verdadeiro(buscar(antes, "aviso-vagas-impares"), "a prévia avisa do jogador sem dupla");
+      const { montar, estado } = criarAppFalso(dadosComFaseFinal(17));
+      const raiz = montar("mataMata");
+      verificarLimpeza(t, raiz, "mata-mata");
+      t.igual(raiz.querySelectorAll(".confronto").length, 9, "1 jogo de oitavas, 4 de quartas, 2 semis, final e 3º lugar (9 duplas)");
+      const alerta = buscar(raiz, "sem-parceiro-oitavas1");
+      t.verdadeiro(alerta && alerta.textContent.includes("está sem dupla"), "o confronto avisa quem está sem dupla");
+      t.verdadeiro(!buscar(raiz, "mm-oitavas1-0-gols1"), "e não abre o placar");
+      t.verdadeiro(texto(raiz, "mm-oitavas1").includes("Aguardando duplas"), "status: aguardando duplas");
+      clicar(raiz, "editar-oitavas1-2");
+      const sel1 = buscar(raiz, "sel-oitavas1-2-1");
+      const sobra = estado.atual().mataMata.oitavas1.dupla2[0];
+      t.igual(sel1.value, sobra, "o editor já traz o jogador que sobrou");
+      const parceiro = [...buscar(raiz, "sel-oitavas1-2-2").options].map((o) => o.value).find((v) => v && v !== sobra && !estado.atual().mataMata.oitavas1.dupla1.includes(v));
+      buscar(raiz, "sel-oitavas1-2-2").value = parceiro;
+      clicar(raiz, "salvar-oitavas1-2");
+      t.igual(estado.atual().mataMata.oitavas1.dupla2, [sobra, parceiro], "dupla completada");
+      t.verdadeiro(buscar(raiz, "mm-oitavas1-0-gols1") && !buscar(raiz, "sem-parceiro-oitavas1"), "agora o placar abre e o aviso some");
+    });
+
     // ---------- execução e relatório ----------
 
     // Um caso pode ser assíncrono (ex.: esperar o "close" da ficha): os casos rodam um de cada vez.

@@ -11,7 +11,7 @@ A small web app to run a 2v2 FIFA tournament from start to finish: sign up the p
 - **Rounds:** enter scores, walkovers or voided games week by week.
 - **Standings:** individual table, live or at the end of any week, with tiebreakers and manual ordering for full ties.
 - **What's at stake:** shows who is already through, who is still fighting and who is out, by checking every possible result of the remaining games.
-- **Knockout stage:** semifinals, 3rd place match and a best-of-3 final, with extra time and penalties.
+- **Knockout stage:** any number of qualifiers from 4 (default 8: semifinals, optional 3rd place match and a best-of-3 final), with byes, extra time and penalties.
 - **Sharing:** exports the standings and the bracket as PNG images and has a TV mode that rotates the screens.
 - **Backup:** saves in the browser, exports and imports JSON, and reminds you to back up.
 
@@ -52,7 +52,7 @@ Um aplicativo web simples para conduzir um campeonato de FIFA em duplas do come�
 - **Rodadas:** lançamento de placares, W.O. ou jogos anulados, semana a semana.
 - **Classificação:** tabela individual, ao vivo ou ao fim de qualquer semana, com critérios de desempate e ordem manual para empates totais.
 - **O que está em jogo:** mostra quem já está garantido, quem ainda disputa e quem está eliminado, testando todos os resultados possíveis dos jogos que faltam.
-- **Mata-mata:** semifinais, disputa de 3º lugar e final em melhor de 3, com prorrogação e pênaltis.
+- **Mata-mata:** qualquer número de classificados a partir de 4 (padrão 8: semifinais, disputa de 3º lugar opcional e final em melhor de 3), com folgas, prorrogação e pênaltis.
 - **Compartilhar:** exporta a classificação e o chaveamento como imagens PNG e tem um modo telão que alterna as telas.
 - **Backup:** salva no navegador, exporta e importa JSON e lembra de fazer backup.
 

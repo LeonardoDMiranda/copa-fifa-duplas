@@ -948,6 +948,13 @@ body.telao-ativo { overflow: hidden; }
   color: var(--telao-suave);
 }
 .telao-chave h2:not(:first-child) { margin-top: 2.4vh; }
+/* Mais (ou menos) rodadas que o padrão de 3 colunas, e muitos confrontos numa coluna: tudo menor para caber. */
+.telao-chave.varias { grid-template-columns: repeat(var(--colunas), minmax(0, 1fr)); gap: 1.4vw; }
+.telao-chave.compacta h2 { font-size: 1.6vh; margin: .2vh 0 .6vh; }
+.telao-chave.compacta .telao-confronto { padding: .5vh .6vw; margin-bottom: .8vh; }
+.telao-chave.compacta .telao-confronto .linha { font-size: 2vh; padding: .2vh .4vw; }
+.telao-chave.compacta .telao-confronto .valor { font-size: 2.4vh; }
+.telao-chave.compacta .telao-confronto .rotulo, .telao-chave.compacta .telao-confronto .detalhe { font-size: 1.3vh; margin: 0; padding-left: 0; }
 .telao-confronto {
   padding: 1.3vh 1.2vw 1.4vh;
   margin-bottom: 1.8vh;
@@ -1009,6 +1016,10 @@ body.telao-ativo { overflow: hidden; }
 .campo-config .erro-campo { max-width: 22em; }
 .diagnostico { margin: var(--esp-2) 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
+.fase-final { margin: var(--esp-2) 0; }
+.fase-final .config-campeonato { margin: var(--esp-1) 0 var(--esp-1); align-items: flex-end; }
+.fase-final select { font: inherit; font-size: var(--fonte-base); padding: 4px var(--esp-2); color: var(--texto); border: 1px solid var(--borda-forte); border-radius: var(--raio); background: var(--superficie); }
+.sem-dupla { color: var(--texto-suave); }
 .aparencia { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2) var(--esp-4); margin: var(--esp-1) 0 var(--esp-2); }
 .rotulo-aparencia { font-size: var(--fonte-sm); font-weight: 600; color: var(--texto-suave); }
 .campo-aparencia { display: flex; align-items: center; gap: 6px; font-size: var(--fonte-sm); color: var(--texto-suave); }

@@ -61,5 +61,5 @@ js/telao.js         # modo telão (tela cheia, alterna telas); também abre sozi
 - `regras.js` não acessa DOM nem `localStorage`. Toda regra de negócio fica nele e é testada em `testes.html`.
 - Sempre que mudar uma regra, adicione ou ajuste um caso em `testes.html` e confira que todos passam.
 - A classificação é **sempre calculada** (base zerada dos jogadores + jogos lançados, via `Regras.baseDosJogadores`). Nunca guarde a tabela calculada no estado.
-- Tudo que pode mudar de um campeonato para outro (pontos, nº de jogos e de semanas) vive em `campeonato.config` (`Regras.REGRAS_PADRAO`); as funções de `regras.js` recebem `config` como parâmetro opcional. Vagas na fase final: só 8 é suportado.
+- Tudo que pode mudar de um campeonato para outro (pontos, nº de jogos e de semanas) vive em `campeonato.config` (`Regras.REGRAS_PADRAO`); as funções de `regras.js` recebem `config` como parâmetro opcional. Vagas na fase final: de 4 a 99 (padrão 8); o chaveamento guarda o próprio formato (ver `docs/ESCOPO.md`, 2.3).
 - Mudanças pequenas e incrementais: o organizador constrói fase por fase (ver `docs/ESCOPO.md`).

@@ -8,9 +8,7 @@
   const INTERVALO_MS = 15000;
   const CONTROLES_VISIVEIS_MS = 3000;
   const { el, formatarSaldo, classeDoLado } = Util;
-  const { VAGAS_FASE_FINAL } = Regras;
   const TITULOS = { classificacao: "Classificação", jogos: "Jogos da semana", "mata-mata": "Mata-mata" };
-  const ROTULOS_MM = { semi1: "Semifinal 1", semi2: "Semifinal 2", terceiro: "3º lugar", final: "Final" };
 
   function criar(estado) {
     const nomePorId = new Map();
@@ -24,7 +22,7 @@
     let timerControles = null;
     let estavaEmTelaCheia = false;
 
-    const nomesDupla = (dupla) => dupla.map((id) => nomePorId.get(id)).join(" + ");
+    const nomesDupla = (dupla) => dupla.map((id) => (id ? nomePorId.get(id) : "sem dupla")).join(" + ");
 
     // Só entram no rodízio as telas que têm o que mostrar: os jogos (depois do calendário
     // confirmado) e o mata-mata (depois de gerado).
@@ -118,14 +116,14 @@
 
     // ---------- telas ----------
 
-    function telaClassificacao(tabela) {
+    function telaClassificacao(tabela, vagas) {
       const tabelaDe = (linhas) => el("table", { class: "telao-tabela" },
         el("thead", {}, el("tr", {},
           el("th", { class: "pos" }, ""), el("th", { class: "var" }, ""), el("th", { class: "nome" }, "Jogador"),
           ["Pts", "V", "SG", "GP", "J"].map((t) => el("th", {}, t)))),
         el("tbody", {}, linhas.map((l) => {
-          let classe = l.posicao <= VAGAS_FASE_FINAL ? "classificado" : "";
-          if (l.posicao === VAGAS_FASE_FINAL) classe += " corte";
+          let classe = l.posicao <= vagas ? "classificado" : "";
+          if (l.posicao === vagas) classe += " corte";
           let variacao = "";
           if (l.variacao > 0) variacao = `▲${l.variacao}`;
           if (l.variacao < 0) variacao = `▼${-l.variacao}`;
@@ -170,7 +168,7 @@
     function confronto(c) {
       const vencedor = c.serie.vencedor;
       return el("div", { class: `telao-confronto${vencedor ? " decidido" : ""}` },
-        el("div", { class: "rotulo" }, ROTULOS_MM[c.chave], c.melhorDe > 1 ? ` · melhor de ${c.melhorDe}` : ""),
+        el("div", { class: "rotulo" }, Regras.rotuloDoConfronto(c.chave), c.melhorDe > 1 ? ` · melhor de ${c.melhorDe}` : ""),
         [1, 2].map((lado) => {
           const dupla = c[`dupla${lado}`];
           let classe = "linha";
@@ -178,14 +176,14 @@
           else if (vencedor) classe += " perdedora";
           return el("div", { class: classe },
             el("span", { class: dupla ? "nomes" : "nomes a-definir" },
-              dupla ? nomesDupla(dupla) : (Exportar.ORIGEM[c.chave] || ["A definir", "A definir"])[lado - 1],
+              dupla ? nomesDupla(dupla) : c.origem[lado - 1],
               dupla && c[`lado${lado}`].manual ? el("sup", {}, "*") : null),
             el("span", { class: "valor" }, String(Exportar.valorDoLado(c, lado))));
         }),
         el("div", { class: "detalhe" }, Exportar.detalheDoConfronto(c)));
     }
 
-    function podio(p) {
+    function podio(p, comTerceiro) {
       const degrau = (classe, medalha, titulo, dupla) => el("div", { class: `telao-degrau ${classe}${dupla ? "" : " vazio"}` },
         el("span", { class: "medalha" }, medalha),
         el("div", { class: "texto-degrau" },
@@ -195,14 +193,23 @@
       return el("div", { class: "telao-podio" },
         degrau("ouro", "🥇", "Campeões", p.campeoes),
         degrau("prata", "🥈", "Vice", p.vice),
-        degrau("bronze", "🥉", "3º lugar", p.terceiro));
+        comTerceiro && degrau("bronze", "🥉", "3º lugar", p.terceiro));
     }
 
+    // Uma coluna por rodada (a final leva o 3º lugar embaixo) e o pódio. Com muitas rodadas, as colunas
+    // dividem a largura e os confrontos da 1ª rodada se comprimem (--n confrontos por coluna).
     function telaMataMata(mm) {
-      return el("div", { class: "telao-chave" },
-        el("div", { class: "coluna" }, el("h2", {}, "Semifinais"), confronto(mm.semi1), confronto(mm.semi2)),
-        el("div", { class: "coluna" }, el("h2", {}, "Final"), confronto(mm.final), el("h2", {}, "Disputa de 3º lugar"), confronto(mm.terceiro)),
-        el("div", { class: "coluna" }, el("h2", {}, "Pódio"), podio(mm.podio)));
+      const maior = Math.max(...mm.rodadas.map((r) => r.confrontos.length + (r.id === "final" && mm.terceiro ? 1 : 0)));
+      const colunas = mm.rodadas.length + 1;
+      return el("div", {
+        class: `telao-chave${colunas !== 3 ? " varias" : ""}${maior > 3 ? " compacta" : ""}`,
+        style: `--colunas: ${colunas}; --n: ${maior}`,
+      },
+        mm.rodadas.map((rodada) => el("div", { class: "coluna" },
+          el("h2", {}, rodada.nome),
+          rodada.confrontos.map(confronto),
+          rodada.id === "final" && mm.terceiro && [el("h2", {}, "Disputa de 3º lugar"), confronto(mm.terceiro)])),
+        el("div", { class: "coluna" }, el("h2", {}, "Pódio"), podio(mm.podio, Boolean(mm.terceiro))));
     }
 
     // ---------- render ----------
@@ -221,7 +228,7 @@
 
       let conteudo, complemento = "", titulo = TITULOS[telaAtual];
       if (telaAtual === "classificacao") {
-        conteudo = telaClassificacao(tabela);
+        conteudo = telaClassificacao(tabela, config.vagasFaseFinal);
         if (atual.jogos.length) complemento = lancados === atual.jogos.length ? "final" : `${lancados}/${atual.jogos.length} jogos lançados`;
       } else if (telaAtual === "jogos") {
         const semana = Regras.semanaAtual(atual.jogos, config);

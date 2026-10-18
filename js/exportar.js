@@ -126,6 +126,7 @@
     const topoPainel = 176;
     const topoCabecalho = topoPainel + 16;
     const topoLinhas = topoCabecalho + 44;
+    const vagas = info.vagas || VAGAS_FASE_FINAL;
     const fimLinhas = topoLinhas + tabela.length * alt;
     const altura = fimLinhas + 110;
     const { canvas, ctx } = criarCanvas(altura);
@@ -149,15 +150,15 @@
     tabela.forEach((linha, i) => {
       const y = topoLinhas + i * alt;
       const meio = y + alt / 2;
-      if (linha.posicao <= VAGAS_FASE_FINAL) {
+      if (linha.posicao <= vagas) {
         ctx.fillStyle = CORES.classificado;
         ctx.fillRect(MARGEM - 8, y, LARGURA - 2 * (MARGEM - 8), alt);
         ctx.fillStyle = CORES.classificadoBorda;
         ctx.fillRect(MARGEM - 8, y, 5, alt);
       }
-      ctx.fillStyle = linha.posicao === VAGAS_FASE_FINAL ? CORES.classificadoBorda : CORES.borda;
-      ctx.fillRect(MARGEM - 8, y + alt - (linha.posicao === VAGAS_FASE_FINAL ? 3 : 1),
-        LARGURA - 2 * (MARGEM - 8), linha.posicao === VAGAS_FASE_FINAL ? 3 : 1);
+      ctx.fillStyle = linha.posicao === vagas ? CORES.classificadoBorda : CORES.borda;
+      ctx.fillRect(MARGEM - 8, y + alt - (linha.posicao === vagas ? 3 : 1),
+        LARGURA - 2 * (MARGEM - 8), linha.posicao === vagas ? 3 : 1);
 
       escrever(ctx, `${linha.posicao}º`, MARGEM + 8, meio, { tamanho: fonte(25), peso: 700 });
       if (linha.variacao > 0) escrever(ctx, `▲${linha.variacao}`, MARGEM + 72, meio, { tamanho: fonte(19), cor: CORES.sobe });
@@ -172,7 +173,7 @@
       }
     });
 
-    escrever(ctx, "Em verde, o top 8, que vai para a fase final.", MARGEM, fimLinhas + 50, { tamanho: 21, cor: CORES.suave });
+    escrever(ctx, `Em verde, o top ${vagas}, que vai para a fase final.`, MARGEM, fimLinhas + 50, { tamanho: 21, cor: CORES.suave });
     escrever(ctx, "▲▼ variação em relação à semana anterior · ⚖️ empate técnico (ordem definida pela organização)",
       MARGEM, fimLinhas + 82, { tamanho: 19, cor: CORES.suave, larguraMax: LARGURA - 2 * MARGEM });
     return canvas;
@@ -180,11 +181,8 @@
 
   // ---------- mata-mata ----------
 
-  const ROTULOS = { semi1: "Semifinal 1", semi2: "Semifinal 2", terceiro: "Disputa de 3º lugar", final: "Final" };
-  const ORIGEM = {
-    terceiro: ["Perdedor da Semi 1", "Perdedor da Semi 2"],
-    final: ["Vencedor da Semi 1", "Vencedor da Semi 2"],
-  };
+  const rotuloDoConfronto = (chave) => (chave === "terceiro" ? "Disputa de 3º lugar" : Regras.rotuloDoConfronto(chave));
+  const nomesDaDupla = (dupla, nomePorId) => dupla.map((id) => (id ? nomePorId.get(id) : "sem dupla")).join(" + ");
   const ALTURA_CONFRONTO = 214;
 
   function placarTexto(a, b) {
@@ -210,7 +208,7 @@
     ctx.fillStyle = decidido ? CORES.classificadoBorda : CORES.pendente;
     ctx.fillRect(x, y + 10, 6, ALTURA_CONFRONTO - 20);
 
-    const titulo = `${ROTULOS[c.chave].toUpperCase()} · ${c.melhorDe > 1 ? `MELHOR DE ${c.melhorDe}` : "JOGO ÚNICO"}`;
+    const titulo = `${rotuloDoConfronto(c.chave).toUpperCase()} · ${c.melhorDe > 1 ? `MELHOR DE ${c.melhorDe}` : "JOGO ÚNICO"}`;
     escrever(ctx, titulo, x + 22, y + 30, { tamanho: 20, peso: 700, cor: CORES.suave, larguraMax: w - 44 });
 
     [1, 2].forEach((lado) => {
@@ -220,15 +218,14 @@
       if (venceu) retangulo(ctx, x + 14, yLinha, w - 28, 50, { cor: CORES.classificado, raio: 8 });
       const meio = yLinha + 25;
       if (dupla) {
-        const nomes = dupla.map((id) => nomePorId.get(id)).join(" + ");
+        const nomes = nomesDaDupla(dupla, nomePorId);
         const larg = escrever(ctx, nomes, x + 26, meio,
           { tamanho: 27, peso: venceu ? 700 : 500, cor: decidido && !venceu ? CORES.suave : CORES.texto, larguraMax: w - 150 });
         if (c[`lado${lado}`].manual) {
           escrever(ctx, "*", x + 26 + larg + 4, meio - 6, { tamanho: 24, peso: 700, cor: CORES.manual });
         }
       } else {
-        const origem = (ORIGEM[c.chave] || ["A definir", "A definir"])[lado - 1];
-        escrever(ctx, origem, x + 26, meio, { tamanho: 25, cor: CORES.suave, italico: true, larguraMax: w - 150 });
+        escrever(ctx, c.origem[lado - 1], x + 26, meio, { tamanho: 25, cor: CORES.suave, italico: true, larguraMax: w - 150 });
       }
       escrever(ctx, valorDoLado(c, lado), x + w - 40, meio, { tamanho: 36, peso: 700, alinhar: "center" });
     });
@@ -254,24 +251,24 @@
         const gols = p.gols1 != null && p.gols2 != null ? placarTexto(p.gols1, p.gols2) : "em andamento";
         return `J${i + 1}: ${gols}${extras ? ` (${extras})` : ""}`;
       }).join("  ·  ");
-      if (!detalhe) detalhe = c.pronto ? "A jogar" : "Aguardando as semifinais";
+      if (!detalhe) detalhe = c.pronto ? "A jogar" : "Aguardando as duplas";
     } else if (c.partidas.length) {
       const extras = extrasDaPartida(partida, c.serie.analises[0] || {});
       detalhe = extras ? `Tempo normal ${placarTexto(partida.gols1, partida.gols2)} · ${extras}` : "";
       if (!c.serie.vencedor && !detalhe) detalhe = "Em andamento";
     } else {
-      detalhe = c.pronto ? "A jogar" : "Aguardando as semifinais";
+      detalhe = c.pronto ? "A jogar" : "Aguardando as duplas";
     }
     if (c.lado1.manual || c.lado2.manual) detalhe += `${detalhe ? "  ·  " : ""}* dupla alterada pela organização`;
     return detalhe;
   }
 
-  function desenharPodio(ctx, podio, nomePorId, y) {
+  function desenharPodio(ctx, podio, nomePorId, y, comTerceiro = true) {
     const degraus = [
       ["🥇", "CAMPEÕES", podio.campeoes, CORES.ouro, CORES.ouroBorda, 104],
       ["🥈", "VICE", podio.vice, CORES.prata, CORES.prataBorda, 88],
-      ["🥉", "3º LUGAR", podio.terceiro, CORES.bronze, CORES.bronzeBorda, 88],
-    ];
+      comTerceiro && ["🥉", "3º LUGAR", podio.terceiro, CORES.bronze, CORES.bronzeBorda, 88],
+    ].filter(Boolean);
     for (const [medalha, titulo, dupla, cor, borda, alt] of degraus) {
       retangulo(ctx, MARGEM - 16, y, LARGURA - 2 * (MARGEM - 16), alt,
         dupla ? { cor, borda } : { cor: CORES.superficie, borda: CORES.borda });
@@ -294,8 +291,13 @@
     const larguraCheia = LARGURA - 2 * MARGEM;
     const tituloSecao = 56;
     const espaco = 24;
-    const alturaPodio = 104 + 88 + 88 + 3 * 12;
-    const altura = 150 + espaco + 3 * (tituloSecao + ALTURA_CONFRONTO + espaco) + tituloSecao + alturaPodio + 30;
+    // Uma seção por rodada (e uma para o 3º lugar): um confronto ocupa a largura toda; vários, duas colunas.
+    const secoes = mm.rodadas.map((r) => ({ titulo: r.nome.toUpperCase(), confrontos: r.confrontos }));
+    if (mm.terceiro) secoes.push({ titulo: "DISPUTA DE 3º LUGAR", confrontos: [mm.terceiro] });
+    const linhasDe = (s) => (s.confrontos.length === 1 ? 1 : Math.ceil(s.confrontos.length / 2));
+    const alturaPodio = 104 + 88 + (mm.terceiro ? 88 + 3 * 12 : 2 * 12);
+    const altura = 150 + espaco + secoes.reduce((soma, s) => soma + tituloSecao + linhasDe(s) * (ALTURA_CONFRONTO + espaco), 0)
+      + tituloSecao + alturaPodio + 30;
     const { canvas, ctx } = criarCanvas(altura);
 
     let subtitulo = "Mata-mata";
@@ -306,24 +308,21 @@
     const secao = (titulo, y) => escrever(ctx, titulo, MARGEM, y + 30, { tamanho: 26, peso: 700, cor: CORES.primaria });
 
     let y = 150 + espaco;
-    secao("SEMIFINAIS", y);
-    y += tituloSecao;
-    desenharConfronto(ctx, mm.semi1, nomePorId, MARGEM, y, larguraMeia);
-    desenharConfronto(ctx, mm.semi2, nomePorId, MARGEM + larguraMeia + 20, y, larguraMeia);
-    y += ALTURA_CONFRONTO + espaco;
-
-    secao("FINAL", y);
-    y += tituloSecao;
-    desenharConfronto(ctx, mm.final, nomePorId, MARGEM, y, larguraCheia);
-    y += ALTURA_CONFRONTO + espaco;
-
-    secao("DISPUTA DE 3º LUGAR", y);
-    y += tituloSecao;
-    desenharConfronto(ctx, mm.terceiro, nomePorId, MARGEM, y, larguraCheia);
-    y += ALTURA_CONFRONTO + espaco;
+    for (const s of secoes) {
+      secao(s.titulo, y);
+      y += tituloSecao;
+      s.confrontos.forEach((c, i) => {
+        if (s.confrontos.length === 1) desenharConfronto(ctx, c, nomePorId, MARGEM, y, larguraCheia);
+        else {
+          desenharConfronto(ctx, c, nomePorId, MARGEM + (i % 2) * (larguraMeia + 20),
+            y + Math.floor(i / 2) * (ALTURA_CONFRONTO + espaco), larguraMeia);
+        }
+      });
+      y += linhasDe(s) * (ALTURA_CONFRONTO + espaco);
+    }
 
     secao("PÓDIO", y);
-    desenharPodio(ctx, mm.podio, nomePorId, y + tituloSecao);
+    desenharPodio(ctx, mm.podio, nomePorId, y + tituloSecao, Boolean(mm.terceiro));
     return canvas;
   }
 
@@ -351,6 +350,6 @@
   }
 
   globalThis.Exportar = {
-    desenharClassificacao, desenharMataMata, alturaDaLinha, nomeArquivo, baixarPNG, valorDoLado, detalheDoConfronto, ORIGEM, LARGURA,
+    desenharClassificacao, desenharMataMata, alturaDaLinha, nomeArquivo, baixarPNG, valorDoLado, detalheDoConfronto, LARGURA,
   };
 })();
