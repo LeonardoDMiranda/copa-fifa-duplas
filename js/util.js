@@ -73,12 +73,15 @@
   // (Esc ou "Cancelar"). opcoes = [{ valor, rotulo, id?, classe? }], da esquerda para a direita;
   // `foco` = valor da opção que começa com o foco (padrão: a última). extras = [{ rotulo, id?,
   // aoClicar }]: botões à esquerda que fazem algo sem fechar a janela (ex.: exportar antes).
-  function escolher(mensagem, { titulo, opcoes, foco = null, extras = [] }) {
+  // corpo = elemento opcional entre o texto e os botões (campos, caixas de seleção); quem o cria
+  // guarda as referências e lê os valores depois do await, pois os nós continuam existindo.
+  function escolher(mensagem, { titulo, opcoes, foco = null, extras = [], corpo = null }) {
     return new Promise((resolver) => {
       const dialogo = el("dialog", { class: "dialogo", "aria-labelledby": "dialogo-titulo" },
         el("form", { method: "dialog" },
           el("h2", { id: "dialogo-titulo" }, titulo),
-          el("div", { class: "dialogo-texto" }, blocosDeTexto(mensagem)),
+          mensagem && el("div", { class: "dialogo-texto" }, blocosDeTexto(mensagem)),
+          corpo,
           el("div", { class: "dialogo-acoes" },
             extras.map((x) => el("button", { type: "button", id: x.id, class: "dialogo-extra", onclick: x.aoClicar }, x.rotulo)),
             el("button", { type: "submit", id: "dialogo-cancelar", value: "" }, "Cancelar"),

@@ -52,7 +52,7 @@ js/abas.js         # FUNÇÕES PURAS: abas de cada fase (preparação ou tempora
 js/telas/*.js       # uma tela cada (configuracao, jogadores, sorteio, rodadas, classificacao, mata-mata, campeonato, campeonatos, ficha): Telas.<nome>.criar(app, raiz), que monta o próprio conteúdo na raiz
 js/ui.js            # orquestração: cria o estado e as telas, redesenho, foco, cabeçalho (seletor de edições) e barra de ações
 js/exportar.js      # geração de PNG via Canvas API
-js/telao.js         # modo telão (tela cheia, alterna telas); também abre sozinho em index.html#telao
+js/telao.js         # modo telão (tela cheia, alterna as telas escolhidas na janela do botão; a escolha fica em localStorage, fora do estado); também abre sozinho em index.html#telao
 ```
 
 ## Convenções

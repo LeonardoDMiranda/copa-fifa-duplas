@@ -469,6 +469,7 @@ button.mini { padding: 2px var(--esp-2); font-size: var(--fonte-sm); }
   white-space: pre-line;
 }
 .erro-campo .icone { margin-top: 1px; }
+.erro-campo[hidden] { display: none; }
 input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"] {
   border-color: var(--erro-texto);
   background: var(--erro-fundo);
@@ -624,6 +625,13 @@ dialog.dialogo::backdrop { background: var(--veu); }
 .dialogo-acoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--esp-2); margin-top: var(--esp-4); }
 .dialogo-acoes button { padding: 7px var(--esp-4); }
 .dialogo-acoes .dialogo-extra { margin-right: auto; } /* ex.: "Exportar backup antes", à esquerda */
+.dialogo-corpo { display: flex; flex-direction: column; gap: var(--esp-3); }
+.dialogo-corpo fieldset { margin: 0; padding: var(--esp-2) var(--esp-3) var(--esp-3); border: 1px solid var(--borda); border-radius: var(--raio); }
+.dialogo-corpo legend { padding: 0 var(--esp-1); font-weight: 600; }
+.telao-opcao { display: flex; align-items: center; gap: var(--esp-2); min-height: 32px; }
+.telao-opcao small { color: var(--texto-suave); }
+.telao-opcao input:disabled + span { color: var(--texto-suave); }
+.telao-opcao-intervalo { display: flex; align-items: center; gap: var(--esp-2); }
 
 /* ---------- campeonatos (edições) ---------- */
 

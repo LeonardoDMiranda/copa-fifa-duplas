@@ -1,14 +1,81 @@
-// Modo telão: tela cheia, fonte grande, alterna Classificação, Jogos e Mata-mata a cada 15 s.
-// Só lê o estado; não altera nada. Pode rodar na mesma janela (sobre o app) ou numa
-// janela separada (index.html#telao) arrastada para a TV.
+// Modo telão: tela cheia, fonte grande, alterna as telas escolhidas (Classificação, Jogos e
+// Mata-mata) a cada 10, 15 ou 30 s. Só lê o estado; não altera nada. Pode rodar na mesma janela
+// (sobre o app) ou numa janela separada (index.html#telao) arrastada para a TV. A escolha de telas
+// e o tempo ficam guardados por aparelho (CHAVE_PREFERENCIA), fora do campeonato e do backup.
 
 (function () {
   "use strict";
 
   const INTERVALO_MS = 15000;
+  const INTERVALOS_MS = [10000, 15000, 30000];
   const CONTROLES_VISIVEIS_MS = 3000;
+  const CHAVE_PREFERENCIA = "copa-fifa-duplas-telao"; // sem o prefixo das edições (ver ui.js, evento storage)
   const { el, formatarSaldo, classeDoLado } = Util;
+  const TELAS = ["classificacao", "jogos", "mata-mata"];
   const TITULOS = { classificacao: "Classificação", jogos: "Jogos da semana", "mata-mata": "Mata-mata" };
+  const MOTIVOS = { jogos: "depois de confirmar o calendário", "mata-mata": "depois de gerar o chaveamento" };
+
+  // Preferência guardada: { telas: [ids], intervaloMs } ou null (nunca escolheu, ou valor inválido).
+  function lerPreferencia(armazenamento) {
+    try {
+      const obj = JSON.parse(armazenamento.getItem(CHAVE_PREFERENCIA));
+      if (!obj || !Array.isArray(obj.telas) || !INTERVALOS_MS.includes(obj.intervaloMs)) return null;
+      const telas = TELAS.filter((t) => obj.telas.includes(t));
+      return telas.length ? { telas, intervaloMs: obj.intervaloMs } : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function gravarPreferencia(armazenamento, { telas, intervaloMs }) {
+    try {
+      armazenamento.setItem(CHAVE_PREFERENCIA, JSON.stringify({ telas, intervaloMs }));
+    } catch (_) {
+      // sem armazenamento: vale só para esta abertura
+    }
+  }
+
+  // Janela de escolha das telas. `disponibilidade` = [{ id, titulo, disponivel, motivo }] (a do
+  // telão). Devolve { acao: "tela-cheia" | "janela", telas, intervaloMs } ou null se cancelou.
+  // Sem preferência, começa com tudo o que existe marcado (o comportamento de antes).
+  async function escolherTelas(disponibilidade, preferencia = null) {
+    const existentes = disponibilidade.filter((t) => t.disponivel).map((t) => t.id);
+    let marcadas = preferencia ? preferencia.telas.filter((t) => existentes.includes(t)) : existentes;
+    if (!marcadas.length) marcadas = ["classificacao"];
+    const caixas = disponibilidade.map((t) => el("input", {
+      type: "checkbox", id: `telao-tela-${t.id}`, value: t.id, checked: t.disponivel && marcadas.includes(t.id), disabled: !t.disponivel,
+    }));
+    const intervalo = el("select", { id: "telao-intervalo" },
+      INTERVALOS_MS.map((ms) => el("option", { value: String(ms), selected: ms === (preferencia ? preferencia.intervaloMs : INTERVALO_MS) }, `${ms / 1000} s`)));
+    const aviso = el("p", { class: "erro-campo", id: "telao-escolha-aviso", role: "status", hidden: true }, "Marque ao menos uma tela.");
+    const corpo = el("div", { class: "dialogo-corpo" },
+      el("fieldset", {},
+        el("legend", {}, "Telas"),
+        disponibilidade.map((t, i) => el("label", { class: "telao-opcao" }, caixas[i], el("span", {}, t.titulo),
+          !t.disponivel && el("small", {}, ` · ${t.motivo}`)))),
+      el("label", { class: "telao-opcao-intervalo" }, el("span", {}, "Tempo em cada tela "), intervalo),
+      aviso);
+    const marcadasAgora = () => disponibilidade.filter((t, i) => caixas[i].checked).map((t) => t.id);
+    const atualizar = () => {
+      const vazio = marcadasAgora().length === 0;
+      aviso.hidden = !vazio;
+      for (const id of ["telao-escolha-abrir", "telao-escolha-janela"]) document.getElementById(id).disabled = vazio;
+    };
+    corpo.addEventListener("change", atualizar);
+    const promessa = Util.escolher("Escolha as telas que aparecem na TV e quanto tempo cada uma fica.", {
+      titulo: "Modo telão",
+      opcoes: [
+        { valor: "janela", id: "telao-escolha-janela", rotulo: "Abrir em nova janela" },
+        { valor: "tela-cheia", id: "telao-escolha-abrir", rotulo: "Abrir telão", classe: "primario" },
+      ],
+      foco: "tela-cheia",
+      corpo,
+    });
+    atualizar();
+    const acao = await promessa;
+    if (!acao) return null;
+    return { acao, telas: marcadasAgora(), intervaloMs: Number(intervalo.value) };
+  }
 
   function criar(estado) {
     const nomePorId = new Map();
@@ -16,6 +83,8 @@
     let ativo = false;
     let pausado = false;
     let telaAtual = "classificacao";
+    let selecao = null; // ids das telas escolhidas; null = todas as que existem
+    let intervaloMs = INTERVALO_MS;
     let decorrido = 0;
     let ultimoTick = 0;
     let relogio = null;
@@ -26,7 +95,7 @@
 
     // Só entram no rodízio as telas que têm o que mostrar: os jogos (depois do calendário
     // confirmado) e o mata-mata (depois de gerado).
-    function telasDisponiveis() {
+    function telasExistentes() {
       const atual = estado.atual();
       const telas = ["classificacao"];
       if (atual.jogos.length) telas.push("jogos");
@@ -34,12 +103,29 @@
       return telas;
     }
 
+    // As que existem e foram escolhidas. Se nenhuma escolhida existe mais (ex.: o mata-mata foi
+    // apagado), cai na Classificação, que sempre existe.
+    function telasDisponiveis() {
+      const existentes = telasExistentes();
+      const lista = selecao ? existentes.filter((t) => selecao.includes(t)) : existentes;
+      return lista.length ? lista : ["classificacao"];
+    }
+
+    // Para a janela de escolha: todas as telas, com o motivo de não estarem disponíveis ainda.
+    function disponibilidade() {
+      const existentes = telasExistentes();
+      return TELAS.map((id) => ({ id, titulo: TITULOS[id], disponivel: existentes.includes(id), motivo: MOTIVOS[id] || "" }));
+    }
+
     // ---------- abrir / fechar / navegar ----------
 
-    function abrir({ telaCheia = true } = {}) {
+    // telas = ids a alternar (padrão: todas as que existem); intervalo = tempo em cada tela.
+    function abrir({ telaCheia = true, telas = null, intervalo = INTERVALO_MS } = {}) {
       ativo = true;
       pausado = false;
-      telaAtual = "classificacao";
+      selecao = Array.isArray(telas) ? telas : null;
+      intervaloMs = INTERVALOS_MS.includes(intervalo) ? intervalo : INTERVALO_MS;
+      telaAtual = telasDisponiveis()[0];
       decorrido = 0;
       ultimoTick = performance.now();
       raiz.hidden = false;
@@ -48,6 +134,14 @@
       relogio = setInterval(tick, 250);
       if (telaCheia) entrarTelaCheia();
       mostrarControles();
+      renderizar();
+    }
+
+    // Outra janela mudou a escolha de telas ou o tempo enquanto este telão está aberto.
+    function definirSelecao({ telas = null, intervalo = INTERVALO_MS } = {}) {
+      selecao = Array.isArray(telas) ? telas : null;
+      intervaloMs = INTERVALOS_MS.includes(intervalo) ? intervalo : INTERVALO_MS;
+      decorrido = 0;
       renderizar();
     }
 
@@ -93,12 +187,12 @@
       const agora = performance.now();
       if (!pausado) decorrido += agora - ultimoTick;
       ultimoTick = agora;
-      if (decorrido >= INTERVALO_MS) {
+      if (decorrido >= intervaloMs) {
         avancar(1);
         return;
       }
       const barra = document.getElementById("telao-barra");
-      if (barra) barra.style.width = `${Math.min(100, (decorrido / INTERVALO_MS) * 100)}%`;
+      if (barra) barra.style.width = `${Math.min(100, (decorrido / intervaloMs) * 100)}%`;
       const hora = document.getElementById("telao-hora");
       if (hora) hora.textContent = horaAtual();
     }
@@ -218,7 +312,7 @@
       if (!ativo) return;
       const atual = estado.atual();
       const lista = telasDisponiveis();
-      if (!lista.includes(telaAtual)) telaAtual = "classificacao";
+      if (!lista.includes(telaAtual)) telaAtual = lista[0];
       const config = atual.campeonato.config;
       const base = Regras.baseDosJogadores(atual.campeonato.jogadores);
       nomePorId.clear();
@@ -270,7 +364,7 @@
             }, "↗ Nova janela"),
             el("button", { type: "button", id: "telao-sair", onclick: fechar }, "✕ Sair (Esc)"))));
       const barra = document.getElementById("telao-barra");
-      if (barra) barra.style.width = `${Math.min(100, (decorrido / INTERVALO_MS) * 100)}%`;
+      if (barra) barra.style.width = `${Math.min(100, (decorrido / intervaloMs) * 100)}%`;
     }
 
     // ---------- eventos ----------
@@ -298,8 +392,10 @@
     raiz.addEventListener("mousemove", mostrarControles);
     estado.aoMudar(renderizar);
 
-    return { abrir, fechar, ativo: () => ativo };
+    return { abrir, fechar, ativo: () => ativo, disponibilidade, definirSelecao };
   }
 
-  globalThis.Telao = { criar, INTERVALO_MS };
+  globalThis.Telao = {
+    criar, escolherTelas, lerPreferencia, gravarPreferencia, TELAS, TITULOS, INTERVALO_MS, INTERVALOS_MS, CHAVE_PREFERENCIA,
+  };
 })();

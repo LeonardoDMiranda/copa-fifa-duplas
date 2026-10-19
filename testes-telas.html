@@ -37,6 +37,7 @@
     // Os casos que definem globalThis.respostaDaConfirmacao respondem a janela de confirmação sem abri-la (ver V13).
     { const original = Util.confirmar; Util.confirmar = (mensagem, opcoes) => (globalThis.respostaDaConfirmacao === undefined ? original(mensagem, opcoes) : Promise.resolve(globalThis.respostaDaConfirmacao)); }
   </script>
+  <script src="js/telao.js"></script>
   <script src="js/telas/configuracao.js"></script>
   <script src="js/telas/jogadores.js"></script>
   <script src="js/telas/sorteio.js"></script>
@@ -1509,6 +1510,68 @@
       t.igual(resultado(dados.mataMata.semi1.dupla2[0]), "derrota por W.O.", "quem faltou");
       t.igual(resultado(dados.mataMata.semi1.dupla1[0]), "vitória por W.O.", "quem avançou");
     }));
+
+    // ---------- V14: janela de escolha das telas do telão ----------
+
+    const DISPONIBILIDADE_TELAO = [
+      { id: "classificacao", titulo: "Classificação", disponivel: true, motivo: "" },
+      { id: "jogos", titulo: "Jogos da semana", disponivel: true, motivo: "" },
+      { id: "mata-mata", titulo: "Mata-mata", disponivel: false, motivo: "depois de gerar o chaveamento" },
+    ];
+
+    // Abre a janela e devolve { dialogo, promessa, caixa(id), marcar(id, valor) }; sempre fecha no fim.
+    async function comJanelaDoTelao(preferencia, fn) {
+      const promessa = Telao.escolherTelas(DISPONIBILIDADE_TELAO, preferencia);
+      const dialogo = document.querySelector("dialog.dialogo[open]");
+      const caixa = (id) => dialogo.querySelector(`#telao-tela-${id}`);
+      const marcar = (id, valor) => { caixa(id).checked = valor; caixa(id).dispatchEvent(new Event("change", { bubbles: true })); };
+      try {
+        await fn({ dialogo, promessa, caixa, marcar });
+      } finally {
+        if (dialogo.open) dialogo.close();
+      }
+    }
+
+    caso("V14.1 Janela do telão: telas com motivo, tempo, foco, acessibilidade e bloqueio sem tela marcada", async (t) => {
+      await comJanelaDoTelao(null, async ({ dialogo, promessa, caixa, marcar }) => {
+        t.igual(dialogo.querySelector("h2").textContent, "Modo telão", "título");
+        t.igual(["classificacao", "jogos", "mata-mata"].map((id) => [caixa(id).checked, caixa(id).disabled]),
+          [[true, false], [true, false], [false, true]], "sem preferência: tudo o que existe marcado; a que não existe fica desabilitada");
+        t.verdadeiro(dialogo.textContent.includes("depois de gerar o chaveamento"), "a tela indisponível diz quando passa a existir");
+        t.igual(dialogo.querySelector("#telao-intervalo").value, "15000", "tempo padrão de 15 s");
+        t.igual([...dialogo.querySelectorAll("#telao-intervalo option")].map((o) => o.textContent), ["10 s", "15 s", "30 s"], "tempos oferecidos");
+        t.igual(document.activeElement.id, "telao-escolha-abrir", "o foco começa em \"Abrir telão\"");
+        verificarAcessibilidade(t, dialogo, "janela do telão");
+
+        marcar("classificacao", false);
+        marcar("jogos", false);
+        t.verdadeiro(dialogo.querySelector("#telao-escolha-abrir").disabled && dialogo.querySelector("#telao-escolha-janela").disabled,
+          "sem nenhuma tela marcada, os dois botões de abrir ficam desabilitados");
+        t.verdadeiro(!dialogo.querySelector("#telao-escolha-aviso").hidden, "e o aviso explica");
+        marcar("jogos", true);
+        t.verdadeiro(!dialogo.querySelector("#telao-escolha-abrir").disabled && dialogo.querySelector("#telao-escolha-aviso").hidden,
+          "marcando uma, volta ao normal");
+
+        dialogo.querySelector("#telao-intervalo").value = "30000";
+        dialogo.querySelector("#telao-escolha-abrir").click();
+        t.igual(await promessa, { acao: "tela-cheia", telas: ["jogos"], intervaloMs: 30000 }, "devolve a ação, as telas marcadas e o tempo");
+      });
+    });
+
+    caso("V14.2 Janela do telão: lembra a última escolha, ignora tela que sumiu, abre em nova janela e Esc cancela", async (t) => {
+      await comJanelaDoTelao({ telas: ["jogos"], intervaloMs: 10000 }, async ({ dialogo, promessa, caixa }) => {
+        t.igual(["classificacao", "jogos"].map((id) => caixa(id).checked), [false, true], "volta como estava");
+        t.igual(dialogo.querySelector("#telao-intervalo").value, "10000", "e com o mesmo tempo");
+        dialogo.querySelector("#telao-escolha-janela").click();
+        t.igual((await promessa).acao, "janela", "\"Abrir em nova janela\" devolve a ação janela");
+      });
+      await comJanelaDoTelao({ telas: ["mata-mata"], intervaloMs: 15000 }, async ({ dialogo, promessa, caixa }) => {
+        t.igual(["classificacao", "jogos", "mata-mata"].map((id) => caixa(id).checked), [true, false, false],
+          "só tinha o mata-mata, que não existe mais: cai na Classificação");
+        await fecharComEsc(dialogo);
+        t.igual(await promessa, null, "Esc cancela sem escolher nada");
+      });
+    });
 
     // ---------- execução e relatório ----------
 

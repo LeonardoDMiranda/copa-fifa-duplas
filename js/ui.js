@@ -610,10 +610,35 @@
   estado.aoMudar(renderizar);
   const telao = Telao.criar(estado);
 
+  // Abre o telão com a escolha de telas guardada (null = todas as que existem). O clique no botão
+  // abre antes a janela de escolha; Shift+clique pula a janela e usa a última escolha.
+  function abrirTelaoCom(preferencia, telaCheia) {
+    telao.abrir({ telaCheia, telas: preferencia ? preferencia.telas : null, intervalo: preferencia ? preferencia.intervaloMs : undefined });
+  }
+
+  async function escolherEAbrirTelao(pularJanela) {
+    const preferencia = Telao.lerPreferencia(armazenamento);
+    if (pularJanela) return abrirTelaoCom(preferencia, true);
+    const escolha = await Telao.escolherTelas(telao.disponibilidade(), preferencia);
+    if (!escolha) return;
+    Telao.gravarPreferencia(armazenamento, escolha);
+    if (escolha.acao === "tela-cheia") return abrirTelaoCom(escolha, true);
+    // A nova janela lê a escolha que acabou de ser guardada. Se o navegador bloquear, abre aqui mesmo.
+    if (!window.open("index.html#telao", "copa-fifa-telao", "popup,width=1280,height=720")) {
+      avisar("O navegador bloqueou a nova janela. O telão abriu nesta.", "erro");
+      abrirTelaoCom(escolha, true);
+    }
+  }
+
   // Outra janela do app (ex.: o telão na TV) salvou algo: relê para ficar em dia. Se ela trocou
   // a edição ativa, esta janela troca junto.
   window.addEventListener("storage", (ev) => {
-    if (ev.key === Campeonatos.CHAVE_INDICE) {
+    if (ev.key === Telao.CHAVE_PREFERENCIA) {
+      if (telao.ativo()) {
+        const p = Telao.lerPreferencia(armazenamento);
+        telao.definirSelecao({ telas: p ? p.telas : null, intervalo: p ? p.intervaloMs : undefined });
+      }
+    } else if (ev.key === Campeonatos.CHAVE_INDICE) {
       campeonatos.recarregar();
       sincronizarEdicao("etapa");
     } else if (ev.key === estado.chave()) {
@@ -629,7 +654,7 @@
   document.getElementById("btn-importar").addEventListener("click", () => document.getElementById("arquivo-importar").click());
   document.getElementById("arquivo-importar").addEventListener("change", importar);
   document.getElementById("btn-campeonato-gerenciar").addEventListener("click", () => irParaAba("campeonatos"));
-  document.getElementById("btn-telao").addEventListener("click", () => telao.abrir());
+  document.getElementById("btn-telao").addEventListener("click", (ev) => escolherEAbrirTelao(ev.shiftKey));
 
   // Menus do cabeçalho (<details>): fecham ao escolher um item, ao clicar fora e com Esc.
   const menus = [...document.querySelectorAll("details.menu")];
@@ -701,5 +726,5 @@
   if (!abaDaUrl(estado.atual())) fixarAbaDaEtapa();
   renderizarAgora();
   // index.html#telao: janela separada para a TV. Tela cheia exige um clique (botão ⛶).
-  if (location.hash === "#telao") telao.abrir({ telaCheia: false });
+  if (location.hash === "#telao") abrirTelaoCom(Telao.lerPreferencia(armazenamento), false);
 })();

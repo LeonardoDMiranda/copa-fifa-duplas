@@ -269,12 +269,15 @@ Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
 
 | # | Passos | Esperado |
 |---|---|---|
-| 11.1 | Clicar em "Modo telão". | Abre em tela cheia com a classificação. |
-| 11.2 | Esperar 15 s. | Passa para a próxima tela (só as que têm conteúdo: classificação; jogos depois do calendário; mata-mata depois do chaveamento). A barra de progresso avança. |
+| 11.1 | Clicar em "Modo telão". | Abre a janela "Modo telão" (foco em "Abrir telão") com as caixas Classificação, Jogos da semana e Mata-mata e o tempo em cada tela (15 s). Na primeira vez, as telas que existem vêm marcadas; as que não existem ficam desabilitadas e dizem quando passam a existir. "Abrir telão" abre em tela cheia com a primeira tela marcada. |
+| 11.1b | Na janela, desmarcar todas as telas; depois marcar só uma e escolher 30 s. Cancelar e Esc. | Sem nenhuma marcada, "Abrir telão" e "Abrir em nova janela" ficam desabilitados e aparece "Marque ao menos uma tela." Cancelar e Esc fecham sem abrir nada e sem mudar a escolha guardada. |
+| 11.1c | Abrir com só "Jogos da semana"; sair; clicar de novo em "Modo telão". Depois Shift+clique no botão. | A janela volta com a mesma escolha e o mesmo tempo. O Shift+clique abre o telão direto, sem janela, só com as telas escolhidas. Recarregar a página mantém a escolha. |
+| 11.1d | "Abrir em nova janela". | Abre uma janela separada (`index.html#telao`) só com as telas escolhidas e o tempo escolhido; o telão não abre nesta janela. Se o navegador bloquear, aparece o aviso e o telão abre nesta. |
+| 11.2 | Esperar o tempo escolhido (15 s por padrão). | Passa para a próxima tela escolhida (só as que têm conteúdo: classificação; jogos depois do calendário; mata-mata depois do chaveamento). Com uma tela só, não troca. A barra de progresso avança. |
 | 11.3 | Espaço, → e ←. | Pausa/continua; avança; volta. |
 | 11.3b **(R)** | Mexer o mouse e pausar (a barra de controles fica visível), em cada tela. | A barra aparece na faixa do rodapé, abaixo do conteúdo: não cobre a última linha da classificação, os jogos nem o mata-mata. |
 | 11.4 | Esc. | Sai do telão. Ctrl+Z não desfaz nada enquanto o telão está aberto. |
-| 11.5 | Abrir `index.html#telao` numa segunda janela e lançar placares na primeira. | O telão atualiza sozinho. |
+| 11.5 | Abrir `index.html#telao` numa segunda janela e lançar placares na primeira. | O telão atualiza sozinho, com as telas e o tempo da última escolha (sem escolha guardada, com todas as que existem). Escolher outras telas na primeira janela atualiza o telão que já está aberto na segunda. |
 | 11.6 **(R)** | Telão com 8, 32, 40 e 60 jogadores (nomes de 30 caracteres), em 1920×1080 e 1280×720. | Tudo cabe na tela, nada passa da borda. Com 8, as linhas ficam no tamanho normal no topo (não esticam); com 32, ocupam a tela; com mais, encolhem. |
 
 ## 12. Várias janelas e robustez
@@ -374,6 +377,19 @@ Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
 ---
 
 ## Última execução
+
+**Fase 27 (janela de escolha das telas do telão), 2026-10-19**, Playwright (Chromium) por um servidor local
+temporário, antes do commit da fase. Massa: 16 jogadores fictícios, 15 de 24 jogos lançados, semana 6.
+
+- `testes.html`: 124 passaram, 0 falharam (F6.3 e F6.4 novos). `testes-telas.html`: 71 passaram, 0 falharam (V14.1 e V14.2 novos).
+- **Conferido no app real:**
+  - 11.1: a janela abre com foco em "Abrir telão", Classificação e Jogos marcados, Mata-mata desabilitado com o motivo e 15 s.
+  - 11.1c: com só "Jogos da semana" e 30 s, o telão abre só nela; Esc fecha; a janela volta com a mesma escolha; Shift+clique abre direto sem janela; `index.html#telao` lê a escolha guardada.
+  - 11.1d: "Abrir em nova janela" chama `window.open("index.html#telao", ...)` e não abre o telão na janela atual (com `window.open` interceptado).
+- **Cobertos só pelos testes automáticos:** 11.1b (nenhuma tela marcada, Cancelar e Esc) e a tela indisponível ignorada.
+- **Ainda não conferidos à mão:** tela cheia pelo clique de verdade (o Playwright usa cliques sintéticos, e o navegador recusa `requestFullscreen`; o código já trata isso), a nova janela de verdade (e o aviso de janela bloqueada), a atualização de um telão já aberto em outra janela quando a escolha muda (11.5), e Lighthouse.
+
+---
 
 **Conferência da Fase 26 e ajuste do W.O. no PNG, 2026-10-19**, Playwright (Chromium) por um servidor local
 temporário. Massa: 32 jogadores fictícios com os 48 jogos lançados e o chaveamento gerado pela tela.

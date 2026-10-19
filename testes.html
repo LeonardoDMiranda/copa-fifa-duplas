@@ -1293,6 +1293,76 @@
       }
     });
 
+    caso("F6.3 Telão: só as telas escolhidas entram no rodízio, e a que não existe é ignorada", (t) => {
+      const est = criarEstado();
+      const raiz = document.createElement("div");
+      raiz.id = "telao";
+      raiz.hidden = true;
+      document.body.appendChild(raiz);
+      const telao = Telao.criar(est);
+      try {
+        const clicar = (id) => raiz.querySelector(`#${id}`).click();
+        const titulo = () => raiz.querySelector("#telao-titulo").textContent;
+        const indicador = () => [...raiz.querySelectorAll(".telao-telas span")].map((s) => s.textContent);
+
+        t.igual(telao.disponibilidade().map((d) => [d.id, d.disponivel]),
+          [["classificacao", true], ["jogos", true], ["mata-mata", false]], "com calendário e sem chaveamento: o mata-mata ainda não existe");
+        t.verdadeiro(/chaveamento/.test(telao.disponibilidade()[2].motivo), "a tela que não existe explica o motivo");
+
+        telao.abrir({ telaCheia: false });
+        t.igual(indicador(), ["Classificação", "Jogos da semana"], "sem escolha: tudo o que existe, como antes");
+        telao.fechar();
+
+        telao.abrir({ telaCheia: false, telas: ["jogos"] });
+        t.verdadeiro(titulo().startsWith("Jogos da semana"), `só Jogos: abre direto nela (${titulo()})`);
+        clicar("telao-proxima");
+        t.verdadeiro(titulo().startsWith("Jogos da semana"), "com uma tela só, o rodízio não sai dela");
+        t.igual(indicador(), ["Jogos da semana"], "o indicador lista só a escolhida");
+        telao.fechar();
+
+        telao.abrir({ telaCheia: false, telas: ["mata-mata"] });
+        t.verdadeiro(titulo().startsWith("Classificação"), "escolheu só uma tela que não existe: cai na Classificação");
+        telao.fechar();
+
+        est.modificar("gerar", (s) => {
+          s.mataMata = Regras.gerarMataMata(Regras.calcularClassificacao(classificacaoBase, s.jogos, s.desempatesManuais));
+        });
+        telao.abrir({ telaCheia: false, telas: ["classificacao", "mata-mata"] });
+        clicar("telao-proxima");
+        t.verdadeiro(titulo().startsWith("Mata-mata"), `pula os Jogos: ${titulo()}`);
+        clicar("telao-proxima");
+        t.verdadeiro(titulo().startsWith("Classificação"), "e volta para a Classificação");
+
+        telao.definirSelecao({ telas: ["jogos"] });
+        t.verdadeiro(titulo().startsWith("Jogos da semana"), "trocar a escolha com o telão aberto atualiza a tela");
+        telao.abrir({ telaCheia: false, intervalo: 12345 });
+        t.igual(indicador(), ["Classificação", "Jogos da semana", "Mata-mata"], "abrir sem telas volta a mostrar todas");
+      } finally {
+        telao.fechar();
+        raiz.remove();
+      }
+    });
+
+    caso("F6.4 Telão: a escolha de telas e o tempo ficam guardados por aparelho", (t) => {
+      const vazio = memoria();
+      t.igual(Telao.lerPreferencia(vazio), null, "nunca escolheu: sem preferência");
+      Telao.gravarPreferencia(vazio, { telas: ["mata-mata", "classificacao"], intervaloMs: 30000 });
+      t.igual(Telao.lerPreferencia(vazio), { telas: ["classificacao", "mata-mata"], intervaloMs: 30000 }, "volta na ordem fixa das telas");
+      t.verdadeiro(!Telao.CHAVE_PREFERENCIA.startsWith(Campeonatos.PREFIXO), "a chave não se confunde com a de uma edição");
+      t.verdadeiro(Telao.INTERVALOS_MS.includes(Telao.INTERVALO_MS), "o tempo padrão é um dos que a janela oferece");
+
+      const ruim = (valor) => Telao.lerPreferencia(memoria({ [Telao.CHAVE_PREFERENCIA]: valor }));
+      t.igual(ruim("não é json"), null, "texto que não é JSON é ignorado");
+      t.igual(ruim(JSON.stringify({ telas: ["classificacao"], intervaloMs: 7 })), null, "tempo que a janela não oferece é ignorado");
+      t.igual(ruim(JSON.stringify({ telas: ["outra"], intervaloMs: 15000 })), null, "só telas desconhecidas: ignorado");
+      t.igual(ruim(JSON.stringify({ telas: "jogos", intervaloMs: 15000 })), null, "telas que não é lista: ignorado");
+
+      const semArmazenamento = { getItem: () => { throw new Error("indisponível"); }, setItem: () => { throw new Error("indisponível"); } };
+      t.igual(Telao.lerPreferencia(semArmazenamento), null, "sem armazenamento, ler não quebra");
+      Telao.gravarPreferencia(semArmazenamento, { telas: ["classificacao"], intervaloMs: 15000 });
+      t.verdadeiro(true, "sem armazenamento, gravar não quebra");
+    });
+
     // ---------- Núcleo configurável (Fase 7) ----------
 
     caso("N1 Pontuação vem da config (vitória 2, empate 2, 0×0 vale 1)", (t) => {
