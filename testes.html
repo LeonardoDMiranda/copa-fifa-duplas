@@ -989,6 +989,28 @@
       const imagem = Exportar.desenharMataMata(r, nomePorId, { geradoEm: new Date(2026, 9, 2, 15, 30), nome: "Copa de teste" });
       t.igual(imagem.height, 1458, "a imagem tem a mesma altura do chaveamento sem W.O.");
 
+      // O "W.O." tem que caber na faixa do vencedor (margem de 14 px do cartão), não encostar na borda.
+      const proto = CanvasRenderingContext2D.prototype;
+      const { fillText, roundRect } = proto;
+      const cartoes = [];
+      const textos = [];
+      proto.roundRect = function (x, y, w, h, ...resto) { cartoes.push({ x, y, w, h }); return roundRect.call(this, x, y, w, h, ...resto); };
+      proto.fillText = function (texto, x, y, ...resto) {
+        textos.push({ texto, x, y, align: this.textAlign, largura: this.measureText(texto).width });
+        return fillText.call(this, texto, x, y, ...resto);
+      };
+      try {
+        Exportar.desenharMataMata(r, nomePorId, { geradoEm: new Date(2026, 9, 2, 15, 30), nome: "Copa de teste" });
+      } finally {
+        proto.fillText = fillText;
+        proto.roundRect = roundRect;
+      }
+      const wo = textos.find((s) => s.texto === "W.O.");
+      t.verdadeiro(Boolean(wo), "o W.O. foi desenhado");
+      const cartao = cartoes.find((c) => c.w > 300 && wo.y > c.y && wo.y < c.y + c.h && wo.x > c.x && wo.x < c.x + c.w);
+      const direita = wo.align === "center" ? wo.x + wo.largura / 2 : wo.align === "right" ? wo.x : wo.x + wo.largura;
+      t.verdadeiro(direita <= cartao.x + cartao.w - 14, `o W.O. termina a ${Math.round(cartao.x + cartao.w - direita)} px da borda do cartão (mínimo 14)`);
+
       const dados = dadosV2((d) => { d.campeonato.config.vagasFaseFinal = 8; });
       const tab = Regras.calcularClassificacao(Regras.baseDosJogadores(dados.campeonato.jogadores), dados.jogos, [], dados.campeonato.config);
       dados.mataMata = Regras.marcarWO(Regras.gerarMataMata(tab, dados.campeonato.config), tab, "semi1", 2, dados.campeonato.config);

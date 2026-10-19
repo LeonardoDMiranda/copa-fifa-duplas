@@ -227,7 +227,10 @@
       } else {
         escrever(ctx, c.origem[lado - 1], x + 26, meio, { tamanho: 25, cor: CORES.suave, italico: true, larguraMax: w - 150 });
       }
-      escrever(ctx, valorDoLado(c, lado), x + w - 40, meio, { tamanho: 36, peso: 700, alinhar: "center" });
+      // "W.O." é mais largo que um dígito: fonte menor e centro recuado para caber na faixa verde.
+      const valor = String(valorDoLado(c, lado));
+      const curto = valor.length <= 2;
+      escrever(ctx, valor, x + w - (curto ? 40 : 48), meio, { tamanho: curto ? 36 : 26, peso: 700, alinhar: "center" });
     });
 
     escrever(ctx, detalheDoConfronto(c), x + 26, y + ALTURA_CONFRONTO - 32,
