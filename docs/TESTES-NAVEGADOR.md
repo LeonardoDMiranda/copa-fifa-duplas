@@ -375,6 +375,23 @@ Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
 
 ## Última execução
 
+**Conferência da Fase 26 e ajuste do W.O. no PNG, 2026-10-19**, Playwright (Chromium) por um servidor local
+temporário. Massa: 32 jogadores fictícios com os 48 jogos lançados e o chaveamento gerado pela tela.
+
+- `testes.html`: 122 passaram, 0 falharam. `testes-telas.html`: 69 passaram, 0 falharam.
+- **Passaram, com a janela de confirmação de verdade:**
+  - 7.20: "Cancelar" no painel e na janela não muda o estado.
+  - 7.21: substituir (o ausente sai, o próximo da tabela entra, dupla "alterada manualmente").
+  - 7.22: "Dar W.O. a esta dupla?" com o botão vermelho; "Decidido por W.O.", marca "W.O.", "avança", campos de placar somem.
+  - 7.23: "Desfazer W.O." devolve os campos; W.O. na final (MD3) e no 3º lugar, pódio sem placar; com placar na final, "W.O. da dupla N" fica desabilitado com "Final já tem placar lançado"; com a série decidida, não há "Ausência".
+  - 7.24: ficha com "derrota por W.O." e "vitória por W.O."; PNG baixado (interceptado) com "W.O." e "–" e a linha "a dupla 2 avança sem placar".
+- **Defeito achado e corrigido:** no PNG do mata-mata o "W.O." passava da faixa do vencedor e encostava na borda do cartão (centro em `x + w − 40` com fonte 36). Agora valores de texto usam fonte 26 e centro em `x + w − 48`. Novo trecho no caso MM15 de `testes.html`: com o código antigo falhava ("termina a 0 px da borda"); com o novo passa ("19 px", mínimo 14).
+- **Ainda não conferidos à mão:** backup exportado e importado em 7.19 e Lighthouse. Cobertos só pelos testes automáticos.
+- `docs/print.png` refeito com a interface atual (16 jogadores fictícios, 15 de 24 jogos, semana 6).
+- Dica: o Playwright guarda `testes.html` e os `.js` em cache; abrir com `?v=N` e, se preciso, `fetch(arquivo, { cache: "reload" })` antes, senão o teste novo ou o código novo não aparece.
+
+---
+
 **Fase 26 (ausência no mata-mata), 2026-10-18**, Edge sem cabeça (`testes.html` e `testes-telas.html`) e
 Playwright (Chromium) por um servidor local temporário, antes do commit da fase.
 

@@ -244,7 +244,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | C | Cadastro de jogadores |
 | S | Sorteio e confirmação do calendário |
 | R | Rodadas e classificação por semana |
-| MM | Mata-mata com N classificados: estrutura (rodadas, chaves, fontes), folgas, duplas com número ímpar, jogos por rodada e 3º lugar, duplas guardadas, salvar/importar (inclusive o formato de antes), PNG e telão; trocar duplas de lugar (bloqueios, volta ao lugar de origem, avanço dos vencedores); ausência na fase final (ausente pulado e em cadeia, substituto sem repetição, W.O. na semi, na final em MD3 e no 3º lugar, bloqueios, desfazer, salvar/importar/desfazer e PNG/telão com W.O.) |
+| MM | Mata-mata com N classificados: estrutura (rodadas, chaves, fontes), folgas, duplas com número ímpar, jogos por rodada e 3º lugar, duplas guardadas, salvar/importar (inclusive o formato de antes), PNG e telão; trocar duplas de lugar (bloqueios, volta ao lugar de origem, avanço dos vencedores); ausência na fase final (ausente pulado e em cadeia, substituto sem repetição, W.O. na semi, na final em MD3 e no 3º lugar, bloqueios, desfazer, salvar/importar/desfazer e PNG/telão com W.O., inclusive o "W.O." cabendo na faixa do vencedor no PNG) |
 | M | Remarcação: ordem e número do jogo, semana original, recusas, aviso de conflito, efeito nas semanas e na classificação, salvar/desfazer/importar |
 | T | PNG e telão com qualquer número de jogadores |
 | B | Lembrete e registro de backup |
@@ -260,6 +260,5 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 - Revisar a regra do sorteio quando o regulamento do próximo campeonato sair.
 - Emparelhamento com folgas (número de duplas que não é potência de 2): as duplas que folgam entram na rodada seguinte na frente dos vencedores e as vizinhas se enfrentam; isso foi decidido na Fase 24 sem regra do regulamento original. Revisar se o organizador preferir que as duplas que folgam enfrentem os vencedores (e não se enfrentem entre si).
 - Confronto direto entre jogadores num campeonato em duplas continua sendo decisão manual do organizador.
-- Revisar o código existente: rodar `testes.html` e `testes-telas.html` no navegador e ler com atenção a lógica mais recente (mata-mata com folgas, troca de duplas de lugar e remarcação de jogos).
-- Refazer `docs/print.png`: o print atual mostra o cabeçalho antigo (anterior às Fases 18 a 26). Os nomes já são fictícios.
-- Fase 26 (ausência no mata-mata): em `testes-telas.html` a janela de confirmação é respondida pelo teste (o fechamento real não é confiável no Edge sem cabeça); conferir os botões "Substituir" e "Dar W.O." com a janela de verdade (casos 7.18 a 7.24 de `docs/TESTES-NAVEGADOR.md`).
+- Revisar o código existente: ler com atenção a lógica mais recente (mata-mata com folgas, troca de duplas de lugar e remarcação de jogos). Os testes automáticos (`testes.html` e `testes-telas.html`) já foram rodados e passam.
+- Fase 26 (ausência no mata-mata): faltam conferir à mão o backup exportado e importado com ausentes (7.19) e o Lighthouse nas telas novas. O resto dos casos 7.18 a 7.24 de `docs/TESTES-NAVEGADOR.md` já foi conferido com a janela de confirmação de verdade.
