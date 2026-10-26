@@ -2,7 +2,7 @@
 
 A small web app to run a 2v2 FIFA tournament from start to finish: sign up the players, draw the whole schedule, enter the scores week by week, follow the individual standings live and run the knockout stage up to a best-of-3 final.
 
-![Standings and weekly rounds](docs/print.png)
+![Weekly rounds in a group stage, with each group's qualifiers](docs/print.png)
 
 ## What it does
 
@@ -44,7 +44,7 @@ MIT. See [`LICENSE`](LICENSE).
 
 Um aplicativo web simples para conduzir um campeonato de FIFA em duplas do começo ao fim: cadastrar os jogadores, sortear o calendário inteiro, lançar os placares semana a semana, acompanhar a classificação individual ao vivo e conduzir o mata-mata até a final em melhor de 3.
 
-![Classificação e rodadas da semana](docs/print.png)
+![Rodadas da semana numa fase de grupos, com os classificados de cada grupo](docs/print.png)
 
 ## O que faz
 
