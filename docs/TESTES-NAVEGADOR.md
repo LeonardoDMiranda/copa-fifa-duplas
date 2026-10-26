@@ -397,7 +397,28 @@ Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
 - 19.6 Ficha: "2º no Grupo A", "entre os 2 classificados do Grupo A", "Situação no Grupo A (2 vagas)".
 - 19.7 400 px: Classificação e Rodadas sem rolagem lateral.
 
+## 20. Fase de grupos: mata-mata, imagens e telão
+
+- 20.1 Prévia: "Prévia pela semeadura atual"; os avisos falam do empate "no Grupo X" ou "na semeadura da fase final".
+- 20.2 Ausente na prévia: o seletor mostra "(2º do Grupo B)"; marcar um classificado faz entrar o próximo do mesmo grupo ("Entram no lugar"); gerar guarda o ausente e ele não aparece em nenhum confronto.
+- 20.3 "Ausência" num confronto: "Substituir por …" oferece o próximo do grupo do ausente.
+- 20.4 "Baixar imagem" na Classificação: uma tabela por grupo, os 2 primeiros de cada grupo em verde, altura até 1.600 px.
+- 20.5 Telão: Classificação com os grupos em duas colunas, cabendo na tela; "Jogo N · Grupo X" nos jogos da semana; mata-mata com as duplas da semeadura.
+- 20.6 Backup exportado e importado de uma edição com grupos: grupos, formato e semeadura iguais.
+
 ## Última execução
+
+**Fase 31 (fase de grupos no mata-mata, imagens e telão), 2026-10-26**, Playwright (Chromium) por um servidor local
+temporário, antes do commit da fase. Massa: a edição de teste das Fases 29 e 30, com os 48 jogos lançados.
+
+- `testes.html`: 136 passaram, 0 falharam (G12 novo). `testes-telas.html`: 79 passaram, 0 falharam (V16.4 novo).
+- **Conferido no app real:** 20.1 (prévia pela semeadura, aviso de empate técnico no Grupo A), chaveamento gerado pela
+  janela de confirmação de verdade ("Gerar mesmo assim"), 20.4 (PNG desenhado na página: 1080 × 1574, quatro grupos)
+  e 20.5 (Classificação do telão com os 4 grupos cabendo em 1920 × 900).
+- **Cobertos só pelos testes automáticos:** 20.2, 20.3 e os jogos e o mata-mata do telão.
+- **Ainda não conferidos à mão:** 20.6 e Lighthouse nas telas com grupos.
+
+---
 
 **Fase 30 (fase de grupos na temporada), 2026-10-26**, Playwright (Chromium) por um servidor local temporário, antes do
 commit da fase. Massa: a edição de teste da Fase 29 (32 jogadores fictícios, 4 grupos × 2), calendário confirmado e

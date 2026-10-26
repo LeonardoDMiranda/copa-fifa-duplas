@@ -117,17 +117,62 @@
     return Math.max(18, Math.min(ALTURA_LINHA, Math.floor((ALTURA_MAXIMA - ALTURA_FIXA) / quantidade)));
   }
 
+  // Com grupos: título do grupo e cabeçalho da tabela de cada um.
+  const ALTURA_TITULO_GRUPO = 34;
+  const ALTURA_CABECALHO_TABELA = 44;
+
+  function cabecalhoDaTabela(ctx, yCab) {
+    const estiloCab = { tamanho: 20, peso: 700, cor: CORES.suave };
+    escrever(ctx, "POS", MARGEM + 8, yCab, estiloCab);
+    escrever(ctx, "JOGADOR", MARGEM + 140, yCab, estiloCab);
+    for (const [rotulo, , x] of COLUNAS) escrever(ctx, rotulo, x, yCab, { ...estiloCab, alinhar: "center" });
+  }
+
+  // Uma linha da classificação a partir de `y`: os `vagas` primeiros em verde, com a linha de corte.
+  function linhaDaClassificacao(ctx, linha, y, alt, vagas, fonte) {
+    const meio = y + alt / 2;
+    if (linha.posicao <= vagas) {
+      ctx.fillStyle = CORES.classificado;
+      ctx.fillRect(MARGEM - 8, y, LARGURA - 2 * (MARGEM - 8), alt);
+      ctx.fillStyle = CORES.classificadoBorda;
+      ctx.fillRect(MARGEM - 8, y, 5, alt);
+    }
+    ctx.fillStyle = linha.posicao === vagas ? CORES.classificadoBorda : CORES.borda;
+    ctx.fillRect(MARGEM - 8, y + alt - (linha.posicao === vagas ? 3 : 1),
+      LARGURA - 2 * (MARGEM - 8), linha.posicao === vagas ? 3 : 1);
+
+    escrever(ctx, `${linha.posicao}º`, MARGEM + 8, meio, { tamanho: fonte(25), peso: 700 });
+    if (linha.variacao > 0) escrever(ctx, `▲${linha.variacao}`, MARGEM + 72, meio, { tamanho: fonte(19), cor: CORES.sobe });
+    if (linha.variacao < 0) escrever(ctx, `▼${-linha.variacao}`, MARGEM + 72, meio, { tamanho: fonte(19), cor: CORES.desce });
+
+    const larguraNome = escrever(ctx, linha.nome, MARGEM + 140, meio, { tamanho: fonte(26), peso: 600, larguraMax: 330 });
+    if (linha.empateTecnico) escrever(ctx, "⚖️", MARGEM + 140 + larguraNome + 8, meio, { tamanho: fonte(20) });
+
+    for (const [, campo, x] of COLUNAS) {
+      const valor = campo === "sg" ? formatarSaldo(linha.sg) : linha[campo];
+      escrever(ctx, valor, x, meio, { tamanho: fonte(25), peso: campo === "pontos" ? 700 : 400, alinhar: "center" });
+    }
+  }
+
   // tabela = Regras.calcularClassificacao(...)
-  // info = { geradoEm, nome (do campeonato), semana (null = ao vivo), lancados, totalJogos, cor?, logo? }
+  // info = { geradoEm, nome (do campeonato), semana (null = ao vivo), lancados, totalJogos, vagas, cor?, logo?,
+  //          grupos? }. Com `grupos` ([{ grupo, linhas }], Regras.classificacaoDosGrupos), uma tabela por grupo, uma
+  // embaixo da outra, e `vagas` é o número de classificados por grupo; `tabela` é ignorada.
   function desenharClassificacao(tabela, info) {
-    const alt = alturaDaLinha(tabela.length);
+    const blocos = info.grupos || [{ grupo: null, linhas: tabela }];
+    const comGrupos = Boolean(info.grupos);
+    const totalLinhas = blocos.reduce((soma, b) => soma + b.linhas.length, 0);
+    // Com grupos, os títulos e cabeçalhos de cada grupo também ocupam a altura disponível.
+    const extraPorGrupo = comGrupos ? ALTURA_TITULO_GRUPO + ALTURA_CABECALHO_TABELA : 0;
+    const alt = comGrupos
+      ? Math.max(18, Math.min(ALTURA_LINHA, Math.floor((ALTURA_MAXIMA - ALTURA_FIXA + ALTURA_CABECALHO_TABELA - blocos.length * extraPorGrupo) / Math.max(totalLinhas, 1))))
+      : alturaDaLinha(tabela.length);
     const k = alt / ALTURA_LINHA; // fonte acompanha a altura da linha
     const fonte = (px) => Math.max(10, Math.round(px * k));
     const topoPainel = 176;
-    const topoCabecalho = topoPainel + 16;
-    const topoLinhas = topoCabecalho + 44;
     const vagas = info.vagas || VAGAS_FASE_FINAL;
-    const fimLinhas = topoLinhas + tabela.length * alt;
+    const alturaDoBloco = (b) => (comGrupos ? extraPorGrupo : ALTURA_CABECALHO_TABELA) + b.linhas.length * alt;
+    const fimLinhas = topoPainel + 16 + blocos.reduce((soma, b) => soma + alturaDoBloco(b), 0);
     const altura = fimLinhas + 110;
     const { canvas, ctx } = criarCanvas(altura);
 
@@ -140,40 +185,22 @@
     retangulo(ctx, MARGEM - 16, topoPainel, LARGURA - 2 * (MARGEM - 16), fimLinhas - topoPainel + 16,
       { cor: CORES.superficie, raio: 14 });
 
-    // Cabeçalho da tabela
-    const yCab = topoCabecalho + 22;
-    const estiloCab = { tamanho: 20, peso: 700, cor: CORES.suave };
-    escrever(ctx, "POS", MARGEM + 8, yCab, estiloCab);
-    escrever(ctx, "JOGADOR", MARGEM + 140, yCab, estiloCab);
-    for (const [rotulo, , x] of COLUNAS) escrever(ctx, rotulo, x, yCab, { ...estiloCab, alinhar: "center" });
-
-    tabela.forEach((linha, i) => {
-      const y = topoLinhas + i * alt;
-      const meio = y + alt / 2;
-      if (linha.posicao <= vagas) {
-        ctx.fillStyle = CORES.classificado;
-        ctx.fillRect(MARGEM - 8, y, LARGURA - 2 * (MARGEM - 8), alt);
-        ctx.fillStyle = CORES.classificadoBorda;
-        ctx.fillRect(MARGEM - 8, y, 5, alt);
+    let y = topoPainel + 16;
+    for (const bloco of blocos) {
+      if (comGrupos) {
+        escrever(ctx, `Grupo ${bloco.grupo}`, MARGEM + 8, y + ALTURA_TITULO_GRUPO / 2 + 4, { tamanho: 26, peso: 700, cor: CORES.primaria });
+        y += ALTURA_TITULO_GRUPO;
       }
-      ctx.fillStyle = linha.posicao === vagas ? CORES.classificadoBorda : CORES.borda;
-      ctx.fillRect(MARGEM - 8, y + alt - (linha.posicao === vagas ? 3 : 1),
-        LARGURA - 2 * (MARGEM - 8), linha.posicao === vagas ? 3 : 1);
-
-      escrever(ctx, `${linha.posicao}º`, MARGEM + 8, meio, { tamanho: fonte(25), peso: 700 });
-      if (linha.variacao > 0) escrever(ctx, `▲${linha.variacao}`, MARGEM + 72, meio, { tamanho: fonte(19), cor: CORES.sobe });
-      if (linha.variacao < 0) escrever(ctx, `▼${-linha.variacao}`, MARGEM + 72, meio, { tamanho: fonte(19), cor: CORES.desce });
-
-      const larguraNome = escrever(ctx, linha.nome, MARGEM + 140, meio, { tamanho: fonte(26), peso: 600, larguraMax: 330 });
-      if (linha.empateTecnico) escrever(ctx, "⚖️", MARGEM + 140 + larguraNome + 8, meio, { tamanho: fonte(20) });
-
-      for (const [, campo, x] of COLUNAS) {
-        const valor = campo === "sg" ? formatarSaldo(linha.sg) : linha[campo];
-        escrever(ctx, valor, x, meio, { tamanho: fonte(25), peso: campo === "pontos" ? 700 : 400, alinhar: "center" });
+      cabecalhoDaTabela(ctx, y + 22);
+      y += ALTURA_CABECALHO_TABELA;
+      for (const linha of bloco.linhas) {
+        linhaDaClassificacao(ctx, linha, y, alt, vagas, fonte);
+        y += alt;
       }
-    });
+    }
 
-    escrever(ctx, `Em verde, o top ${vagas}, que vai para a fase final.`, MARGEM, fimLinhas + 50, { tamanho: 21, cor: CORES.suave });
+    escrever(ctx, comGrupos ? `Em verde, os ${vagas} primeiros de cada grupo, que vão para a fase final.` : `Em verde, o top ${vagas}, que vai para a fase final.`,
+      MARGEM, fimLinhas + 50, { tamanho: 21, cor: CORES.suave });
     escrever(ctx, "▲▼ variação em relação à semana anterior · ⚖️ empate técnico (ordem definida pela organização)",
       MARGEM, fimLinhas + 82, { tamanho: 19, cor: CORES.suave, larguraMax: LARGURA - 2 * MARGEM });
     return canvas;

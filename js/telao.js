@@ -211,7 +211,26 @@
     // ---------- telas ----------
 
     function telaClassificacao(tabela, vagas) {
-      const tabelaDe = (linhas) => el("table", { class: "telao-tabela" },
+      const tabelaDe = (linhas) => tabelaDoTelao(linhas, vagas);
+      // --linhas: linhas por coluna; com jogadores demais, a altura da linha diminui para caber.
+      const meio = Math.ceil(tabela.length / 2);
+      return el("div", { class: "telao-duas-colunas", style: `--linhas: ${Math.max(meio, 1)}` },
+        tabelaDe(tabela.slice(0, meio)), tabelaDe(tabela.slice(meio)));
+    }
+
+    // Fase de grupos: uma tabela por grupo, os grupos divididos em duas colunas (A e B na primeira...). Cada
+    // grupo conta 2 linhas a mais em --linhas (título e cabeçalho), para tudo caber na altura.
+    function telaClassificacaoDosGrupos(tabelas, k) {
+      const meio = Math.ceil(tabelas.length / 2);
+      const colunas = [tabelas.slice(0, meio), tabelas.slice(meio)];
+      const linhas = Math.max(...colunas.map((c) => c.reduce((soma, t) => soma + t.linhas.length + 2, 0)), 1);
+      return el("div", { class: "telao-duas-colunas telao-grupos", style: `--linhas: ${linhas}` },
+        colunas.map((c) => el("div", { class: "telao-coluna-grupos" },
+          c.map((t) => [el("h2", { class: "telao-titulo-grupo" }, `Grupo ${t.grupo}`), tabelaDoTelao(t.linhas, k)]))));
+    }
+
+    function tabelaDoTelao(linhas, vagas) {
+      return el("table", { class: "telao-tabela" },
         el("thead", {}, el("tr", {},
           el("th", { class: "pos" }, ""), el("th", { class: "var" }, ""), el("th", { class: "nome" }, "Jogador"),
           ["Pts", "V", "SG", "GP", "J"].map((t) => el("th", {}, t)))),
@@ -231,14 +250,11 @@
             el("td", {}, String(l.gp)),
             el("td", {}, String(l.jogos)));
         })));
-      // --linhas: linhas por coluna; com jogadores demais, a altura da linha diminui para caber.
-      const meio = Math.ceil(tabela.length / 2);
-      return el("div", { class: "telao-duas-colunas", style: `--linhas: ${Math.max(meio, 1)}` },
-        tabelaDe(tabela.slice(0, meio)), tabelaDe(tabela.slice(meio)));
     }
 
-    // `jogos` = só os jogos da semana em andamento; a grade se ajusta ao número deles.
-    function telaJogos(jogos) {
+    // `jogos` = só os jogos da semana em andamento; a grade se ajusta ao número deles. `grupoDe`: id -> grupo,
+    // só com fase de grupos (o rótulo do jogo diz o grupo).
+    function telaJogos(jogos, grupoDe = null) {
       const proximo = jogos.find((j) => !j.resultado);
       return el("div", { class: "telao-jogos", style: `--n: ${Math.max(jogos.length, 1)}` }, jogos.map((jogo, i) => {
         const r = jogo.resultado;
@@ -252,7 +268,8 @@
         } else placar = el("div", { class: "telao-placar" }, `${r.gols1} × ${r.gols2}`);
         const ehProximo = jogo === proximo;
         return el("div", { class: `telao-jogo${r ? " lancado" : ""}${ehProximo ? " proximo" : ""}` },
-          el("div", { class: "rotulo" }, `Jogo ${i + 1}`, ehProximo && el("span", { class: "tag-proximo" }, "PRÓXIMO")),
+          el("div", { class: "rotulo" }, `Jogo ${i + 1}`, grupoDe && grupoDe.get(jogo.dupla1[0]) ? ` · Grupo ${grupoDe.get(jogo.dupla1[0])}` : null,
+            ehProximo && el("span", { class: "tag-proximo" }, "PRÓXIMO")),
           el("div", { class: `telao-dupla d1${classeDoLado(r, 1)}` }, nomesDupla(jogo.dupla1)),
           placar,
           el("div", { class: `telao-dupla d2${classeDoLado(r, 2)}` }, nomesDupla(jogo.dupla2)));
@@ -317,17 +334,21 @@
       const base = Regras.baseDosJogadores(atual.campeonato.jogadores);
       nomePorId.clear();
       for (const l of base) nomePorId.set(l.id, l.nome);
-      const tabela = Regras.classificacaoPorSemana(base, atual.jogos, atual.desempatesManuais, config);
+      // Com grupos, a semeadura (é dela que o mata-mata tira as duplas); na liga única, a classificação.
+      const ausentes = (atual.mataMata && atual.mataMata.ausentes) || [];
+      const tabela = Regras.classificacaoDaFaseFinal(base, atual.jogos, atual.desempatesManuais, config, ausentes);
       const lancados = atual.jogos.filter((j) => j.resultado).length;
 
       let conteudo, complemento = "", titulo = TITULOS[telaAtual];
       if (telaAtual === "classificacao") {
-        conteudo = telaClassificacao(tabela, config.vagasFaseFinal);
+        conteudo = Regras.usaGrupos(config)
+          ? telaClassificacaoDosGrupos(Regras.classificacaoDosGrupos(base, atual.jogos, atual.desempatesManuais, config), config.grupos.classificados)
+          : telaClassificacao(tabela, config.vagasFaseFinal);
         if (atual.jogos.length) complemento = lancados === atual.jogos.length ? "final" : `${lancados}/${atual.jogos.length} jogos lançados`;
       } else if (telaAtual === "jogos") {
         const semana = Regras.semanaAtual(atual.jogos, config);
         const daSemana = atual.jogos.filter((j) => Regras.semanaDoJogo(j) === semana);
-        conteudo = telaJogos(daSemana);
+        conteudo = telaJogos(daSemana, Regras.usaGrupos(config) ? new Map(atual.campeonato.jogadores.map((j) => [j.id, j.grupo])) : null);
         titulo = `${TITULOS.jogos} ${semana}`;
         complemento = `${daSemana.filter((j) => j.resultado).length}/${daSemana.length} lançados`;
       } else {

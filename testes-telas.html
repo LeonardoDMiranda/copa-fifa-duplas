@@ -1770,6 +1770,40 @@
       ficha.querySelector("dialog").close();
     });
 
+    caso("V16.4 Mata-mata com grupos: prévia pela semeadura, ausente substituído pelo próximo do grupo", (t) => aceitandoConfirmacoes(async () => {
+      const ctx = criarAppFalso(dadosGruposNaTemporada(8));
+      const { estado } = ctx;
+      const raiz = ctx.montar("mataMata");
+      const grupoDe = (id) => estado.atual().campeonato.jogadores.find((j) => j.id === id).grupo;
+      t.verdadeiro(raiz.textContent.includes("Prévia pela semeadura atual"), "a prévia é pela semeadura");
+      t.verdadeiro([...buscar(raiz, "sel-ausente-previa").options].slice(1).every((o) => /\(\dº do Grupo [A-D]\)$/.test(o.textContent)), "o seletor mostra a posição no grupo");
+      const lista = ctx.tabelaAtual();
+      const ausente = lista.find((l) => l.classificado && l.grupo === "B");
+      mudarCampo(buscar(raiz, "sel-ausente-previa"), ausente.id);
+      clicar(raiz, "btn-marcar-ausente");
+      const doGrupoB = lista.find((l) => l.grupo === "B" && !l.classificado);
+      t.verdadeiro(texto(raiz, "entram-no-lugar").includes(`${doGrupoB.nome} (`) && texto(raiz, "entram-no-lugar").includes("do Grupo B"), "entra o próximo do mesmo grupo");
+      verificarLimpeza(t, raiz, "prévia com grupos e ausente");
+      verificarAcessibilidade(t, raiz, "prévia com grupos e ausente");
+      clicar(raiz, "btn-gerar-chave");
+      await confirmarDialogo();
+      const mm = estado.atual().mataMata;
+      t.igual(mm && mm.ausentes, [ausente.id], "chaveamento gerado com o ausente guardado");
+      const r = Regras.resolverMataMata(mm, ctx.tabelaAtual(), estado.atual().campeonato.config);
+      const noChaveamento = r.chaves.flatMap((k) => [...(r[k].dupla1 || []), ...(r[k].dupla2 || [])]);
+      t.verdadeiro(!noChaveamento.includes(ausente.id) && noChaveamento.includes(doGrupoB.id), "sem o ausente e com quem entrou no lugar dele");
+      // Durante a fase final: o substituto vem do grupo do jogador ausente.
+      clicar(raiz, "ausencia-semi1");
+      const escolhido = estado.atual().mataMata.semi1.dupla1[0];
+      mudarCampo(buscar(raiz, "ausente-semi1"), escolhido);
+      const entra = Regras.proximoSubstituto(estado.atual().mataMata, ctx.tabelaAtual(), estado.atual().campeonato.config, escolhido);
+      t.igual(grupoDe(entra), grupoDe(escolhido), "o substituto oferecido é do grupo do ausente");
+      t.igual(texto(raiz, "substituir-semi1"), `Substituir por ${ctx.app.nomePorId.get(entra)}`, "o botão diz quem entra");
+      clicar(raiz, "substituir-semi1");
+      await esperar();
+      t.verdadeiro(estado.atual().mataMata.semi1.dupla1.includes(entra) && estado.atual().mataMata.substituidos.includes(escolhido), "substituição feita");
+    }));
+
     // ---------- execução e relatório ----------
 
     // Um caso pode ser assíncrono (ex.: esperar o "close" da ficha): os casos rodam um de cada vez.

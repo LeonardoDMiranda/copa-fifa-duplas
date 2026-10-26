@@ -331,7 +331,9 @@
       const vista = abaAtiva(atual) === "classificacao" ? telas.classificacao.semanaVista() : null;
       const semana = vista !== null && ultimaSemana !== null && vista <= ultimaSemana ? vista : null;
       const jogos = semana === null ? atual.jogos : atual.jogos.filter((j) => Regras.semanaDoJogo(j) <= semana);
-      const tabela = semana === null ? tabelaAtual()
+      // Com grupos: uma tabela por grupo, com os classificados de cada um em verde.
+      const grupos = Regras.usaGrupos(cfg) ? Regras.classificacaoDosGrupos(classificacaoBase, atual.jogos, atual.desempatesManuais, cfg, semana) : null;
+      const tabela = grupos ? [] : semana === null ? tabelaAtual()
         : Regras.classificacaoPorSemana(classificacaoBase, atual.jogos, atual.desempatesManuais, cfg, semana);
       canvas = Exportar.desenharClassificacao(tabela, {
         geradoEm: agora,
@@ -339,7 +341,8 @@
         semana,
         lancados: jogos.filter((j) => j.resultado).length,
         totalJogos: jogos.length,
-        vagas: cfg.vagasFaseFinal,
+        vagas: grupos ? cfg.grupos.classificados : cfg.vagasFaseFinal,
+        grupos,
         ...visual,
       });
       prefixo = `${base}-classificacao${semana === null ? "" : `-semana-${semana}`}`;

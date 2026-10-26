@@ -2655,6 +2655,54 @@
       t.igual(muitos.map((g) => [g.pendentes, g.situacoes]), [[24, null], [24, null]], "24 jogos pendentes por grupo: sem situação (pendentes demais)");
     });
 
+    caso("G12 PNG e telão com grupos: uma tabela por grupo e o mata-mata pela semeadura", (t) => {
+      // PNG: 4 grupos de 8 cabem em 1600 px (as linhas encolhem para caber os títulos e cabeçalhos dos grupos).
+      const grupos32 = Regras.formarGruposPorPotes(jogadoresFicticios(32), 4, 1).jogadores;
+      const cfg32 = configGrupos(4, 2);
+      const tabelas = Regras.classificacaoDosGrupos(Regras.baseDosJogadores(grupos32), [], [], cfg32);
+      const png = Exportar.desenharClassificacao([], { geradoEm: new Date(), nome: "Copa de teste", semana: null, lancados: 0, totalJogos: 48, vagas: 2, grupos: tabelas });
+      t.igual(png.width, 1080, "PNG com grupos: largura 1080");
+      t.verdadeiro(png.height <= 1600 && png.height > 1200, `PNG com grupos: altura ${png.height} (≤ 1600)`);
+      const liga = Exportar.desenharClassificacao(Regras.calcularClassificacao(Regras.baseDosJogadores(grupos32), []), { geradoEm: new Date(), lancados: 0, totalJogos: 48 });
+      t.verdadeiro(png.height !== liga.height, "a imagem com grupos é outra (títulos e cabeçalhos de cada grupo)");
+
+      // Telão: 16 jogadores em 2 grupos, 2 classificados por grupo (final direta), semana 1 lançada.
+      const cfg = configGrupos(2, 2, { jogosPorJogador: 4, semanas: 4 });
+      const jogadores = Regras.formarGruposPorPotes(jogadoresFicticios(16), 2, 2).jogadores;
+      const jogos = Regras.calendarioParaJogos(Regras.gerarCalendario(jogadores, { jogosPorJogador: 4, semanas: 4, semente: 2, grupos: cfg.grupos }).calendario)
+        .map((j, i) => (j.semana === 1 ? { ...j, resultado: placar((i % 3) + 1, i % 2) } : j));
+      const lista = Regras.classificacaoDaFaseFinal(Regras.baseDosJogadores(jogadores), jogos, [], cfg);
+      const dados = dadosV2((d) => {
+        d.campeonato.config = cfg;
+        d.campeonato.jogadores = jogadores;
+        d.campeonato.sorteio = { semente: 2, confirmado: true };
+        d.jogos = jogos;
+        d.mataMata = Regras.gerarMataMata(lista, cfg);
+      });
+      const est = Estado.criar(memoria({ [Estado.CHAVE]: JSON.stringify(dados) }));
+      const raiz = document.createElement("div");
+      raiz.id = "telao";
+      raiz.hidden = true;
+      document.body.appendChild(raiz);
+      const telao = Telao.criar(est);
+      try {
+        telao.abrir({ telaCheia: false });
+        t.verdadeiro(raiz.querySelector(".telao-grupos"), "telão: classificação por grupo");
+        t.igual([...raiz.querySelectorAll(".telao-titulo-grupo")].map((h) => h.textContent), ["Grupo A", "Grupo B"], "telão: um título por grupo");
+        t.igual([...raiz.querySelectorAll(".telao-grupos tbody")].map((tb) => [tb.rows.length, tb.querySelectorAll("tr.classificado").length]), [[8, 2], [8, 2]],
+          "telão: 8 jogadores por grupo, 2 em verde");
+        raiz.querySelector("#telao-proxima").click();
+        const rotulos = [...raiz.querySelectorAll(".telao-jogo .rotulo")].map((r) => r.textContent);
+        t.verdadeiro(rotulos.length && rotulos.every((r) => /^Jogo \d+ · Grupo [AB]/.test(r)), `telão: jogos da semana com o grupo (${rotulos[0]})`);
+        raiz.querySelector("#telao-proxima").click();
+        const nomes = raiz.querySelector(".telao-confronto .nomes").textContent;
+        t.verdadeiro(nomes.includes(lista[0].nome) && nomes.includes(lista[3].nome), "telão: a final com 1º + 4º da semeadura");
+      } finally {
+        telao.fechar();
+        raiz.remove();
+      }
+    });
+
     caso("G10 Grupos no estado: salvos, validados, levados por backup, duplicar e modelo", (t) => {
       const jogadoresG = Regras.formarGruposPorPotes(comEstrelas(classificacaoBase.map((l) => ({ id: l.id, nome: l.nome }))), 4, 1).jogadores;
       const comGrupos = (d) => {

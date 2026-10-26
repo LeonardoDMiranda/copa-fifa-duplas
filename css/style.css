@@ -891,6 +891,9 @@ body.telao-ativo { overflow: hidden; }
   height: 100%;
 }
 .telao-tabela { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; table-layout: fixed; }
+/* Fase de grupos: os grupos empilhados em cada coluna, com o nome do grupo em cima da tabela. */
+.telao-coluna-grupos { display: flex; flex-direction: column; gap: calc(var(--altura-linha) * .4); }
+.telao-titulo-grupo { margin: 0; height: var(--altura-linha); display: flex; align-items: flex-end; font-size: min(2.6vh, calc(var(--altura-linha) * .6)); color: var(--telao-verde-claro); }
 .telao-tabela th {
   font-size: 1.9vh;
   font-weight: 700;

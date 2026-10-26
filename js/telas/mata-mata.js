@@ -52,19 +52,35 @@
       if (!mudou) renderizar();
     }
 
-    function painelGerar(atual, tabela) {
+    // Nome com a posição: na liga única, a da classificação ("3º Fulano"); com grupos, a do grupo.
+    const rotuloNaTabela = (l) => (l.grupo ? `${l.nome} (${l.posicaoNoGrupo}º do Grupo ${l.grupo})` : `${l.posicao}º ${l.nome}`);
+
+    // A lista que o chaveamento usa com esses ausentes: na liga única, a classificação (os ausentes saem na hora
+    // de gerar); com grupos, a semeadura refeita sem eles (o próximo do mesmo grupo entra).
+    function listaComAusentes(atual, tabela, ausentes) {
+      const cfg = atual.campeonato.config;
+      return Regras.usaGrupos(cfg) ? Regras.classificacaoDaFaseFinal(app.base(), atual.jogos, atual.desempatesManuais, cfg, ausentes) : tabela;
+    }
+
+    function painelGerar(atual, tabelaAoVivo) {
       const cfg = atual.campeonato.config;
       const vagas = cfg.vagasFaseFinal;
-      if (tabela.length < vagas) {
+      const comGrupos = Regras.usaGrupos(cfg);
+      if (tabelaAoVivo.length < vagas) {
         return app.proximoPasso(`O chaveamento precisa de pelo menos ${vagas} jogadores cadastrados.`, "jogadores", "Ir para Jogadores");
       }
-      ausentesPrevia = ausentesPrevia.filter((id) => tabela.some((l) => l.id === id));
-      const faltamJogadores = Regras.semAusentes(tabela, ausentesPrevia).length < vagas;
-      const painel = painelAusentesPrevia(tabela, vagas);
+      ausentesPrevia = ausentesPrevia.filter((id) => tabelaAoVivo.some((l) => l.id === id));
+      const tabela = listaComAusentes(atual, tabelaAoVivo, ausentesPrevia);
+      // Com grupos, cada grupo precisa ter os seus classificados sem os ausentes.
+      const faltamJogadores = comGrupos
+        ? tabela.filter((l) => l.classificado).length < vagas
+        : Regras.semAusentes(tabela, ausentesPrevia).length < vagas;
+      const painel = painelAusentesPrevia(tabelaAoVivo, tabela, vagas);
       if (faltamJogadores) {
         return el("div", { class: "gerar-chave" }, painel,
-          el("div", { class: "alerta", id: "aviso-ausentes-demais" }, Icones.svg("alerta"),
-            `Sem os ausentes, restam menos de ${vagas} jogadores para o chaveamento. Remova algum ausente.`));
+          el("div", { class: "alerta", id: "aviso-ausentes-demais" }, Icones.svg("alerta"), comGrupos
+            ? `Sem os ausentes, algum grupo fica com menos de ${cfg.grupos.classificados} jogadores para classificar. Remova algum ausente.`
+            : `Sem os ausentes, restam menos de ${vagas} jogadores para o chaveamento. Remova algum ausente.`));
       }
       const avisos = Regras.avisosParaGerarChaveamento(atual.jogos, tabela, cfg, ausentesPrevia);
       // A prévia é o próprio chaveamento que seria gerado agora: só a 1ª rodada e quem folga.
@@ -77,7 +93,7 @@
       const linhaFolga = (f, i) => el("li", {}, duplaComFicha(f.dupla, `previa-folga-${i}`), ` (${f.origem})`);
       return el("div", { class: "gerar-chave" },
         painel,
-        el("p", {}, `Prévia pela classificação atual (${vagas} classificados, ${primeira.nome.toLowerCase()}):`),
+        el("p", {}, `Prévia pela ${comGrupos ? "semeadura" : "classificação"} atual (${vagas} classificados, ${primeira.nome.toLowerCase()}):`),
         el("ul", { class: "previa" }, primeira.confrontos.map(linhaPrevia)),
         previa.folgam.length > 0 && el("div", {},
           el("p", { class: "legenda" }, `Folgam nesta rodada e entram na seguinte (${previa.folgam.length}):`),
@@ -87,20 +103,25 @@
           + "o confronto dele só abre quando a dupla estiver completa."),
         avisos.length
           ? el("ul", { class: "avisos-chave" }, avisos.map(itemAlerta))
-          : el("p", { class: "tudo-certo" }, Icones.svg("ok"), `Todos os jogos lançados e nenhum empate técnico pendente no top ${vagas}.`),
+          : el("p", { class: "tudo-certo" }, Icones.svg("ok"), comGrupos
+            ? "Todos os jogos lançados e nenhum empate técnico pendente entre os classificados dos grupos nem na semeadura."
+            : `Todos os jogos lançados e nenhum empate técnico pendente no top ${vagas}.`),
         el("button", { type: "button", id: "btn-gerar-chave", class: "primario", onclick: gerarChaveamento }, "Gerar chaveamento"));
     }
 
     // Jogadores que não vão jogar a fase final, marcados antes de gerar o chaveamento: quem vem depois
-    // na classificação sobe e entra na mesma posição (Regras.semAusentes).
-    function painelAusentesPrevia(tabela, vagas) {
+    // na classificação sobe e entra na mesma posição (Regras.semAusentes). Com grupos, entra o próximo do
+    // mesmo grupo e a semeadura é refeita (`comAusentes` já é a lista refeita).
+    function painelAusentesPrevia(tabela, comAusentes, vagas) {
       const nome = (id) => app.nomePorId.get(id);
-      const disponiveis = Regras.semAusentes(tabela, ausentesPrevia);
-      const entram = disponiveis.slice(0, vagas).filter((l) => tabela.indexOf(l) >= vagas);
+      const comGrupos = Regras.usaGrupos(app.config());
+      const entram = comGrupos
+        ? comAusentes.filter((l) => l.classificado && !tabela.some((x) => x.id === l.id && x.classificado))
+        : Regras.semAusentes(tabela, ausentesPrevia).slice(0, vagas).filter((l) => tabela.indexOf(l) >= vagas);
       const candidatos = tabela.filter((l) => !ausentesPrevia.includes(l.id));
       const seletor = el("select", { id: "sel-ausente-previa", "aria-label": "Jogador ausente na fase final" },
         el("option", { value: "" }, "Jogador"),
-        candidatos.map((l) => el("option", { value: l.id }, `${l.posicao}º ${l.nome}`)));
+        candidatos.map((l) => el("option", { value: l.id }, rotuloNaTabela(l))));
       const marcar = () => {
         if (!seletor.value) return;
         ausentesPrevia = [...ausentesPrevia, seletor.value];
@@ -108,7 +129,9 @@
         renderizar();
       };
       return el("div", { class: "ausentes-previa", id: "ausentes-previa" },
-        el("p", { class: "legenda" }, "Algum classificado não vai jogar a fase final? Marque o ausente: o próximo da classificação entra na mesma posição."),
+        el("p", { class: "legenda" }, comGrupos
+          ? "Algum classificado não vai jogar a fase final? Marque o ausente: o próximo do mesmo grupo se classifica e a semeadura é refeita."
+          : "Algum classificado não vai jogar a fase final? Marque o ausente: o próximo da classificação entra na mesma posição."),
         el("div", { class: "editor-dupla" }, seletor,
           el("button", { type: "button", id: "btn-marcar-ausente", class: "mini", onclick: marcar }, "Marcar ausente")),
         ausentesPrevia.length > 0 && el("ul", { class: "previa", id: "lista-ausentes" },
@@ -119,17 +142,18 @@
               onclick: () => { ausentesPrevia = ausentesPrevia.filter((x) => x !== id); renderizar(); },
             }, "Remover")))),
         ausentesPrevia.length > 0 && entram.length > 0 && el("p", { class: "legenda", id: "entram-no-lugar" },
-          `Entram no lugar: ${entram.map((l) => `${l.posicao}º ${l.nome}`).join(", ")}.`));
+          `Entram no lugar: ${entram.map(rotuloNaTabela).join(", ")}.`));
     }
 
     // Recalcula na hora do clique: um placar digitado logo antes pode ter mudado a classificação.
     async function gerarChaveamento() {
       const ausentes = ausentesPrevia.slice();
-      const avisos = Regras.avisosParaGerarChaveamento(estado.atual().jogos, tabelaAtual(), app.config(), ausentes);
+      const lista = () => listaComAusentes(estado.atual(), tabelaAtual(), ausentes);
+      const avisos = Regras.avisosParaGerarChaveamento(estado.atual().jogos, lista(), app.config(), ausentes);
       if (avisos.length && !(await confirmar(`- ${avisos.join("\n- ")}`,
         { titulo: "Gerar o chaveamento mesmo assim?", acao: "Gerar mesmo assim", perigo: true }))) return;
       if (estado.atual().mataMata) return; // outra janela já gerou
-      const tabela = tabelaAtual();
+      const tabela = lista();
       ausentesPrevia = [];
       estado.modificar("gerar chaveamento", (s) => { s.mataMata = Regras.gerarMataMata(tabela, app.config(), ausentes); });
     }
@@ -249,7 +273,7 @@
         id: `sel-${c.chave}-${lado}-${n}`, "aria-label": `${ROTULOS[c.chave]}, dupla ${lado}, jogador ${n}`, ...Util.atributosDeErro(idErro, erro),
       },
         el("option", { value: "" }, "Jogador"),
-        tabela.map((l) => el("option", { value: l.id, selected: l.id === atual[n - 1] }, `${l.posicao}º ${l.nome}`)));
+        tabela.filter((l) => !l.ausente).map((l) => el("option", { value: l.id, selected: l.id === atual[n - 1] }, rotuloNaTabela(l))));
       const sel1 = seletor(1), sel2 = seletor(2);
       const fechar = () => { editandoDupla = null; errosCampo.delete(chaveErro); };
 
@@ -345,7 +369,8 @@
       const jogadores = [...(c.dupla1 || []), ...(c.dupla2 || [])].filter(Boolean);
       const escolhido = jogadores.includes(ausenciaAberta.jogador) ? ausenciaAberta.jogador : jogadores[0];
       const lado = (c.dupla1 || []).includes(escolhido) ? 1 : 2;
-      const entra = Regras.proximoSubstituto(mm, tabela, cfg);
+      // Com grupos, o substituto é o próximo do grupo do ausente (ver Regras.proximoSubstituto).
+      const entra = Regras.proximoSubstituto(mm, tabela, cfg, escolhido);
       const erroSubstituir = Regras.erroDeSubstituicao(mm, tabela, c.chave, lado, escolhido, cfg);
       const erroWO = Regras.erroDeWO(mm, tabela, c.chave, lado, cfg);
       const seletor = el("select", {
