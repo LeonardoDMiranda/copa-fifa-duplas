@@ -60,6 +60,9 @@
     const config = Regras.normalizarConfig(c.config);
     const erroConfig = Regras.validarConfig(config);
     if (erroConfig) throw new Error(`configuração inválida: ${erroConfig}`);
+    // Fase de grupos (Fase 28): só os campos conhecidos; sem grupos (backup antigo), null.
+    config.grupos = config.grupos ? { quantidade: config.grupos.quantidade, classificados: config.grupos.classificados } : null;
+    const letras = config.grupos ? Regras.letrasDosGrupos(config.grupos.quantidade) : [];
     if (!Array.isArray(c.jogadores)) throw new Error("lista de jogadores ausente.");
     const ids = new Set();
     const jogadores = c.jogadores.map((j) => {
@@ -67,7 +70,10 @@
       if (ids.has(j.id)) throw new Error(`jogador repetido: ${j.id}.`);
       ids.add(j.id);
       // Estrelas ausentes ou inválidas (backup antigo) ficam a definir.
-      return { id: j.id, nome: j.nome.trim(), estrelas: Regras.validarEstrelas(j.estrelas) ? j.estrelas : null };
+      const jogador = { id: j.id, nome: j.nome.trim(), estrelas: Regras.validarEstrelas(j.estrelas) ? j.estrelas : null };
+      // Grupo: só com fase de grupos e se for um dos grupos da configuração; senão, fica sem (a formar).
+      if (letras.includes(j.grupo)) jogador.grupo = j.grupo;
+      return jogador;
     });
     let sorteio = null;
     if (c.sorteio !== null && c.sorteio !== undefined) {

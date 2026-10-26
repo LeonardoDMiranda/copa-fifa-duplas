@@ -2412,6 +2412,257 @@
       t.igual(est.atual().campeonato.jogadores[0].estrelas, 1, "desfazer volta ao valor anterior");
     });
 
+    // ---------- Fase de grupos (Fase 28) ----------
+
+    const configGrupos = (quantidade, classificados, extra = {}) =>
+      ({ ...Regras.REGRAS_PADRAO, grupos: { quantidade, classificados }, vagasFaseFinal: quantidade * classificados, ...extra });
+    const tamanhosDe = (jogadores, quantidade) => Regras.jogadoresPorGrupo(jogadores, quantidade).map((g) => g.ids.length);
+    // Linha de classificação feita à mão (para os critérios da semeadura): os pontos além das vitórias são empates.
+    const linhaG = (id, pontos, v, gp, gc, jogos = 3) =>
+      ({ id, nome: id.toUpperCase(), pontos, v, e: pontos - 3 * v, d: jogos - v - (pontos - 3 * v), gp, gc });
+    // Grupo A: A1 9 pts; A2 6 pts (igual a B1 em tudo, mas 2º do grupo); A3 igual a B3; A4 e B4 sem jogos.
+    // Grupo B: B1 6 pts (1º do B); B2 4 pts; B3 3 pts.
+    function tabelasG() {
+      const com = (linhas) => linhas.map((l, i) => ({ ...l, posicao: i + 1 }));
+      return [
+        { grupo: "A", linhas: com([linhaG("a1", 9, 3, 6, 1), linhaG("a2", 6, 2, 4, 2), linhaG("a3", 3, 1, 2, 3), linhaG("a4", 0, 0, 0, 0, 0)]) },
+        { grupo: "B", linhas: com([linhaG("b1", 6, 2, 4, 2), linhaG("b2", 4, 1, 3, 3), linhaG("b3", 3, 1, 2, 3), linhaG("b4", 0, 0, 0, 0, 0)]) },
+      ];
+    }
+
+    caso("G1 Config com grupos: validação e padrão sem grupos", (t) => {
+      t.igual(Regras.REGRAS_PADRAO.grupos, null, "padrão: liga única (grupos null)");
+      t.igual(Regras.normalizarConfig({}).grupos, null, "config antiga, sem o campo, vira liga única");
+      t.igual(Regras.validarConfig(configGrupos(4, 2)), null, "4 grupos × 2 classificados = 8 vagas: válido");
+      t.igual(Regras.validarConfig(configGrupos(2, 5)), null, "2 grupos × 5 = 10 vagas: válido");
+      t.verdadeiro(Regras.validarConfig({ ...configGrupos(4, 2), vagasFaseFinal: 12 }), "vagas diferentes de grupos × classificados: recusado");
+      for (const [q, k] of [[1, 4], [9, 1], [2.5, 2], [4, 0], [4, "2"]]) {
+        t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, grupos: { quantidade: q, classificados: k }, vagasFaseFinal: 8 }), `${q} grupos × ${k} classificados: recusado`);
+      }
+      t.verdadeiro(Regras.validarConfig({ ...Regras.REGRAS_PADRAO, grupos: [4, 2] }), "grupos precisa ser objeto");
+      t.verdadeiro(Regras.validarConfig(configGrupos(2, 1)), "2 × 1 = 2 vagas: abaixo do mínimo de 4");
+      t.igual(Regras.letrasDosGrupos(3), ["A", "B", "C"], "grupos nomeados por letra");
+      t.verdadeiro(Regras.usaGrupos(configGrupos(4, 2)) && !Regras.usaGrupos(Regras.REGRAS_PADRAO), "usaGrupos só com config.grupos");
+    });
+
+    caso("G2 Formação por potes de estrelas", (t) => {
+      const jogadores = jogadoresFicticios(32);
+      const original = JSON.stringify(jogadores);
+      const r = Regras.formarGruposPorPotes(jogadores, 4, 7);
+      t.igual(JSON.stringify(jogadores), original, "não altera a lista recebida");
+      t.igual(r.jogadores.map((j) => j.id), jogadores.map((j) => j.id), "mantém a ordem dos jogadores");
+      t.igual(tamanhosDe(r.jogadores, 4), [8, 8, 8, 8], "32 jogadores em 4 grupos de 8");
+      // Cada pote manda um para cada grupo: para qualquer nível, os grupos têm quase o mesmo número de
+      // jogadores daquele nível para cima (diferença de no máximo 1).
+      for (let s = 1; s <= 5; s++) {
+        const n = Regras.letrasDosGrupos(4).map((g) => r.jogadores.filter((j) => j.grupo === g && j.estrelas >= s).length);
+        t.verdadeiro(Math.max(...n) - Math.min(...n) <= 1, `${s}+ estrelas por grupo: ${n.join(", ")}`);
+      }
+      t.igual(JSON.stringify(Regras.formarGruposPorPotes(jogadores, 4, 7)), JSON.stringify(r), "mesma semente, mesmos grupos");
+      t.verdadeiro(JSON.stringify(Regras.formarGruposPorPotes(jogadores, 4, 8)) !== JSON.stringify(r), "outra semente, outros grupos");
+      t.igual(tamanhosDe(Regras.formarGruposPorPotes(jogadoresFicticios(30), 4, 1).jogadores, 4).sort(), [7, 7, 8, 8], "30 em 4 grupos: o último pote incompleto deixa 2 grupos com 1 a mais");
+      t.igual(tamanhosDe(Regras.formarGruposPorPotes(jogadoresFicticios(32), 2, 1).jogadores, 2), [16, 16], "32 em 2 grupos de 16");
+      const semNivel = jogadoresFicticios(8).map((j, i) => (i ? j : { ...j, estrelas: null }));
+      t.verdadeiro(Regras.formarGruposPorPotes(semNivel, 2, 1).erro, "sem estrelas de todos: erro");
+      t.verdadeiro(Regras.formarGruposPorPotes(jogadores, 9, 1).erro, "9 grupos: erro");
+    });
+
+    caso("G3 Ajuste manual dos grupos: mover e trocar", (t) => {
+      const iguais = Regras.formarGruposPorPotes(jogadoresFicticios(32), 4, 3).jogadores;
+      const deA = iguais.find((j) => j.grupo === "A"), deB = iguais.find((j) => j.grupo === "B");
+      t.verdadeiro(Regras.moverJogadorDeGrupo(iguais, deA.id, "B", 4).erro, "4 grupos de 8: mover deixaria 7 e 9 (recusado)");
+      const trocados = Regras.trocarJogadoresDeGrupo(iguais, deA.id, deB.id).jogadores;
+      t.igual([trocados.find((j) => j.id === deA.id).grupo, trocados.find((j) => j.id === deB.id).grupo], ["B", "A"], "trocar dois jogadores de grupo");
+      t.igual(tamanhosDe(trocados, 4), [8, 8, 8, 8], "a troca mantém os tamanhos");
+      t.verdadeiro(Regras.trocarJogadoresDeGrupo(iguais, deA.id, iguais.filter((j) => j.grupo === "A")[1].id).erro, "trocar dentro do mesmo grupo: erro");
+      const trinta = Regras.formarGruposPorPotes(jogadoresFicticios(30), 4, 1).jogadores;
+      const tamanhos = tamanhosDe(trinta, 4);
+      const maior = Regras.letrasDosGrupos(4)[tamanhos.indexOf(8)], menor = Regras.letrasDosGrupos(4)[tamanhos.indexOf(7)];
+      const movido = Regras.moverJogadorDeGrupo(trinta, trinta.find((j) => j.grupo === maior).id, menor, 4);
+      t.igual(tamanhosDe(movido.jogadores, 4).sort(), [7, 7, 8, 8], "8,8,7,7: mover de um grupo de 8 para um de 7 é aceito");
+      const novo = [...iguais, { id: "novo", nome: "Novo", estrelas: 3 }];
+      t.igual(Regras.moverJogadorDeGrupo(novo, "novo", "C", 4).jogadores.find((j) => j.id === "novo").grupo, "C", "jogador novo, sem grupo, entra num grupo");
+      t.verdadeiro(Regras.moverJogadorDeGrupo(iguais, deA.id, "E", 4).erro, "grupo que não existe: erro");
+    });
+
+    caso("G4 Diagnóstico com grupos: a conta é feita grupo a grupo", (t) => {
+      const cfg = configGrupos(4, 2);
+      const jogadores = jogadoresFicticios(32);
+      const antes = Regras.diagnosticarCampeonato(jogadores, cfg);
+      t.verdadeiro(!antes.pronto && antes.problemas.some((p) => p.includes("Forme os grupos")), "sem grupos formados: pede para formar");
+      const formados = Regras.formarGruposPorPotes(jogadores, 4, 1).jogadores;
+      const d = Regras.diagnosticarCampeonato(formados, cfg);
+      t.verdadeiro(d.pronto, `grupos formados: pronto ${d.problemas.join("; ")}`);
+      t.igual(d.grupos, ["A", "B", "C", "D"].map((grupo) => ({ grupo, jogadores: 8, totalJogos: 12 })), "4 grupos de 8, 12 jogos cada");
+      t.igual([d.totalJogos, d.jogosPorSemanaMin, d.jogosPorSemanaMax], [48, 4, 8], "48 jogos; semanas com 8 e com 4 (as sobras de cada grupo vão para as primeiras)");
+      const trinta = Regras.diagnosticarCampeonato(jogadoresFicticios(30), cfg);
+      t.verdadeiro(trinta.problemas.some((p) => p.startsWith("Grupos C e D: 7 jogadores × 6 jogos = 42 vagas")), `30 jogadores em 4 grupos: grupos de 7 não fecham (${trinta.problemas.join("; ")})`);
+      const vinteQuatro = Regras.diagnosticarCampeonato(jogadoresFicticios(24), cfg);
+      t.verdadeiro(vinteQuatro.problemas.some((p) => p.includes("6 jogadores permitem no máximo 5 jogos")), "grupos de 6: não dá 6 jogos sem repetir parceiro");
+      const movido = formados.find((j) => j.grupo !== "A").id;
+      const desiguais = formados.map((j) => (j.id === movido ? { ...j, grupo: "A" } : j));
+      t.verdadeiro(Regras.diagnosticarCampeonato(desiguais, cfg).problemas.some((p) => p.includes("diferença entre eles")), "tamanhos com diferença maior que 1: problema");
+      const poucos = Regras.diagnosticarCampeonato(Regras.formarGruposPorPotes(jogadoresFicticios(16), 2, 1).jogadores, configGrupos(2, 9));
+      t.verdadeiro(poucos.problemas.some((p) => p.includes("menos que os 9 classificados")), "grupo menor que os classificados por grupo: problema");
+      t.igual(Regras.diagnosticarCampeonato(jogadoresFicticios(32)).grupos, null, "sem grupos: diagnóstico como antes");
+    });
+
+    caso("G5 Sorteio por grupo: parceiros e adversários só do próprio grupo", (t) => {
+      const inicio = Date.now();
+      for (const [n, q, semente] of [[32, 4, 1], [32, 2, 3], [24, 3, 4]]) {
+        const cfg = configGrupos(q, 2);
+        const jogadores = Regras.formarGruposPorPotes(jogadoresFicticios(n), q, semente).jogadores;
+        const r = Regras.gerarCalendario(jogadores, { jogosPorJogador: 6, semanas: 8, semente, grupos: cfg.grupos });
+        const a = Regras.avaliarCalendario(jogadores, r.calendario || [], cfg);
+        t.verdadeiro(r.calendario && a.pronto, `${n} jogadores em ${q} grupos: respeita o regulamento ${(r.erro || "") + a.violacoes.slice(0, 2).join("; ")}`);
+        if (!r.calendario) continue;
+        t.igual(r.calendario.length, n * 6 / 4, `${n} em ${q} grupos: ${n * 6 / 4} jogos`);
+        const grupo = new Map(jogadores.map((j) => [j.id, j.grupo]));
+        t.verdadeiro(r.calendario.every((j) => new Set([...j.dupla1, ...j.dupla2].map((id) => grupo.get(id))).size === 1), `${n} em ${q} grupos: todo jogo é dentro de um grupo`);
+        t.verdadeiro(r.calendario.every((j, i) => i === 0 || r.calendario[i - 1].semana <= j.semana), `${n} em ${q} grupos: calendário em ordem de semana`);
+      }
+      t.verdadeiro(Date.now() - inicio < 8000, `tempo total ${Date.now() - inicio} ms (< 8 s)`);
+      const jogadores = Regras.formarGruposPorPotes(jogadoresFicticios(32), 4, 5).jogadores;
+      const sortearG = (semente) => JSON.stringify(Regras.gerarCalendario(jogadores, { jogosPorJogador: 6, semanas: 8, semente, grupos: { quantidade: 4, classificados: 2 } }));
+      t.igual(sortearG(9), sortearG(9), "mesma semente, mesmo calendário");
+      const r = JSON.parse(sortearG(9));
+      const grupoDoJogo = jogadores.find((x) => x.id === r.calendario[0].dupla1[0]).grupo;
+      const deOutro = jogadores.find((j) => j.grupo !== grupoDoJogo);
+      const misturado = Regras.trocarJogadorNoCalendario(r.calendario, 0, 1, 0, deOutro.id);
+      t.verdadeiro(Regras.avaliarCalendario(jogadores, misturado, configGrupos(4, 2)).violacoes.some((v) => v.includes("grupos diferentes")),
+        "troca à mão que põe alguém de outro grupo no jogo: violação");
+      t.verdadeiro(Regras.gerarCalendario(jogadoresFicticios(32), { jogosPorJogador: 6, semanas: 8, semente: 1, grupos: { quantidade: 4, classificados: 2 } }).erro,
+        "com grupos e sem os grupos formados: erro");
+    });
+
+    caso("G6 Classificação por grupo", (t) => {
+      const cfg = configGrupos(2, 2, { jogosPorJogador: 4, semanas: 4 });
+      const jogadores = Regras.formarGruposPorPotes(jogadoresFicticios(16), 2, 1).jogadores;
+      const calendario = Regras.gerarCalendario(jogadores, { jogosPorJogador: 4, semanas: 4, semente: 1, grupos: cfg.grupos }).calendario;
+      const jogos = Regras.calendarioParaJogos(calendario).map((j) => ({ ...j, resultado: placar(1, 0) }));
+      const base = Regras.baseDosJogadores(jogadores);
+      t.verdadeiro(base.every((l) => l.grupo), "a base leva o grupo de cada jogador");
+      const tabelas = Regras.classificacaoDosGrupos(base, jogos, [], cfg);
+      t.igual(tabelas.map((g) => g.grupo), ["A", "B"], "uma tabela por grupo");
+      for (const { grupo, linhas } of tabelas) {
+        t.verdadeiro(linhas.length === 8 && linhas.every((l) => l.grupo === grupo), `Grupo ${grupo}: só os 8 jogadores do grupo`);
+        t.igual(linhas.map((l) => l.posicao), [1, 2, 3, 4, 5, 6, 7, 8], `Grupo ${grupo}: posições de 1 a 8`);
+        t.igual(linhas.reduce((s, l) => s + l.v, 0), 16, `Grupo ${grupo}: 8 jogos com vencedor, 16 vitórias individuais`);
+      }
+      const ate1 = Regras.classificacaoDosGrupos(base, jogos, [], cfg, 1);
+      t.verdadeiro(ate1.every((g) => g.linhas.reduce((s, l) => s + l.jogos, 0) === 4 * calendario.filter((j) => j.semana === 1 && g.linhas.some((l) => l.id === j.dupla1[0])).length),
+        "após a semana 1: só os jogos da semana 1 de cada grupo");
+      const zerado = Regras.classificacaoDosGrupos(base, [], [], cfg);
+      t.verdadeiro(zerado.every((g) => g.linhas.every((l) => !l.empateTecnico)), "sem jogos: nenhum empate técnico sinalizado");
+    });
+
+    caso("G7 Semeadura por campanha: critérios, ordem do organizador e ausentes", (t) => {
+      const cfg = configGrupos(2, 2);
+      const lista = Regras.semeaduraPorCampanha(tabelasG(), cfg);
+      t.igual(lista.map((l) => l.id), ["a1", "b1", "a2", "b2", "a3", "b3", "a4", "b4"], "classificados pela campanha, depois os demais");
+      t.igual(lista.map((l) => l.posicao), [1, 2, 3, 4, 5, 6, 7, 8], "posição = lugar na lista");
+      t.igual(lista.slice(0, 4).map((l) => l.classificado), [true, true, true, true], "os 2 primeiros de cada grupo são os classificados");
+      t.igual([lista[1].posicaoNoGrupo, lista[2].posicaoNoGrupo], [1, 2], "B1 e A2 iguais em tudo: vale a melhor posição no grupo");
+      t.igual(lista[4].empateSemeadura, { grupo: ["a3", "b3"], ordemManual: false }, "A3 e B3 iguais em tudo (até a posição): empate, ordem alfabética provisória");
+      t.igual(lista[6].empateSemeadura, null, "A4 e B4 sem jogos: empate não sinalizado");
+      const manual = Regras.semeaduraPorCampanha(tabelasG(), cfg, [{ jogadores: ["b3", "a3"] }]);
+      t.igual(manual.slice(4, 6).map((l) => l.id), ["b3", "a3"], "ordem do organizador decide o empate");
+      t.igual(manual[4].empateSemeadura.ordemManual, true, "empate com ordem manual");
+      const semA2 = Regras.semeaduraPorCampanha(tabelasG(), cfg, [], ["a2"]);
+      t.igual(semA2.map((l) => l.id), ["a1", "b1", "b2", "a3", "b3", "a4", "b4", "a2"], "A2 ausente: o próximo do grupo A (A3) se classifica e a lista é refeita pela campanha");
+      t.igual([semA2[3].posicaoNoGrupo, semA2[3].classificado, semA2[7].ausente], [2, true, true], "A3 vira o 2º do grupo; o ausente vai para o fim");
+      const tabelasB = tabelasG();
+      tabelasB[0].linhas[0] = { ...tabelasB[0].linhas[0], gp: 5, gc: 0 };
+      tabelasB[1].linhas[0] = { ...tabelasB[1].linhas[0], pontos: 9, v: 3, gp: 6, gc: 1 };
+      t.igual(Regras.semeaduraPorCampanha(tabelasB, cfg).slice(0, 2).map((l) => l.id), ["b1", "a1"], "mesmos pontos, V e saldo: gols pró decide");
+    });
+
+    caso("G8 Mata-mata com grupos: duplas pela semeadura e substituto do mesmo grupo", (t) => {
+      const cfg = configGrupos(2, 2);
+      const lista = Regras.semeaduraPorCampanha(tabelasG(), cfg);
+      const mm = Regras.gerarMataMata(lista, cfg);
+      t.igual([mm.final.dupla1, mm.final.dupla2], [["a1", "b2"], ["b1", "a2"]], "4 vagas: final com 1º + 4º × 2º + 3º da semeadura");
+      t.igual(Regras.proximoSubstituto(mm, lista, cfg, "b1"), "b3", "B1 ausente: entra o próximo do grupo B (B3), não o A3");
+      t.igual(Regras.proximoSubstituto(mm, lista, cfg), "a3", "sem informar o ausente: o próximo da lista geral");
+      const esgotado = { ...mm, substituidos: ["b3", "b4"] };
+      t.igual(Regras.proximoSubstituto(esgotado, lista, cfg, "b1"), "a3", "grupo B sem mais ninguém: o próximo da lista geral");
+      const novo = Regras.substituirJogador(mm, lista, "final", 2, "b1", cfg);
+      t.igual([novo.final.dupla2, novo.substituidos], [["b3", "a2"], ["b1"]], "substituir: B3 entra no lugar de B1, na mesma dupla");
+      const comAusente = Regras.semeaduraPorCampanha(tabelasG(), cfg, [], ["a2"]);
+      const mmAusente = Regras.gerarMataMata(comAusente, cfg, ["a2"]);
+      t.igual([mmAusente.final.dupla1, mmAusente.final.dupla2, mmAusente.ausentes], [["a1", "a3"], ["b1", "b2"], ["a2"]], "ausente antes do chaveamento: semeadura refeita e ausente guardado");
+      const resolvido = Regras.resolverMataMata(mmAusente, comAusente, cfg);
+      t.igual(resolvido.final.dupla1, ["a1", "a3"], "resolver lê a mesma semeadura");
+      t.igual(Regras.avisosParaGerarChaveamento([], lista, cfg), [], "sem empate entre os classificados: sem aviso");
+      const empatados = tabelasG();
+      empatados[1].linhas[1] = { ...empatados[0].linhas[1], id: "b2", nome: "B2", posicao: 2 };
+      empatados[1].linhas[0] = { ...empatados[0].linhas[0], id: "b1", nome: "B1", posicao: 1 };
+      t.verdadeiro(Regras.avisosParaGerarChaveamento([], Regras.semeaduraPorCampanha(empatados, cfg), cfg).some((a) => a.includes("na semeadura da fase final")),
+        "empate entre classificados de grupos diferentes sem ordem: aviso");
+      const semGrupos = Regras.REGRAS_PADRAO;
+      const tabela = Regras.calcularClassificacao(Regras.baseDosJogadores(jogadoresFicticios(10)), [], [], { config: semGrupos });
+      const mmLiga = Regras.gerarMataMata(tabela, semGrupos);
+      t.igual(Regras.proximoSubstituto(mmLiga, tabela, semGrupos, tabela[0].id), tabela[8].id, "liga única: o ausente informado não muda nada (próximo da classificação)");
+    });
+
+    caso("G9 Desempates com grupos: valem os do grupo e os da semeadura", (t) => {
+      const cfg = configGrupos(2, 2);
+      const jogadores = [
+        { id: "x", nome: "X", grupo: "A" }, { id: "y", nome: "Y", grupo: "A" },
+        { id: "w", nome: "W", grupo: "B" }, { id: "z", nome: "Z", grupo: "B" },
+      ];
+      const base = Regras.baseDosJogadores(jogadores);
+      // Grupo A empatado (X, Y), com a ordem do organizador Y antes de X; grupo B empatado, W antes de Z
+      // (alfabética). Semeadura: Y e W empatam como 1ºs; X e Z como 2ºs.
+      const dm = [{ jogadores: ["y", "x"] }, { jogadores: ["w", "x"] }, { jogadores: ["x", "z"] }];
+      t.igual(Regras.podarDesempatesManuais(base, [], dm, cfg), [dm[0], dm[2]],
+        "mantém a ordem do grupo A (Y, X) e a da semeadura entre os 2ºs (X, Z); descarta W e X, que não estão empatados");
+      t.igual(Regras.podarDesempatesManuais(base, [], dm, Regras.REGRAS_PADRAO), [],
+        "liga única: os 4 empatados formam um grupo só e nenhuma dessas ordens vale");
+      const lista = Regras.classificacaoDaFaseFinal(base, [], [dm[0], dm[2]], cfg);
+      t.igual(lista.map((l) => l.id), ["w", "y", "x", "z"], "classificacaoDaFaseFinal monta a semeadura: 1ºs (alfabética), depois 2ºs (ordem do organizador)");
+      t.igual(Regras.classificacaoDaFaseFinal(base, [], [], Regras.REGRAS_PADRAO).map((l) => l.id), ["w", "x", "y", "z"], "liga única: a classificação de sempre");
+    });
+
+    caso("G10 Grupos no estado: salvos, validados, levados por backup, duplicar e modelo", (t) => {
+      const jogadoresG = Regras.formarGruposPorPotes(comEstrelas(classificacaoBase.map((l) => ({ id: l.id, nome: l.nome }))), 4, 1).jogadores;
+      const comGrupos = (d) => {
+        d.campeonato.config = configGrupos(4, 2);
+        d.campeonato.jogadores = jogadoresG;
+      };
+      const arm = memoria({ [Estado.CHAVE]: JSON.stringify(dadosV2(comGrupos)) });
+      const est = Estado.criar(arm);
+      t.igual(est.atual().campeonato.config.grupos, { quantidade: 4, classificados: 2 }, "config.grupos é carregado");
+      t.igual(est.atual().campeonato.jogadores.map((j) => j.grupo), jogadoresG.map((j) => j.grupo), "o grupo de cada jogador é carregado");
+      const texto = est.exportarJSON();
+      est.resetar();
+      t.igual(est.atual().campeonato.config.grupos, null, "resetar volta à liga única");
+      est.importarJSON(texto);
+      t.igual(est.atual().campeonato.jogadores.map((j) => j.grupo), jogadoresG.map((j) => j.grupo), "exportar e importar levam os grupos");
+      const antigo = Estado.criar(memoria2026()).atual();
+      t.igual([antigo.campeonato.config.grupos, antigo.campeonato.jogadores.some((j) => "grupo" in j)], [null, false], "backup antigo, sem grupos: liga única, sem migração");
+      const letraErrada = Estado.validarEstado(dadosV2((d) => { comGrupos(d); d.campeonato.jogadores = jogadoresG.map((j, i) => (i ? j : { ...j, grupo: "Z" })); }));
+      t.verdadeiro(!("grupo" in letraErrada.campeonato.jogadores[0]), "grupo que não existe na config: jogador fica sem grupo (a formar)");
+      const semConfig = Estado.validarEstado(dadosV2((d) => { d.campeonato.jogadores = jogadoresG; }));
+      t.verdadeiro(semConfig.campeonato.jogadores.every((j) => !("grupo" in j)), "liga única: o grupo dos jogadores é descartado");
+      let erro = null;
+      try { Estado.validarEstado(dadosV2((d) => { comGrupos(d); d.campeonato.config.vagasFaseFinal = 12; })); } catch (e) { erro = e; }
+      t.verdadeiro(erro && erro.message.includes("grupos × classificados"), `config de grupos incoerente é recusada (${erro && erro.message})`);
+      const extra = Estado.validarEstado(dadosV2((d) => { comGrupos(d); d.campeonato.config.grupos = { quantidade: 4, classificados: 2, lixo: 1 }; }));
+      t.igual(extra.campeonato.config.grupos, { quantidade: 4, classificados: 2 }, "só os campos conhecidos de config.grupos");
+
+      const armC = memoria({ [Estado.CHAVE]: JSON.stringify(dadosV2(comGrupos)) });
+      const camps = Campeonatos.criar(armC);
+      const a = camps.ativo();
+      const esperado = [{ quantidade: 4, classificados: 2 }, jogadoresG.map((j) => j.grupo)];
+      const copia = edicaoGuardada(armC, camps.duplicar(a));
+      t.igual([copia.campeonato.config.grupos, copia.campeonato.jogadores.map((j) => j.grupo)], esperado, "duplicar leva os grupos");
+      const modelo = JSON.parse(camps.exportarModelo(a));
+      t.igual([modelo.campeonato.config.grupos, modelo.campeonato.jogadores.map((j) => j.grupo)], esperado, "o modelo leva os grupos");
+      const doModelo = edicaoGuardada(armC, camps.criarDeModelo(JSON.stringify(modelo)));
+      t.igual([doModelo.campeonato.config.grupos, doModelo.campeonato.jogadores.map((j) => j.grupo)], esperado, "edição criada do modelo tem os grupos");
+    });
+
     // ---------- Base visual e acessível (Fase 18) ----------
 
     caso("U1 plural: singular só com 1", (t) => {

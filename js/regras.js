@@ -13,6 +13,8 @@
   //   terceiroLugar: disputa de 3º lugar (só existe quando há duas semifinais).
   //   melhorDe: jogos de cada rodada do mata-mata, só o que foge do padrão (jogo único; a final
   //     em melhor de 3). Chaves: "final", "semifinais", "quartas", "oitavas", "rodada1"... e "terceiro".
+  //   grupos: null (liga única) ou { quantidade, classificados } (fase de grupos; aí vagasFaseFinal =
+  //     quantidade × classificados). Ver "Fase de grupos" mais abaixo.
   const REGRAS_PADRAO = Object.freeze({
     pontosVitoria: 3,
     pontosEmpate: 1,
@@ -22,6 +24,7 @@
     melhorDe: Object.freeze({}),
     jogosPorJogador: 6,
     semanas: 8,
+    grupos: null,
   });
   const VAGAS_FASE_FINAL = REGRAS_PADRAO.vagasFaseFinal;
   const MIN_VAGAS_FASE_FINAL = 4;
@@ -52,7 +55,7 @@
       return `vagas na fase final precisa ser um inteiro de ${MIN_VAGAS_FASE_FINAL} a ${MAX_VAGAS_FASE_FINAL}.`;
     }
     if (typeof c.terceiroLugar !== "boolean") return "terceiroLugar precisa ser verdadeiro ou falso.";
-    return erroDeMelhorDe(c.melhorDe);
+    return erroDeMelhorDe(c.melhorDe) || erroDosGrupos(c.grupos, c.vagasFaseFinal);
   }
 
   // Jogos por rodada do mata-mata: { chave: 1 | 3 | 5 }. Erro em português ou null.
@@ -64,9 +67,14 @@
     return null;
   }
 
-  // Base zerada da classificação: um jogador por linha, sem jogos.
+  // Base zerada da classificação: um jogador por linha, sem jogos. Com fase de grupos, a linha leva o
+  // grupo do jogador (só se ele tiver um).
   function baseDosJogadores(jogadores) {
-    return jogadores.map((j) => ({ id: j.id, nome: j.nome, pontos: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0 }));
+    return jogadores.map((j) => {
+      const linha = { id: j.id, nome: j.nome, pontos: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0 };
+      if (j.grupo) linha.grupo = j.grupo;
+      return linha;
+    });
   }
 
   function saldo(linha) {
@@ -222,8 +230,15 @@
 
   // Descarta as ordens manuais cujo grupo não existe mais exatamente igual
   // (ex.: um placar mudou e desfez ou alterou o empate técnico).
+  // Com fase de grupos, valem os empates dentro de cada grupo e os da semeadura (entre grupos).
   function podarDesempatesManuais(base, jogos, desempatesManuais, config = REGRAS_PADRAO) {
-    const grupos = detectarEmpatesTecnicos(aplicarJogos(base, jogos, config));
+    const grupos = usaGrupos(config)
+      ? [
+        ...letrasDosGrupos(config.grupos.quantidade).flatMap((g) =>
+          detectarEmpatesTecnicos(aplicarJogos(base.filter((l) => l.grupo === g), jogos, config))),
+        ...empatesDaSemeadura(candidatosDaSemeadura(classificacaoDosGrupos(base, jogos, desempatesManuais, config), config, [])),
+      ]
+      : detectarEmpatesTecnicos(aplicarJogos(base, jogos, config));
     return desempatesManuais.filter((dm) => grupos.some((g) => mesmoConjunto(g, dm.jogadores)));
   }
 
@@ -371,22 +386,28 @@
 
   // Confere se jogadores × jogos por jogador × semanas formam um calendário possível
   // (cada jogo tem 4 jogadores; no máximo 1 jogo por jogador por semana; sem repetir parceiro).
-  // Retorna { jogadores, totalJogos, jogosPorSemanaMin, jogosPorSemanaMax, problemas: [texto], pronto }.
+  // Retorna { jogadores, totalJogos, jogosPorSemanaMin, jogosPorSemanaMax, grupos, problemas: [texto], pronto }.
+  // Com fase de grupos, a conta é feita grupo a grupo (cada um tem o seu sorteio) e `grupos` traz
+  // [{ grupo, jogadores, totalJogos }]: o tamanho real, ou o esperado enquanto os grupos não foram formados.
   function diagnosticarCampeonato(jogadores, config = REGRAS_PADRAO) {
     const n = jogadores.length;
     const jogos = config.jogosPorJogador;
     const semanas = config.semanas;
-    const vagas = n * jogos;
-    const totalJogos = Math.floor(vagas / 4);
     const problemas = [];
     if (n < config.vagasFaseFinal) problemas.push(`Cadastre pelo menos ${config.vagasFaseFinal} jogadores (hoje: ${n}).`);
-    if (vagas % 4 !== 0) {
-      problemas.push(`${n} jogadores × ${jogos} jogos = ${vagas} vagas, e cada jogo ocupa 4: não fecha. Ajuste os jogadores ou os jogos por jogador.`);
+    let grupos = null;
+    if (usaGrupos(config)) {
+      grupos = diagnosticarGrupos(jogadores, config, problemas);
+    } else {
+      const vagas = n * jogos;
+      if (vagas % 4 !== 0) {
+        problemas.push(`${n} jogadores × ${jogos} jogos = ${vagas} vagas, e cada jogo ocupa 4: não fecha. Ajuste os jogadores ou os jogos por jogador.`);
+      }
     }
     if (jogos > semanas) {
       problemas.push(`Cada jogador joga no máximo uma vez por semana: ${jogos} jogos pedem pelo menos ${jogos} semanas (há ${semanas}).`);
     }
-    if (n > 0 && jogos > n - 1) {
+    if (!grupos && n > 0 && jogos > n - 1) {
       problemas.push(`Sem repetir parceiro, ${n} jogadores permitem no máximo ${n - 1} jogos por jogador.`);
     }
     const semEstrelas = jogadoresSemEstrelas(jogadores);
@@ -394,11 +415,17 @@
       const nomes = semEstrelas.slice(0, 5).map((j) => j.nome).join(", ") + (semEstrelas.length > 5 ? ` e mais ${semEstrelas.length - 5}` : "");
       problemas.push(`Defina as estrelas (nível de ${ESTRELAS_MIN} a ${ESTRELAS_MAX}) de ${semEstrelas.length} ${semEstrelas.length === 1 ? "jogador" : "jogadores"}: ${nomes}.`);
     }
+    // Com grupos, cada semana soma os jogos de cada grupo (as sobras de cada um ficam nas primeiras semanas).
+    const totalJogos = grupos ? grupos.reduce((soma, g) => soma + g.totalJogos, 0) : Math.floor((n * jogos) / 4);
+    const porSemana = grupos && semanas > 0
+      ? grupos.map((g) => jogosPorSemana(g.totalJogos, semanas)).reduce((soma, lista) => soma.map((v, i) => v + lista[i]))
+      : null;
     return {
       jogadores: n,
       totalJogos,
-      jogosPorSemanaMin: Math.floor(totalJogos / semanas),
-      jogosPorSemanaMax: Math.ceil(totalJogos / semanas),
+      jogosPorSemanaMin: porSemana ? Math.min(...porSemana) : Math.floor(totalJogos / semanas),
+      jogosPorSemanaMax: porSemana ? Math.max(...porSemana) : Math.ceil(totalJogos / semanas),
+      grupos,
       problemas,
       pronto: problemas.length === 0,
     };
@@ -413,6 +440,8 @@
   // tentativas pouco melhoradas. Medido com 32 jogadores × 6 jogos × 8 semanas: ~1 s por sorteio.
   const TENTATIVAS_SORTEIO = 8; // calendários completos construídos; fica o melhor
   const TENTATIVAS_SEMANA = 6; // formas de montar cada semana; fica a melhor
+  const TENTATIVAS_ESCOLHA = 5; // escolhas de quem joga na semana, se a primeira não fecha as duplas
+  const MAX_TENTATIVAS_SORTEIO = 60; // se nenhum dos TENTATIVAS_SORTEIO fechou, tenta até aqui
   const MELHORAS_POR_TENTATIVA = 1000;
 
   // Pesos dos critérios desejáveis (docs/REGULAMENTO.md), aplicados ao quadrado de cada desvio:
@@ -559,16 +588,20 @@
       const comJogos = ids.filter((id) => restantes.get(id) > 0);
       const obrigados = comJogos.filter((id) => restantes.get(id) === semanasRestantes); // não podem mais descansar
       if (obrigados.length > vagas || comJogos.length < vagas) return null;
-      // Quem tem mais jogos a cumprir joga primeiro; empate decidido pelo sorteio.
-      const outros = embaralhar(comJogos.filter((id) => restantes.get(id) < semanasRestantes), sorteio)
-        .sort((a, b) => restantes.get(b) - restantes.get(a));
-      const jogam = obrigados.concat(outros.slice(0, vagas - obrigados.length));
 
-      let melhor = null;
-      for (let t = 0; t < TENTATIVAS_SEMANA; t++) {
-        const montada = montarSemana(jogam, parceiros, encontros, sorteio, nivel);
-        if (montada && (!melhor || montada.custo < melhor.custo)) melhor = montada;
-        if (melhor && melhor.custo === 0) break;
+      // Se não der para formar duplas sem repetir parceiro com quem foi escolhido, escolhe de novo quem joga
+      // (acontece em grupos pequenos, em que quase todos os parceiros possíveis são usados).
+      let melhor = null, jogam = null;
+      for (let escolha = 0; escolha < TENTATIVAS_ESCOLHA && !melhor; escolha++) {
+        // Quem tem mais jogos a cumprir joga primeiro; empate decidido pelo sorteio.
+        const outros = embaralhar(comJogos.filter((id) => restantes.get(id) < semanasRestantes), sorteio)
+          .sort((a, b) => restantes.get(b) - restantes.get(a));
+        jogam = obrigados.concat(outros.slice(0, vagas - obrigados.length));
+        for (let t = 0; t < TENTATIVAS_SEMANA; t++) {
+          const montada = montarSemana(jogam, parceiros, encontros, sorteio, nivel);
+          if (montada && (!melhor || montada.custo < melhor.custo)) melhor = montada;
+          if (melhor && melhor.custo === 0) break;
+        }
       }
       if (!melhor) return null;
 
@@ -591,23 +624,38 @@
   }
 
   // Sorteia o calendário inteiro. `semente` (inteiro) torna o resultado reproduzível.
+  // Com `grupos` (config.grupos), cada grupo tem o seu sorteio, só com os próprios jogadores; as semanas são
+  // comuns e, em cada uma, vêm os jogos do Grupo A, depois os do B...
   // Retorna { calendario } ou { erro: texto }.
-  function gerarCalendario(jogadores, { jogosPorJogador, semanas, semente }) {
-    const diagnostico = diagnosticarCampeonato(jogadores, { ...REGRAS_PADRAO, jogosPorJogador, semanas });
+  function gerarCalendario(jogadores, { jogosPorJogador, semanas, semente, grupos = null }) {
+    const vagasFaseFinal = grupos ? grupos.quantidade * grupos.classificados : REGRAS_PADRAO.vagasFaseFinal;
+    const diagnostico = diagnosticarCampeonato(jogadores, { ...REGRAS_PADRAO, jogosPorJogador, semanas, grupos, vagasFaseFinal });
     if (!diagnostico.pronto) return { erro: diagnostico.problemas.join(" ") };
 
-    const ids = jogadores.map((j) => j.id);
     const estrelas = estrelasPorId(jogadores);
-    const tamanhos = jogosPorSemana(diagnostico.totalJogos, semanas);
     const sorteio = criarSorteador(semente);
-    let melhor = null;
-    for (let t = 0; t < TENTATIVAS_SORTEIO; t++) {
-      const tentativa = construirCalendario(ids, jogosPorJogador, tamanhos, sorteio, estrelas);
-      if (tentativa && (!melhor || tentativa.custo < melhor.custo)) melhor = tentativa;
-      if (melhor && melhor.custo === 0) break;
+    const partes = grupos ? jogadoresPorGrupo(jogadores, grupos.quantidade) : [{ grupo: null, ids: jogadores.map((j) => j.id) }];
+    const calendarios = [];
+    for (const { grupo, ids } of partes) {
+      const tamanhos = jogosPorSemana((ids.length * jogosPorJogador) / 4, semanas);
+      let melhor = null;
+      for (let t = 0; t < TENTATIVAS_SORTEIO || (!melhor && t < MAX_TENTATIVAS_SORTEIO); t++) {
+        const tentativa = construirCalendario(ids, jogosPorJogador, tamanhos, sorteio, estrelas);
+        if (tentativa && (!melhor || tentativa.custo < melhor.custo)) melhor = tentativa;
+        if (melhor && melhor.custo === 0) break;
+      }
+      if (!melhor) {
+        const qual = grupo ? `o calendário do Grupo ${grupo}` : "um calendário";
+        return { erro: `Não foi possível montar ${qual} com essas combinações. Tente sortear de novo.` };
+      }
+      calendarios.push(melhor.calendario);
     }
-    if (!melhor) return { erro: "Não foi possível montar um calendário com essas combinações. Tente sortear de novo." };
-    return { calendario: melhor.calendario };
+    if (calendarios.length === 1) return { calendario: calendarios[0] };
+    const calendario = [];
+    for (let semana = 1; semana <= semanas; semana++) {
+      for (const c of calendarios) calendario.push(...c.filter((j) => j.semana === semana));
+    }
+    return { calendario };
   }
 
   // Confere um calendário (rascunho ou jogos confirmados). Violações são as restrições do
@@ -616,8 +664,10 @@
   //           parceirosRepetidos: [{ jogadores: [nomeA, nomeB], vezes }],
   //           adversariosRepetidos: { pares, maxVezes },
   //           jogosPorSemana: [n por semana], violacoes: [texto], pronto }
+  // Com fase de grupos, jogo com jogadores de grupos diferentes também é violação.
   function avaliarCalendario(jogadores, calendario, config = REGRAS_PADRAO) {
     const nome = new Map(jogadores.map((j) => [j.id, j.nome]));
+    const grupoDe = new Map(jogadores.map((j) => [j.id, j.grupo || null]));
     const jogosDe = new Map(jogadores.map((j) => [j.id, 0]));
     const semanasDe = new Map(jogadores.map((j) => [j.id, []]));
     const parceiros = new Map();
@@ -636,6 +686,9 @@
       if (erroDuplas) {
         violacoes.push(`Semana ${jogo.semana}: ${erroDuplas}`);
         continue;
+      }
+      if (usaGrupos(config) && new Set([...jogo.dupla1, ...jogo.dupla2].map((id) => grupoDe.get(id))).size > 1) {
+        violacoes.push(`Semana ${jogo.semana}: o jogo mistura jogadores de grupos diferentes.`);
       }
       for (const id of [...jogo.dupla1, ...jogo.dupla2]) {
         if (!jogosDe.has(id)) {
@@ -737,6 +790,208 @@
       contagem.set(j.semana, n);
       return { id: `s${j.semana}-j${n}`, semana: j.semana, dupla1: j.dupla1.slice(), dupla2: j.dupla2.slice(), resultado: null };
     });
+  }
+
+  // ---------- Fase de grupos ----------
+  // Opcional (docs/REGULAMENTO.md, "Fase de grupos"): config.grupos = { quantidade, classificados }, e cada
+  // jogador tem `grupo` ("A", "B"...). O sorteio e a classificação são por grupo; os primeiros de cada grupo
+  // vão para a fase final, semeados pela campanha numa lista única. Sem config.grupos, nada disso se aplica.
+
+  const MIN_GRUPOS = 2;
+  const MAX_GRUPOS = 8;
+
+  function usaGrupos(config) {
+    return Boolean(config && config.grupos);
+  }
+
+  // ["A", "B", ...] para `quantidade` grupos.
+  function letrasDosGrupos(quantidade) {
+    return Array.from({ length: quantidade }, (_, i) => String.fromCharCode(65 + i));
+  }
+
+  // Erro da configuração dos grupos (texto em português) ou null. null/undefined = liga única.
+  function erroDosGrupos(grupos, vagasFaseFinal) {
+    if (grupos === null || grupos === undefined) return null;
+    if (typeof grupos !== "object" || Array.isArray(grupos)) return "grupos precisa ser um objeto.";
+    const { quantidade, classificados } = grupos;
+    if (!Number.isInteger(quantidade) || quantidade < MIN_GRUPOS || quantidade > MAX_GRUPOS) {
+      return `o número de grupos precisa ser um inteiro de ${MIN_GRUPOS} a ${MAX_GRUPOS}.`;
+    }
+    if (!Number.isInteger(classificados) || classificados < 1) return "classificados por grupo precisa ser um inteiro ≥ 1.";
+    if (quantidade * classificados !== vagasFaseFinal) {
+      return `com grupos, as vagas na fase final são grupos × classificados por grupo (${quantidade} × ${classificados} = ${quantidade * classificados}, não ${vagasFaseFinal}).`;
+    }
+    return null;
+  }
+
+  // Ids dos jogadores de cada grupo: [{ grupo: "A", ids }], na ordem das letras.
+  function jogadoresPorGrupo(jogadores, quantidade) {
+    return letrasDosGrupos(quantidade).map((grupo) => ({ grupo, ids: jogadores.filter((j) => j.grupo === grupo).map((j) => j.id) }));
+  }
+
+  // Confere os grupos para o sorteio (acrescenta os problemas em `problemas`). Enquanto houver jogador sem
+  // grupo, confere os tamanhos que a divisão vai dar (diferença de no máximo 1). Retorna
+  // [{ grupo, jogadores, totalJogos }].
+  function diagnosticarGrupos(jogadores, config, problemas) {
+    const { quantidade, classificados } = config.grupos;
+    const jogos = config.jogosPorJogador;
+    const letras = letrasDosGrupos(quantidade);
+    const semGrupo = jogadores.filter((j) => !letras.includes(j.grupo));
+    let tamanhos;
+    if (semGrupo.length) {
+      if (jogadores.length) {
+        problemas.push(`Forme os grupos: ${semGrupo.length} ${semGrupo.length === 1 ? "jogador está" : "jogadores estão"} sem grupo.`);
+      }
+      const base = Math.floor(jogadores.length / quantidade);
+      tamanhos = letras.map((_, i) => base + (i < jogadores.length % quantidade ? 1 : 0));
+    } else {
+      tamanhos = jogadoresPorGrupo(jogadores, quantidade).map((g) => g.ids.length);
+      const maior = Math.max(...tamanhos), menor = Math.min(...tamanhos);
+      if (maior - menor > 1) {
+        problemas.push(`Os grupos têm de ${menor} a ${maior} jogadores: a diferença entre eles pode ser de no máximo 1.`);
+      }
+    }
+    // Problemas iguais em vários grupos (ex.: todos com 7 jogadores) aparecem uma vez só.
+    const porTamanho = new Map();
+    letras.forEach((g, i) => porTamanho.set(tamanhos[i], [...(porTamanho.get(tamanhos[i]) || []), g]));
+    for (const [n, gs] of porTamanho) {
+      if (!jogadores.length) break;
+      const quais = gs.length === 1 ? `Grupo ${gs[0]}` : `Grupos ${gs.slice(0, -1).join(", ")} e ${gs[gs.length - 1]}`;
+      if ((n * jogos) % 4 !== 0) {
+        problemas.push(`${quais}: ${n} jogadores × ${jogos} jogos = ${n * jogos} vagas, e cada jogo ocupa 4: não fecha. Ajuste os jogadores, os grupos ou os jogos por jogador.`);
+      }
+      if (jogos > n - 1) {
+        problemas.push(`${quais}: sem repetir parceiro, ${n} jogadores permitem no máximo ${Math.max(0, n - 1)} jogos por jogador.`);
+      }
+      if (n < classificados) {
+        problemas.push(`${quais}: ${n} jogadores, menos que os ${classificados} classificados por grupo.`);
+      }
+    }
+    return letras.map((grupo, i) => ({ grupo, jogadores: tamanhos[i], totalJogos: Math.floor((tamanhos[i] * jogos) / 4) }));
+  }
+
+  // Forma os grupos por potes de estrelas: os jogadores, do maior para o menor nível (empates sorteados),
+  // são cortados em potes do tamanho do número de grupos, e cada pote manda um jogador para cada grupo, por
+  // sorteio. O último pote pode ficar incompleto: alguns grupos têm 1 jogador a mais. Usa a semente do
+  // sorteio do calendário. Retorna { jogadores } (mesma ordem, com `grupo`) ou { erro }.
+  function formarGruposPorPotes(jogadores, quantidade, semente) {
+    if (!Number.isInteger(quantidade) || quantidade < MIN_GRUPOS || quantidade > MAX_GRUPOS) {
+      return { erro: `Use de ${MIN_GRUPOS} a ${MAX_GRUPOS} grupos.` };
+    }
+    const semEstrelas = jogadoresSemEstrelas(jogadores);
+    if (semEstrelas.length) return { erro: "Defina as estrelas de todos os jogadores antes de formar os grupos." };
+    const sorteio = criarSorteador(semente);
+    const letras = letrasDosGrupos(quantidade);
+    const ordenados = embaralhar(jogadores, sorteio).sort((a, b) => b.estrelas - a.estrelas);
+    const grupoDe = new Map();
+    for (let i = 0; i < ordenados.length; i += quantidade) {
+      const destinos = embaralhar(letras, sorteio);
+      ordenados.slice(i, i + quantidade).forEach((j, k) => grupoDe.set(j.id, destinos[k]));
+    }
+    return { jogadores: jogadores.map((j) => ({ ...j, grupo: grupoDe.get(j.id) })) };
+  }
+
+  // Ajuste manual: põe o jogador em outro grupo. Com todos já nos grupos, os tamanhos não podem ficar com
+  // diferença maior que 1. Retorna { jogadores } ou { erro }.
+  function moverJogadorDeGrupo(jogadores, id, grupo, quantidade) {
+    if (!jogadores.some((j) => j.id === id)) return { erro: "Jogador não encontrado." };
+    const letras = letrasDosGrupos(quantidade);
+    if (!letras.includes(grupo)) return { erro: "Grupo inválido." };
+    const novos = jogadores.map((j) => (j.id === id ? { ...j, grupo } : j));
+    if (novos.every((j) => letras.includes(j.grupo))) {
+      const tamanhos = jogadoresPorGrupo(novos, quantidade).map((g) => g.ids.length);
+      const maior = Math.max(...tamanhos), menor = Math.min(...tamanhos);
+      if (maior - menor > 1) {
+        return { erro: `Os grupos ficariam com de ${menor} a ${maior} jogadores: a diferença pode ser de no máximo 1. Troque dois jogadores de grupo.` };
+      }
+    }
+    return { jogadores: novos };
+  }
+
+  // Ajuste manual: dois jogadores de grupos diferentes trocam de grupo. Retorna { jogadores } ou { erro }.
+  function trocarJogadoresDeGrupo(jogadores, idA, idB) {
+    const a = jogadores.find((j) => j.id === idA), b = jogadores.find((j) => j.id === idB);
+    if (!a || !b) return { erro: "Jogador não encontrado." };
+    if (!a.grupo || !b.grupo) return { erro: "Os dois jogadores precisam estar em algum grupo." };
+    if (a.grupo === b.grupo) return { erro: "Os dois jogadores já estão no mesmo grupo." };
+    return { jogadores: jogadores.map((j) => (j.id === idA ? { ...j, grupo: b.grupo } : j.id === idB ? { ...j, grupo: a.grupo } : j)) };
+  }
+
+  // Classificação de cada grupo: [{ grupo, linhas }]. Cada grupo usa só os próprios jogos, e o empate técnico
+  // é sinalizado quando começa entre os classificados do grupo. `ate` como em classificacaoPorSemana.
+  function classificacaoDosGrupos(base, jogos, desempatesManuais = [], config = REGRAS_PADRAO, ate = null) {
+    const configDoGrupo = { ...config, vagasFaseFinal: config.grupos.classificados };
+    return letrasDosGrupos(config.grupos.quantidade).map((grupo) => {
+      const baseDoGrupo = base.filter((l) => l.grupo === grupo);
+      const ids = new Set(baseDoGrupo.map((l) => l.id));
+      const jogosDoGrupo = jogos.filter((j) => ids.has(j.dupla1[0]));
+      return { grupo, linhas: classificacaoPorSemana(baseDoGrupo, jogosDoGrupo, desempatesManuais, configDoGrupo, ate) };
+    });
+  }
+
+  // Jogadores para a semeadura, com o grupo, a posição no grupo (contada sem os ausentes) e se está entre os
+  // classificados do grupo. Os ausentes ficam de fora.
+  function candidatosDaSemeadura(tabelas, config, ausentes) {
+    const k = config.grupos.classificados;
+    const candidatos = [];
+    for (const { grupo, linhas } of tabelas) {
+      linhas.filter((l) => !ausentes.includes(l.id)).forEach((l, i) => {
+        candidatos.push({ ...l, grupo, posicaoNoGrupo: i + 1, classificado: i < k });
+      });
+    }
+    return candidatos;
+  }
+
+  // Critérios 1 a 5 da semeadura: os do desempate e a melhor posição no grupo.
+  function chaveDaSemeadura(linha) {
+    return `${chaveCriterios(linha)}|${linha.posicaoNoGrupo}`;
+  }
+
+  // Empates da semeadura: jogadores (sempre de grupos diferentes) iguais nos critérios 1 a 5.
+  function empatesDaSemeadura(candidatos) {
+    const grupos = new Map();
+    for (const l of candidatos) grupos.set(chaveDaSemeadura(l), [...(grupos.get(chaveDaSemeadura(l)) || []), l.id]);
+    return [...grupos.values()].filter((ids) => ids.length > 1);
+  }
+
+  // Ordena pela campanha: pontos, V, saldo, gols pró, melhor posição no grupo e, empatados em tudo, a ordem
+  // do organizador (sem ela, a alfabética, provisória). O empate é sinalizado (empateSemeadura) quando
+  // alguém do grupo já jogou.
+  function ordenarPelaCampanha(lista, desempatesManuais) {
+    const linhas = lista.slice().sort((a, b) =>
+      compararCriterios(a, b) || a.posicaoNoGrupo - b.posicaoNoGrupo || a.nome.localeCompare(b.nome, "pt-BR"));
+    for (const grupo of empatesDaSemeadura(linhas)) {
+      const manual = desempatesManuais.find((dm) => mesmoConjunto(dm.jogadores, grupo));
+      const ordem = manual ? manual.jogadores : grupo;
+      const inicio = linhas.findIndex((l) => l.id === grupo[0]);
+      const trecho = ordem.map((id) => linhas.find((l) => l.id === id));
+      const relevante = trecho.some((l) => l.v + l.e + l.d > 0);
+      const info = { grupo: ordem.slice(), ordemManual: Boolean(manual) };
+      linhas.splice(inicio, trecho.length, ...trecho.map((l) => (relevante ? { ...l, empateSemeadura: info } : l)));
+    }
+    return linhas;
+  }
+
+  // Lista da fase final com grupos: os classificados de todos os grupos, ordenados pela campanha (é a ordem
+  // que forma as duplas: 1º + último...), depois os demais na mesma ordem (de onde saem os substitutos) e, por
+  // último, os ausentes. Cada linha leva grupo, posicaoNoGrupo, classificado, ausente e empateSemeadura;
+  // `posicao` é a posição na lista.
+  function semeaduraPorCampanha(tabelas, config, desempatesManuais = [], ausentes = []) {
+    const candidatos = candidatosDaSemeadura(tabelas, config, ausentes);
+    const fora = tabelas.flatMap(({ grupo, linhas }) => linhas.filter((l) => ausentes.includes(l.id))
+      .map((l) => ({ ...l, grupo, posicaoNoGrupo: null, classificado: false, ausente: true })));
+    return [
+      ...ordenarPelaCampanha(candidatos.filter((l) => l.classificado), desempatesManuais),
+      ...ordenarPelaCampanha(candidatos.filter((l) => !l.classificado), desempatesManuais),
+      ...fora,
+    ].map((l, i) => ({ ausente: false, empateSemeadura: null, ...l, posicao: i + 1 }));
+  }
+
+  // A lista que o mata-mata usa (gerar, resolver, substituir): na liga única, a classificação; com grupos, a
+  // semeadura pela campanha, já sem os `ausentes` marcados antes do chaveamento.
+  function classificacaoDaFaseFinal(base, jogos, desempatesManuais = [], config = REGRAS_PADRAO, ausentes = []) {
+    if (!usaGrupos(config)) return classificacaoPorSemana(base, jogos, desempatesManuais, config);
+    return semeaduraPorCampanha(classificacaoDosGrupos(base, jogos, desempatesManuais, config), config, desempatesManuais, ausentes);
   }
 
   // ---------- Mata-mata ----------
@@ -887,12 +1142,17 @@
     const nome = (id) => classificacao.find((l) => l.id === id).nome;
     const vistos = new Set();
     for (const linha of semAusentes(classificacao, ausentes).slice(0, config.vagasFaseFinal)) {
-      const empate = linha.empateTecnico;
-      if (!empate || empate.ordemManual) continue;
-      const chave = empate.grupo.join("|");
-      if (vistos.has(chave)) continue;
-      vistos.add(chave);
-      avisos.push(`Empate técnico sem ordem manual no top ${config.vagasFaseFinal}: ${empate.grupo.map(nome).join(", ")}.`);
+      // Com grupos: o empate dentro do grupo e o da semeadura (entre grupos).
+      for (const [empate, onde] of [
+        [linha.empateTecnico, linha.grupo ? `no Grupo ${linha.grupo}` : `no top ${config.vagasFaseFinal}`],
+        [linha.empateSemeadura, "na semeadura da fase final"],
+      ]) {
+        if (!empate || empate.ordemManual) continue;
+        const chave = empate.grupo.join("|");
+        if (vistos.has(chave)) continue;
+        vistos.add(chave);
+        avisos.push(`Empate técnico sem ordem manual ${onde}: ${empate.grupo.map(nome).join(", ")}.`);
+      }
     }
     return avisos;
   }
@@ -1153,7 +1413,9 @@
 
   // O próximo da classificação que pode entrar no lugar de um ausente: fora do chaveamento, não marcado
   // como ausente antes de gerar e nunca antes substituído. Null se a classificação acabou.
-  function proximoSubstituto(mataMata, classificacao, config = REGRAS_PADRAO) {
+  // Com grupos e o ausente informado (`jogadorId`), vem primeiro o próximo do mesmo grupo; se o grupo não
+  // tiver mais ninguém, o próximo da lista geral (a semeadura).
+  function proximoSubstituto(mataMata, classificacao, config = REGRAS_PADRAO, jogadorId = null) {
     const ocupados = new Set([...(mataMata.ausentes || []), ...(mataMata.substituidos || [])]);
     const resolvido = resolverMataMata(mataMata, classificacao, config);
     for (const chave of resolvido.chaves) {
@@ -1162,7 +1424,9 @@
         for (const id of dupla || []) ocupados.add(id);
       }
     }
-    const proximo = classificacao.find((l) => !ocupados.has(l.id));
+    const ausente = usaGrupos(config) && jogadorId ? classificacao.find((l) => l.id === jogadorId) : null;
+    const doGrupo = ausente && ausente.grupo ? classificacao.find((l) => l.grupo === ausente.grupo && !ocupados.has(l.id)) : null;
+    const proximo = doGrupo || classificacao.find((l) => !ocupados.has(l.id));
     return proximo ? proximo.id : null;
   }
 
@@ -1176,7 +1440,7 @@
     if (c.serie.vencedor) return `${rotulo} já está decidido: não dá para substituir um jogador dele.`;
     const dupla = c[`dupla${lado}`];
     if (!dupla || !dupla.includes(jogadorId)) return "O jogador não está nessa dupla.";
-    if (proximoSubstituto(mataMata, classificacao, config) === null) {
+    if (proximoSubstituto(mataMata, classificacao, config, jogadorId) === null) {
       return "Não há mais jogadores na classificação para entrar no lugar do ausente.";
     }
     return null;
@@ -1187,7 +1451,7 @@
   function substituirJogador(mataMata, classificacao, chave, lado, jogadorId, config = REGRAS_PADRAO) {
     const erro = erroDeSubstituicao(mataMata, classificacao, chave, lado, jogadorId, config);
     if (erro) throw new Error(erro);
-    const entra = proximoSubstituto(mataMata, classificacao, config);
+    const entra = proximoSubstituto(mataMata, classificacao, config, jogadorId);
     const dupla = resolverMataMata(mataMata, classificacao, config)[chave][`dupla${lado}`];
     const novo = definirDupla(mataMata, chave, lado, dupla.map((id) => (id === jogadorId ? entra : id)));
     novo.substituidos = [...(mataMata.substituidos || []), jogadorId];
@@ -1466,7 +1730,7 @@
     const config = estado.campeonato.config;
     if (estado.mataMata) {
       const base = baseDosJogadores(estado.campeonato.jogadores);
-      const tabela = classificacaoPorSemana(base, estado.jogos, estado.desempatesManuais, config);
+      const tabela = classificacaoDaFaseFinal(base, estado.jogos, estado.desempatesManuais, config, estado.mataMata.ausentes || []);
       const campeoes = resolverMataMata(estado.mataMata, tabela, config).podio.campeoes;
       return campeoes ? { etapa: "campeoes", texto: "🏆 campeões" } : { etapa: "fase-final", texto: "fase final" };
     }
@@ -1706,6 +1970,17 @@
     custoDoCalendario,
     cadastroTravado,
     diagnosticarCampeonato,
+    MIN_GRUPOS,
+    MAX_GRUPOS,
+    usaGrupos,
+    letrasDosGrupos,
+    jogadoresPorGrupo,
+    formarGruposPorPotes,
+    moverJogadorDeGrupo,
+    trocarJogadoresDeGrupo,
+    classificacaoDosGrupos,
+    semeaduraPorCampanha,
+    classificacaoDaFaseFinal,
     semanaDoJogo,
     numerosNaSemana,
     jogoRemarcado,

@@ -6,7 +6,7 @@ Regras que o app implementa. Só vale o que está aqui.
 
 - Jogos em **duplas**; a classificação é **individual**. Cada jogador recebe o resultado da partida da sua dupla (V/E/D, gols pró e gols contra).
 - Fase de classificação: cada inscrito joga 6 jogos, com duplas pré-definidas pelo calendário.
-- Os **N primeiros** vão para a fase final. O padrão é **8**; o organizador pode configurar de 4 a 99 classificados (ver "Fase final").
+- Os **N primeiros** vão para a fase final. O padrão é **8**; o organizador pode configurar de 4 a 99 classificados (ver "Fase final"). Com fase de grupos, classificam-se os primeiros de cada grupo (ver "Fase de grupos").
 
 ## Sorteio do calendário (campeonatos conduzidos pelo app)
 
@@ -26,6 +26,19 @@ Regras que o app implementa. Só vale o que está aqui.
 - O sorteio usa uma **semente** (guardada no backup): a mesma semente gera o mesmo calendário. O organizador pode sortear de novo e trocar jogadores à mão antes de **confirmar**; depois de confirmado, só dá para renomear jogadores.
 - **Remarcação:** as duas duplas podem combinar de **adiar ou adiantar** um jogo para outra semana do campeonato (de 1 até a última). O organizador remarca no app; o jogo mantém seu resultado e conta na semana nova. Só jogo **sem resultado** pode ser remarcado. O limite de 1 jogo por jogador por semana vale para o sorteio: ao remarcar, o app **avisa** se algum jogador já joga na semana escolhida, mas não impede. Não há semana extra além da última.
 - Quem não comparece leva W.O.; o W.O. das duas duplas (ou outro caso em que o jogo não vale) é **anulado**: sem pontos, V/E/D nem gols para ninguém.
+
+## Fase de grupos (opcional)
+
+> Regras decididas pelo organizador para os campeonatos conduzidos pelo app; o regulamento original só prevê liga única. Sem grupos, vale tudo o que está acima, sem mudança.
+
+- **Grupos:** o organizador escolhe de **2 a 8 grupos** (A, B, C...). Os tamanhos podem diferir em **no máximo 1 jogador**. Cada grupo precisa fechar a conta sozinho: jogadores do grupo × jogos por jogador **divisível por 4**, e pelo menos **jogos por jogador + 1** jogadores no grupo (para ninguém repetir parceiro). No padrão de 6 jogos, o menor grupo possível tem 8 jogadores. Se a conta não fecha, o sorteio não é liberado.
+- **Formação por potes:** os jogadores são ordenados por estrelas (do maior para o menor) e divididos em potes do tamanho do número de grupos (com 4 grupos, o pote 1 tem os 4 de mais estrelas). Cada pote manda **um jogador para cada grupo**, por sorteio; empates de estrelas na divisa entre potes também são sorteados. O último pote pode ficar incompleto: por isso alguns grupos têm 1 jogador a mais. A formação usa a mesma semente do sorteio do calendário.
+- **Ajuste manual:** antes de confirmar o calendário, o organizador pode mover um jogador para outro grupo ou trocar dois jogadores de grupo, desde que os tamanhos continuem válidos. Mudar os grupos descarta o rascunho do calendário. Depois de confirmado, os grupos não mudam.
+- **Sorteio do calendário:** feito **dentro de cada grupo**, com as mesmas restrições obrigatórias e desejáveis da liga única (parceiros e adversários só do próprio grupo). As semanas são comuns a todos os grupos, e continua valendo no máximo 1 jogo por jogador por semana. Em grupos pequenos, repetir adversário é esperado.
+- **Classificação:** cada grupo tem a sua, com a mesma pontuação e os mesmos critérios de desempate (inclusive a ordem manual em empate técnico, dentro do grupo).
+- **Classificados:** o organizador escolhe quantos se classificam **por grupo** (o mesmo número em todos, sem melhores terceiros). O total de classificados é grupos × classificados por grupo e precisa ficar entre 4 e 99.
+- **Semeadura por campanha:** os classificados de todos os grupos formam uma lista única, ordenada por: 1) pontos; 2) vitórias; 3) saldo de gols; 4) gols pró; 5) melhor posição no grupo; 6) ordem definida pelo organizador. Dois jogadores do mesmo grupo mantêm sempre a ordem do grupo. A partir dessa lista, a fase final segue as regras de "Fase final" (1º + último, 2º + penúltimo...). Jogadores do mesmo grupo podem formar dupla ou se enfrentar; o organizador pode reorganizar o chaveamento pelas regras de sempre.
+- **Ausência:** antes do chaveamento, o ausente é substituído pelo próximo do **mesmo grupo**, e a lista da semeadura é refeita com ele, pela campanha. Durante a fase final, a substituição também chama o próximo do mesmo grupo que ainda não esteja no chaveamento; se o grupo não tiver mais ninguém, chama o próximo da lista geral (mesma ordem da semeadura) entre os não classificados. O W.O. da dupla funciona como em "Ausência na fase final".
 
 ## Pontuação (fase de classificação)
 

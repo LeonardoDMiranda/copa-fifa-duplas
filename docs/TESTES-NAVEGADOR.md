@@ -378,6 +378,18 @@ Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
 
 ## Última execução
 
+**Fase 28 (regras da fase de grupos), 2026-10-26**, Playwright (Chromium) por um servidor local temporário,
+antes do commit da fase. Fase só de regras puras e estado: nada mudou na tela.
+
+- `testes.html`: 134 passaram, 0 falharam (G1 a G10 novos). `testes-telas.html`: 71 passaram, 0 falharam (sem casos novos).
+- **Medido no navegador:** sorteio com grupos de 8 jogadores × 6 jogos × 8 semanas, 10 sementes por tamanho: 0 falhas
+  em 16 jogadores/2 grupos, 24/3 e 32/4; 32 em 4 grupos leva cerca de 1,2 s (pior caso 1,4 s), o mesmo que a liga única.
+  Antes do ajuste do sorteio (escolher de novo quem joga quando a semana não fecha, e mais tentativas quando nenhuma
+  fecha), falhavam 12 de 20 sorteios com 2 grupos de 8 e 18 de 20 com 3 grupos de 8.
+- **Ainda não há o que conferir à mão:** as telas com grupos chegam nas Fases 29 a 31.
+
+---
+
 **Fase 27 (janela de escolha das telas do telão), 2026-10-19**, Playwright (Chromium) por um servidor local
 temporário, antes do commit da fase. Massa: 16 jogadores fictícios, 15 de 24 jogos lançados, semana 6.
 

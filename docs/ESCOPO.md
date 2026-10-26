@@ -97,6 +97,8 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
   - adversário repetido = 12;
   - saldo = 1 por unidade ao quadrado.
 
+  Se as duplas de uma semana não fecham sem repetir parceiro, o sorteio escolhe de novo quem joga nela (até 5 vezes); se nenhuma das 8 tentativas de calendário fecha, continua tentando até 60. Isso só pesa nos grupos pequenos (Fase 28), em que quase todos os parceiros possíveis são usados.
+
   Prioridade (regulamento): o equilíbrio vem antes de evitar adversário repetido. Por isso um jogo fora do aceitável (132 com d = 2) custa mais que repetir um adversário, inclusive num 3º encontro (48). Entre um jogo com Δ 1 (8) e um adversário repetido (12), o sorteio fica com o Δ 1.
 
   Medido em 40 sorteios de 32 jogadores × 6 jogos × 8 semanas (grupo misto e grupo forte):
@@ -143,6 +145,18 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
 - O logo (PNG, JPG ou WebP) é reduzido para caber em 256×128 e guardado na edição como data URL (até ~80 mil caracteres). SVG não é aceito.
 - Como o registro do backup, a aparência fica **fora do desfazer** (o logo repetido em cada passo do histórico ocuparia espaço demais), mas é do campeonato: vai no backup, resetar volta ao padrão, importar traz a do arquivo, e desfazer o resetar ou o importar devolve a anterior.
 
+### 2.9 Fase de grupos (opcional)
+
+Regras em `docs/REGULAMENTO.md` ("Fase de grupos"). Sem `config.grupos` (o padrão), tudo é como na liga única. Fase 28: regras puras e estado; as telas vêm nas Fases 29 a 31.
+
+- **Config:** `config.grupos = { quantidade: 2..8, classificados: ≥1 }`, e `vagasFaseFinal` precisa ser `quantidade × classificados` (`Regras.validarConfig`). Cada jogador ganha `grupo` ("A", "B"...).
+- **Formação** (`Regras.formarGruposPorPotes(jogadores, quantidade, semente)`): ordena por estrelas (empates sorteados), corta em potes do tamanho do número de grupos e cada pote manda um para cada grupo, por sorteio. Exige estrelas de todos. Ajuste manual: `moverJogadorDeGrupo` (só se os tamanhos continuarem com diferença ≤ 1, quando todos já têm grupo) e `trocarJogadoresDeGrupo`.
+- **Diagnóstico:** a conta "jogadores × jogos ÷ 4" e o limite de parceiros são feitos grupo a grupo (enquanto há jogador sem grupo, com os tamanhos que a divisão vai dar); também avisa grupo menor que os classificados e tamanhos com diferença maior que 1. `diagnostico.grupos` traz `[{ grupo, jogadores, totalJogos }]`.
+- **Sorteio** (`gerarCalendario(..., { grupos })`): um sorteio por grupo, com a mesma semente em sequência; as semanas são comuns e, em cada uma, vêm os jogos do Grupo A, depois os do B... `avaliarCalendario` acusa jogo que mistura grupos.
+- **Classificação** (`classificacaoDosGrupos`): uma tabela por grupo, só com os jogos do grupo; o empate técnico é sinalizado quando começa entre os classificados do grupo.
+- **Semeadura** (`semeaduraPorCampanha`, `classificacaoDaFaseFinal`): lista única com os classificados pela campanha (pontos, V, saldo, gols pró, melhor posição no grupo e ordem do organizador), depois os demais na mesma ordem e, no fim, os ausentes. É essa lista que vai para `gerarMataMata` e `resolverMataMata`. Os empates da semeadura usam o mesmo `desempatesManuais` (o conjunto de jogadores diz qual empate é); `podarDesempatesManuais` mantém os do grupo e os da semeadura.
+- **Ausência:** antes do chaveamento, `classificacaoDaFaseFinal(..., ausentes)` tira o ausente do grupo e refaz a semeadura. Durante, `proximoSubstituto(..., jogadorId)` chama o próximo do mesmo grupo e, se não houver, o próximo da lista geral.
+
 ## 3. Modelo de dados (estado salvo no `localStorage`)
 
 ```js
@@ -154,8 +168,9 @@ Regras em `docs/REGULAMENTO.md` ("Sorteio do calendário"). Resumo:
   versao: 2,
   campeonato: {
     nome: "Copa FIFA em Duplas",
-    config: { pontosVitoria, pontosEmpate, pontosEmpateSemGols, vagasFaseFinal, terceiroLugar, melhorDe: { <rodada>: 1|3|5 }, jogosPorJogador, semanas },
-    jogadores: [ { id, nome, estrelas: 1..5 | null } ],   // null = nível ainda não definido
+    config: { pontosVitoria, pontosEmpate, pontosEmpateSemGols, vagasFaseFinal, terceiroLugar, melhorDe: { <rodada>: 1|3|5 }, jogosPorJogador, semanas,
+              grupos: null | { quantidade, classificados } },   // grupos: Fase 28; null = liga única (backups antigos)
+    jogadores: [ { id, nome, estrelas: 1..5 | null, grupo? } ],   // null = nível ainda não definido; grupo: "A".."H", só com config.grupos
     sorteio: null | { semente, confirmado, rascunho?: [ { semana, dupla1, dupla2 } ] }
   },
   jogos: [ { id, semana, semanaOriginal?, dupla1: [id, id], dupla2: [id, id],   // semanaOriginal: só se remarcado
@@ -230,6 +245,7 @@ O app foi feito em fases pequenas, cada uma com testes em `testes.html`:
 | 25 | Chaveamento reorganizável: trocar de lugar duas duplas de confrontos da mesma rodada (sem placar lançado), com os vencedores avançando pelo que ficou, e voltar ao lugar de origem trocando de novo |
 | 26 | Jogador ausente no mata-mata: marcar ausentes na prévia (o próximo da classificação entra na mesma posição) e, no confronto, botão "Ausência" para substituir o jogador ou dar W.O. à dupla (a adversária avança sem placar, "W.O." na tela, no PNG, no telão e na ficha). Campos opcionais `ausentes`, `substituidos` e `wo`: backups antigos valem sem migração |
 | 27 | Janela de escolha das telas do Modo telão (Classificação, Jogos da semana e Mata-mata), tempo de 10, 15 ou 30 s por tela e escolha lembrada por aparelho (fora do estado e do backup). `Util.escolher` passou a aceitar um corpo em DOM |
+| 28 | Regras da fase de grupos, ainda sem tela: `config.grupos` e `jogador.grupo` opcionais, formação por potes de estrelas e ajuste manual, diagnóstico e sorteio por grupo, classificação por grupo, semeadura por campanha (inclusive ausentes e substituto do mesmo grupo) e desempates da semeadura. O sorteio passou a escolher de novo quem joga quando uma semana não fecha (necessário nos grupos pequenos) |
 
 A numeração segue o plano de melhorias do organizador, não a ordem de entrega: por isso a 15 vem antes da 13 e da 14.
 
@@ -254,6 +270,7 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 | E | Várias edições: migração, índice corrompido, criar/duplicar/arquivar/excluir, trocar a ativa, importar como novo ou substituindo |
 | A | Aparência (contraste, validação, fora do desfazer, backup/reset/importar), modelo de campeonato, duplicar com aparência, cor no PNG e no telão |
 | L | Nível: validação das estrelas, sorteio bloqueado sem elas, diferença posição a posição e limite do aceitável, qualidade e tempo do sorteio equilibrado, estrelas no estado/duplicar/modelo |
+| G | Fase de grupos: config, formação por potes, mover/trocar de grupo, diagnóstico por grupo, sorteio por grupo (sem misturar grupos, reproduzível, tempo), classificação por grupo, semeadura (critérios, ordem do organizador, ausentes), mata-mata com a semeadura e substituto do mesmo grupo, desempates mantidos e grupos no estado/backup/duplicar/modelo |
 | U | Base da interface: `plural`, `numero` (formato brasileiro), `rotuloDoJogo`, `botaoIcone` (nome acessível), ícones decorativos e atributos do erro junto do campo |
 
 `testes-telas.html` desenha cada tela sozinha, com um app falso: V1 (app vazio), V2 (fixture), V3 (lançar pela tela e descrição do desfazer), V4 (acessibilidade de todas as telas: nome dos botões, rótulo dos campos, sem emoji, sem "(es)", sem id de jogo), V5 (erro junto do campo) V6 (tela de Campeonatos com cartões: destaque da aberta, ações do menu ⋯ e fechamento do menu), V7 (abas por fase, endereços antigos e Ajustes) e V8 (navegação por semana, W.O. com nomes, título dos cartões, coluna Situação igual às regras, "Baixar imagem" e rótulos do mata-mata), V9 (ficha do jogador: números iguais aos da tabela, um jogo por linha do calendário, Esc/X/clique fora com o foco de volta ao nome, troca para o parceiro, fase final do campeão, ir para a semana e ficha aberta atualizando), V10 (remarcação: botão só em jogo sem resultado, semana atual desabilitada, remarcar e desfazer, aviso de conflito, marca nos Ajustes e na ficha com o calendário sorteado ainda avaliado como respeitado), V11 (fase final: campos da Configuração e trava com o chaveamento gerado, mata-mata com 12, 17 classificados, sem 3º lugar e com jogos por rodada), V12 (trocar duplas de lugar: escolha em duas etapas, só a mesma rodada, confronto com placar bloqueado com explicação, cancelar e trocar de novo desfaz) e V13 (ausência: marcar ausente na prévia e gerar, substituir pelo painel, W.O. e desfazer, W.O. bloqueado com placar e ficha com vitória/derrota por W.O.) e V14 (janela do telão: telas com motivo, tempo, foco, acessibilidade, bloqueio sem tela marcada, última escolha lembrada, nova janela e Esc).
@@ -263,6 +280,6 @@ Abrir no navegador: a página roda todos os casos e mostra quantos passaram. Os 
 - Revisar a regra do sorteio quando o regulamento do próximo campeonato sair.
 - Emparelhamento com folgas (número de duplas que não é potência de 2): as duplas que folgam entram na rodada seguinte na frente dos vencedores e as vizinhas se enfrentam; isso foi decidido na Fase 24 sem regra do regulamento original. Revisar se o organizador preferir que as duplas que folgam enfrentem os vencedores (e não se enfrentem entre si).
 - Confronto direto entre jogadores num campeonato em duplas continua sendo decisão manual do organizador.
-- Fase de grupos + mata-mata (planejada em 2026-10-19, fases 28 a 31, ainda não feita). Decisões do organizador: mesmo número de classificados por grupo (sem melhores terceiros); grupos formados por potes de estrelas com ajuste manual; mata-mata semeado por campanha (lista única dos classificados, mantendo 1º+último, 2º+penúltimo). Campos novos sempre opcionais (`config.grupos`, `jogador.grupo`), então a liga única e os backups antigos seguem valendo. A regra de semeadura precisa ir para `docs/REGULAMENTO.md` antes do código.
+- Fase de grupos + mata-mata (planejada em 2026-10-19, fases 28 a 31). Regras no `docs/REGULAMENTO.md` ("Fase de grupos") desde 2026-10-26; a Fase 28 (regras puras e estado, ver 2.9) está feita. Faltam: 29 (preparação na tela: Configuração, Jogadores com grupo, potes e ajuste manual, Sorteio por grupo), 30 (Rodadas e Classificação por grupo, Situação com as vagas do grupo, ficha) e 31 (mata-mata semeado na tela, ausentes, PNG, telão).
 - Revisar o código existente: ler com atenção a lógica mais recente (mata-mata com folgas, troca de duplas de lugar e remarcação de jogos). Os testes automáticos (`testes.html` e `testes-telas.html`) já foram rodados e passam.
 - Fase 26 (ausência no mata-mata): faltam conferir à mão o backup exportado e importado com ausentes (7.19) e o Lighthouse nas telas novas. O resto dos casos 7.18 a 7.24 de `docs/TESTES-NAVEGADOR.md` já foi conferido com a janela de confirmação de verdade.
