@@ -416,7 +416,10 @@ temporário, antes do commit da fase. Massa: a edição de teste das Fases 29 e 
   janela de confirmação de verdade ("Gerar mesmo assim"), 20.4 (PNG desenhado na página: 1080 × 1574, quatro grupos)
   e 20.5 (Classificação do telão com os 4 grupos cabendo em 1920 × 900).
 - **Cobertos só pelos testes automáticos:** 20.2, 20.3 e os jogos e o mata-mata do telão.
-- **Ainda não conferidos à mão:** 20.6 e Lighthouse nas telas com grupos.
+- **Conferido depois do commit da fase:**
+  - 20.6: exportar a edição com grupos e importar como edição nova deu grupos, formato, jogos, desempates, semeadura e chaveamento iguais.
+  - Backup no formato de antes das Fases 28 a 31 (sem `config.grupos` nem `grupo`) abre como liga única: uma tabela com 32 jogadores, top 8 em verde, nenhuma menção a grupo.
+  - Lighthouse (Chrome DevTools, modo snapshot, desktop), acessibilidade 100 em Configuração, Jogadores e Sorteio com grupos, e em Rodadas, Classificação e Mata-mata com a temporada em andamento. A única falha é de SEO (sem meta description), que não importa para um app local.
 
 ---
 
