@@ -74,10 +74,11 @@
 
     // `elementoOrigem`: o nome clicado. Com a ficha já aberta (clique no parceiro), só troca o jogador.
     function abrir(id, elementoOrigem = null) {
-      if (!nomePorId.has(id)) return;
+      const tabela = app.tabelaAtual();
+      if (!nomePorId.has(id) || !tabela.some((l) => l.id === id)) return;
       if (!dialogo.open) origem = elementoOrigem;
       jogadorId = id;
-      desenhar(app.estado.atual(), app.tabelaAtual());
+      desenhar(app.estado.atual(), tabela);
       if (!dialogo.open) dialogo.showModal();
       titulo.focus();
       dialogo.scrollTop = 0;
@@ -95,10 +96,13 @@
 
     // ---------- partes da ficha ----------
 
+    // Com fase de grupos, a posição é no grupo do jogador (a da semeadura é outra coisa).
     function numeros(linha, jogosNoCalendario) {
       const item = (rotulo, id, valor) => el("div", {}, el("dt", {}, rotulo), el("dd", { id }, valor));
       return el("dl", { class: "ficha-numeros" },
-        item("Posição", "ficha-posicao", `${linha.posicao}º`),
+        linha.grupo
+          ? item("Posição", "ficha-posicao", `${linha.posicaoNoGrupo}º no Grupo ${linha.grupo}`)
+          : item("Posição", "ficha-posicao", `${linha.posicao}º`),
         item("Pontos", "ficha-pontos", String(linha.pontos)),
         item("Saldo", "ficha-saldo", formatarSaldo(linha.sg)),
         item("V / E / D", "ficha-ved", `${linha.v} / ${linha.e} / ${linha.d}`),
@@ -106,26 +110,33 @@
     }
 
     function subtitulo(linha) {
-      const vagas = app.estado.atual().campeonato.config.vagasFaseFinal;
+      const cfg = app.estado.atual().campeonato.config;
       const empate = linha.empateTecnico;
       const outros = empate && empate.grupo.filter((id) => id !== linha.id).map((id) => nomePorId.get(id));
+      const onde = linha.grupo
+        ? `${linha.classificado ? "entre os" : "fora dos"} ${cfg.grupos.classificados} classificados do Grupo ${linha.grupo}`
+        : `${linha.posicao <= cfg.vagasFaseFinal ? "dentro" : "fora"} do top ${cfg.vagasFaseFinal}`;
       return el("p", { class: "legenda", id: "ficha-subtitulo" },
-        `Classificação ao vivo: ${linha.posicao <= vagas ? "dentro" : "fora"} do top ${vagas}.`,
+        `Classificação ao vivo: ${onde}.`,
         empate && ` Empate técnico com ${outros.join(", ")}.`);
     }
 
-    function situacao(atual) {
+    // Com fase de grupos, a situação é para as vagas do grupo do jogador, e o limite de pendentes conta só os jogos dele.
+    function situacao(atual, linha) {
+      const cfg = atual.campeonato.config;
       const situacoes = atual.jogos.length ? Util.situacoes(app.base(), atual) : null;
       const s = situacoes && situacoes.find((x) => x.id === jogadorId);
       let conteudo;
       if (s) {
         conteudo = el("div", { id: "ficha-situacao", class: `ficha-situacao ${s.situacao}` }, Util.marcaSituacao(s, atual.jogos));
       } else {
-        const pendentes = atual.jogos.filter((j) => !j.resultado).length;
+        const doGrupo = linha.grupo && atual.jogos.length ? Util.situacoesDosGrupos(app.base(), atual).find((g) => g.grupo === linha.grupo) : null;
+        const pendentes = doGrupo ? doGrupo.pendentes : atual.jogos.filter((j) => !j.resultado).length;
         conteudo = el("p", { id: "ficha-situacao", class: "legenda" },
-          `Disponível quando faltarem até ${Regras.limitePendentesSituacoes(atual.campeonato.config)} jogos (faltam ${pendentes}).`);
+          `Disponível quando faltarem até ${Regras.limitePendentesSituacoes(cfg)} jogos${doGrupo ? " do grupo" : ""} (faltam ${pendentes}).`);
       }
-      return el("section", { class: "ficha-secao" }, el("h3", {}, `Situação para o top ${atual.campeonato.config.vagasFaseFinal}`), conteudo);
+      const titulo = linha.grupo ? `Situação no Grupo ${linha.grupo} (${cfg.grupos.classificados} vagas)` : `Situação para o top ${cfg.vagasFaseFinal}`;
+      return el("section", { class: "ficha-secao" }, el("h3", {}, titulo), conteudo);
     }
 
     // "com Parceiro × Adversário + Adversário", com os nomes que trocam a ficha. `outra` pode faltar
@@ -187,13 +198,15 @@
 
     function desenhar(atual, tabela) {
       const linha = tabela.find((l) => l.id === jogadorId);
+      // Com grupos, quem está sem grupo não entra na tabela (só acontece antes de formar os grupos).
+      if (!linha) { fechar(); return; }
       const jogosDele = atual.jogos.filter((j) => j.dupla1.includes(jogadorId) || j.dupla2.includes(jogadorId));
       titulo.textContent = linha.nome;
       // replaceChildren escreveria "null" como texto: a fase final, quando não há, sai da lista.
       corpo.replaceChildren(...[
         subtitulo(linha),
         numeros(linha, jogosDele.length),
-        situacao(atual),
+        situacao(atual, linha),
         faseFinal(atual, tabela),
         jogos(jogosDele, atual),
       ].filter(Boolean));

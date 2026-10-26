@@ -149,7 +149,8 @@
       const base = () => Regras.baseDosJogadores(estado.atual().campeonato.jogadores);
       function tabelaAtual() {
         const atual = estado.atual();
-        return Regras.classificacaoPorSemana(base(), atual.jogos, atual.desempatesManuais, atual.campeonato.config);
+        const ausentes = (atual.mataMata && atual.mataMata.ausentes) || [];
+        return Regras.classificacaoDaFaseFinal(base(), atual.jogos, atual.desempatesManuais, atual.campeonato.config, ausentes);
       }
       function sincronizarJogadores() {
         nomePorId.clear();
@@ -1691,6 +1692,83 @@
       t.verdadeiro(!jogadores.querySelector("[id^='grupo-']") && !buscar(jogadores, "btn-formar-grupos"), "depois de confirmar: sem seletor de grupo nem formar de novo");
       t.igual(jogadores.querySelectorAll(".lista-jogadores .marca-grupo").length, 32, "cada jogador mostra o grupo, fixo");
     }));
+
+    // ---------- V16: fase de grupos na temporada (Fase 30) ----------
+
+    let calendarioDosGrupos = null; // sorteado uma vez só (~1 s)
+    // Grupos formados (4 × 2 classificados), calendário confirmado e as `semanasLancadas` primeiras com placar.
+    function dadosGruposNaTemporada(semanasLancadas) {
+      const dados = dadosComGrupos();
+      if (!calendarioDosGrupos) {
+        calendarioDosGrupos = Regras.gerarCalendario(dados.campeonato.jogadores,
+          { jogosPorJogador: 6, semanas: 8, semente: SEMENTE, grupos: GRUPOS_4X2 }).calendario;
+      }
+      dados.jogos = Regras.calendarioParaJogos(calendarioDosGrupos);
+      dados.jogos.forEach((j, i) => { if (j.semana <= semanasLancadas) j.resultado = { tipo: "placar", gols1: (i % 3) + 1, gols2: i % 2 }; });
+      dados.campeonato.sorteio = { semente: SEMENTE, confirmado: true };
+      return dados;
+    }
+    const linhasDe = (raiz, id) => [...buscar(raiz, id).rows];
+
+    caso("V16.1 Classificação com grupos: uma tabela por grupo, Situação com as vagas do grupo e semeadura", (t) => {
+      const ctx = criarAppFalso(dadosGruposNaTemporada(7));
+      const raiz = ctx.montar("classificacao");
+      t.verdadeiro(raiz.querySelector(".tabela-rolagem").hidden && !buscar(raiz, "classificacao-grupos").hidden, "a tabela única some; aparecem as dos grupos");
+      t.igual([...raiz.querySelectorAll(".classificacao-grupo")].map((s) => s.id), ["A", "B", "C", "D"].map((g) => `classificacao-grupo-${g}`), "uma tabela por grupo");
+      for (const g of ["A", "B", "C", "D"]) {
+        const linhas = linhasDe(raiz, `corpo-grupo-${g}`);
+        t.igual([linhas.length, linhas.filter((tr) => tr.classList.contains("classificado")).length], [8, 2], `Grupo ${g}: 8 jogadores, 2 em verde`);
+        t.verdadeiro(linhas.every((tr) => tr.querySelector("td.col-situacao")), `Grupo ${g}: coluna Situação (poucos jogos pendentes no grupo)`);
+      }
+      t.igual(texto(raiz, "legenda-vagas"), "Os 2 primeiros de cada grupo vão para a fase final", "legenda das vagas");
+      const semeadura = linhasDe(raiz, "corpo-semeadura");
+      t.igual(semeadura.length, 8, "semeadura com os 8 classificados");
+      const lista = ctx.tabelaAtual();
+      t.igual(semeadura.map((tr) => tr.id), lista.filter((l) => l.classificado).map((l) => `semeadura-${l.id}`), "na ordem da semeadura das regras");
+      t.verdadeiro(/^\dº do Grupo [A-D]$/.test(semeadura[0].cells[2].textContent), "cada um com a posição e o grupo");
+      verificarLimpeza(t, raiz, "classificação com grupos");
+      verificarAcessibilidade(t, raiz, "classificação com grupos");
+      mudarCampo(buscar(raiz, "select-semana-classificacao"), "3");
+      t.verdadeiro(!raiz.querySelector("#classificacao-grupos td.col-situacao") && texto(raiz, "rotulo-classificacao") === "após a semana 3", "após a semana 3: sem Situação");
+    });
+
+    caso("V16.2 Classificação com grupos: Situação indisponível por grupo e desempate na semeadura", (t) => {
+      // Semana 1 toda em 1×0: os vencedores ficam iguais em tudo, dentro do grupo e entre os grupos.
+      const dados = dadosGruposNaTemporada(1);
+      dados.jogos.forEach((j) => { if (j.resultado) j.resultado = { tipo: "placar", gols1: 1, gols2: 0 }; });
+      const ctx = criarAppFalso(dados);
+      const raiz = ctx.montar("classificacao");
+      t.verdadeiro(!raiz.querySelector("td.col-situacao"), "semana 1: sem Situação em nenhum grupo");
+      t.verdadeiro(texto(raiz, "classificacao-grupo-A").includes("jogos do grupo (faltam "), "cada grupo explica quando a Situação aparece");
+      const botao = raiz.querySelector("#corpo-semeadura button[id^='semeadura-desempate-'][id$='-desce']:not(:disabled)");
+      t.verdadeiro(botao, "há empate na semeadura com as setas");
+      if (!botao) return;
+      const id = botao.id.replace("semeadura-desempate-", "").replace("-desce", "");
+      const antes = ctx.tabelaAtual().filter((l) => l.classificado).map((l) => l.id);
+      botao.click();
+      const depois = ctx.tabelaAtual().filter((l) => l.classificado).map((l) => l.id);
+      t.igual(depois.indexOf(id), antes.indexOf(id) + 1, "descer na semeadura muda a ordem dos classificados");
+      t.verdadeiro(ctx.estado.atual().desempatesManuais.length >= 1, "a ordem fica guardada nos desempates manuais");
+      verificarLimpeza(t, raiz, "classificação com grupos (semana 1)");
+    });
+
+    caso("V16.3 Rodadas e ficha com grupos: classificados de cada grupo e posição no grupo", (t) => {
+      const ctx = criarAppFalso(dadosGruposNaTemporada(7));
+      const rodadas = ctx.montar("rodadas");
+      const ficha = ctx.montar("ficha");
+      t.igual([...rodadas.querySelectorAll(".top-grupo")].map((d) => d.id), ["A", "B", "C", "D"].map((g) => `top-grupo-${g}`), "painel com um quadro por grupo");
+      t.verdadeiro([...rodadas.querySelectorAll(".top-grupo tbody")].every((tb) => tb.rows.length === 3 && tb.querySelectorAll("tr.classificado").length === 2),
+        "cada grupo: os 2 classificados e o 1º de fora");
+      const cartoes = [...rodadas.querySelectorAll("article.jogo")];
+      t.verdadeiro(cartoes.length > 0 && cartoes.every((c) => /^Grupo [A-D]$/.test(c.querySelector(".jogo-topo .marca-grupo").textContent)), "cada cartão de jogo mostra o grupo");
+      verificarLimpeza(t, rodadas, "rodadas com grupos");
+      rodadas.querySelector(".top-grupo .nome-jogador-btn").click();
+      t.verdadeiro(/^\dº no Grupo A$/.test(texto(ficha, "ficha-posicao")), `ficha: posição no grupo (${texto(ficha, "ficha-posicao")})`);
+      t.verdadeiro(texto(ficha, "ficha-subtitulo").includes("classificados do Grupo A"), "ficha: dentro ou fora dos classificados do grupo");
+      t.verdadeiro(ficha.textContent.includes("Situação no Grupo A (2 vagas)"), "ficha: situação para as vagas do grupo");
+      verificarLimpeza(t, ficha, "ficha com grupos");
+      ficha.querySelector("dialog").close();
+    });
 
     // ---------- execução e relatório ----------
 

@@ -2632,6 +2632,29 @@
       t.igual(Regras.classificacaoDaFaseFinal(base, [], [], Regras.REGRAS_PADRAO).map((l) => l.id), ["w", "x", "y", "z"], "liga única: a classificação de sempre");
     });
 
+    caso("G11 Situação por grupo: vagas do grupo e limite de pendentes de cada grupo", (t) => {
+      const cfg = configGrupos(2, 2, { jogosPorJogador: 4, semanas: 4 });
+      const jogadores = Regras.formarGruposPorPotes(jogadoresFicticios(16), 2, 3).jogadores;
+      const jogos = Regras.calendarioParaJogos(Regras.gerarCalendario(jogadores, { jogosPorJogador: 4, semanas: 4, semente: 3, grupos: cfg.grupos }).calendario)
+        .map((j, i) => (j.semana <= 3 ? { ...j, resultado: placar(i % 3, (i + 1) % 2) } : j));
+      const base = Regras.baseDosJogadores(jogadores);
+      const porGrupo = Regras.situacoesDosGrupos(base, jogos, [], cfg);
+      const tabelas = Regras.classificacaoDosGrupos(base, jogos, [], cfg);
+      t.igual(porGrupo.map((g) => g.grupo), ["A", "B"], "um resultado por grupo");
+      porGrupo.forEach((g, i) => {
+        const ids = tabelas[i].linhas.map((l) => l.id);
+        t.igual(g.pendentes, jogos.filter((j) => !j.resultado && ids.includes(j.dupla1[0])).length, `Grupo ${g.grupo}: pendentes contam só os jogos do grupo (${g.pendentes})`);
+        t.verdadeiro(g.situacoes && g.situacoes.every((s) => ids.includes(s.id)) && g.situacoes.length === 8, `Grupo ${g.grupo}: situação calculada só para os 8 do grupo`);
+        const garantidos = g.situacoes.filter((s) => s.situacao === "garantido").map((s) => s.id);
+        t.verdadeiro(garantidos.length <= 2 && garantidos.every((id) => ids.indexOf(id) < 2), `Grupo ${g.grupo}: garantidos (${garantidos.length}) só entre os 2 classificados do grupo`);
+        t.verdadeiro(g.situacoes.some((s) => s.situacao !== "garantido"), `Grupo ${g.grupo}: nem todos garantidos (vagas do grupo, não as 4 da fase final)`);
+      });
+      const grandes = Regras.formarGruposPorPotes(jogadoresFicticios(32), 2, 1).jogadores;
+      const semResultado = Regras.calendarioParaJogos(Regras.gerarCalendario(grandes, { jogosPorJogador: 6, semanas: 8, semente: 1, grupos: { quantidade: 2, classificados: 4 } }).calendario);
+      const muitos = Regras.situacoesDosGrupos(Regras.baseDosJogadores(grandes), semResultado, [], configGrupos(2, 4));
+      t.igual(muitos.map((g) => [g.pendentes, g.situacoes]), [[24, null], [24, null]], "24 jogos pendentes por grupo: sem situação (pendentes demais)");
+    });
+
     caso("G10 Grupos no estado: salvos, validados, levados por backup, duplicar e modelo", (t) => {
       const jogadoresG = Regras.formarGruposPorPotes(comEstrelas(classificacaoBase.map((l) => ({ id: l.id, nome: l.nome }))), 4, 1).jogadores;
       const comGrupos = (d) => {

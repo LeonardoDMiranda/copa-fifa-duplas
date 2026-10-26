@@ -162,7 +162,9 @@
     const diag = Regras.diagnosticarCampeonato(camp.jogadores, camp.config);
     const n = camp.jogadores.length;
     const lancados = atual.jogos.filter((j) => j.resultado).length;
-    const empatePendente = tabela.some((l) => l.empateTecnico && !l.empateTecnico.ordemManual);
+    // Com grupos, também o empate da semeadura entre classificados de grupos diferentes.
+    const empatePendente = tabela.some((l) => (l.empateTecnico && !l.empateTecnico.ordemManual)
+      || (l.classificado && l.empateSemeadura && !l.empateSemeadura.ordemManual));
     const campeoes = atual.mataMata && Regras.resolverMataMata(atual.mataMata, tabela, camp.config).podio.campeoes;
     // Passo 1: jogos por jogador cabem nas semanas (o resto do diagnóstico depende dos jogadores).
     const configCompleta = !Regras.validarConfig(camp.config) && camp.config.jogosPorJogador <= camp.config.semanas;
@@ -174,7 +176,7 @@
       sorteio: travado ? { icone: "confirmar", leitor: "calendário confirmado" }
         : camp.sorteio && camp.sorteio.rascunho ? { texto: "rascunho", leitor: "sorteio ainda não confirmado" } : null,
       rodadas: atual.jogos.length ? { texto: `${lancados}/${atual.jogos.length}`, leitor: `${lancados} de ${atual.jogos.length} jogos lançados` } : null,
-      classificacao: empatePendente ? { icone: "empate", leitor: `empate técnico no top ${camp.config.vagasFaseFinal} sem ordem definida` } : null,
+      classificacao: empatePendente ? { icone: "empate", leitor: camp.config.grupos ? "empate técnico sem ordem definida" : `empate técnico no top ${camp.config.vagasFaseFinal} sem ordem definida` } : null,
       "mata-mata": campeoes ? { icone: "trofeu", leitor: "campeões definidos" } : null,
     };
     const visiveis = abasDaFase(atual);
@@ -302,8 +304,11 @@
   let erroSalvamentoAvisado = null;
 
   // Classificação ao vivo; a variação ▲▼ é em relação à semana anterior (ver Regras.classificacaoPorSemana).
+  // Com fase de grupos, a lista da semeadura (os classificados de todos os grupos pela campanha, depois os
+  // demais): é ela que o mata-mata e a ficha usam. As tabelas de cada grupo vêm de Regras.classificacaoDosGrupos.
   function calcularTabela(atual) {
-    return Regras.classificacaoPorSemana(classificacaoBase, atual.jogos, atual.desempatesManuais, atual.campeonato.config);
+    const ausentes = (atual.mataMata && atual.mataMata.ausentes) || [];
+    return Regras.classificacaoDaFaseFinal(classificacaoBase, atual.jogos, atual.desempatesManuais, atual.campeonato.config, ausentes);
   }
 
   function tabelaAtual() {

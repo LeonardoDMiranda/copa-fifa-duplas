@@ -246,13 +246,28 @@
   // Situação (Regras.calcularSituacoes) de cada jogador ao vivo, ou null com pendentes demais
   // (ver Regras.limitePendentesSituacoes). O cálculo enumera até Regras.MAX_CENARIOS_SITUACOES
   // cenários: só refaz quando jogos, desempates ou jogadores mudam.
+  // Com fase de grupos, as situações dos grupos em que o cálculo cabe, juntas (null se não cabe em nenhum).
   let cacheSituacoes = { chave: null, valor: null };
   function situacoes(base, atual) {
+    if (Regras.usaGrupos(atual.campeonato.config)) {
+      const disponiveis = situacoesDosGrupos(base, atual).filter((g) => g.situacoes);
+      return disponiveis.length ? disponiveis.flatMap((g) => g.situacoes) : null;
+    }
     const chave = JSON.stringify([atual.jogos.map((j) => j.resultado), atual.desempatesManuais, atual.campeonato]);
     if (cacheSituacoes.chave !== chave) {
       cacheSituacoes = { chave, valor: Regras.calcularSituacoes(base, atual.jogos, atual.desempatesManuais, atual.campeonato.config) };
     }
     return cacheSituacoes.valor;
+  }
+
+  // Situação grupo a grupo (Regras.situacoesDosGrupos), com o mesmo cache: [{ grupo, pendentes, situacoes }].
+  let cacheSituacoesDosGrupos = { chave: null, valor: null };
+  function situacoesDosGrupos(base, atual) {
+    const chave = JSON.stringify([atual.jogos.map((j) => j.resultado), atual.desempatesManuais, atual.campeonato]);
+    if (cacheSituacoesDosGrupos.chave !== chave) {
+      cacheSituacoesDosGrupos = { chave, valor: Regras.situacoesDosGrupos(base, atual.jogos, atual.desempatesManuais, atual.campeonato.config) };
+    }
+    return cacheSituacoesDosGrupos.valor;
   }
 
   // Ícone e texto de cada situação.
@@ -298,6 +313,6 @@
     contraste, CONTRASTE_MINIMO, corLegivelComBranco, carregarImagem, prepararLogo,
     buscar, proximoPasso, numerosNaSemana,
     plural, numero, rotuloDoJogo, botaoIcone, atributosDeErro, mensagemDeErro,
-    botaoJogador, situacoes, marcaSituacao, ROTULOS_MATA_MATA,
+    botaoJogador, situacoes, situacoesDosGrupos, marcaSituacao, ROTULOS_MATA_MATA,
   };
 })();

@@ -1,5 +1,6 @@
 // Tela "Classificação": ao vivo ou após uma semana, com a ordem manual dos empates técnicos e, ao
 // vivo, a coluna "Situação" (garantido, em disputa ou eliminado para o top 8). O nome abre a ficha.
+// Com fase de grupos: uma tabela por grupo (Situação com as vagas do grupo) e a semeadura da fase final.
 
 (function () {
   "use strict";
@@ -24,7 +25,11 @@
     const cabecalho = ([texto, extenso, classe]) => el("th", { scope: "col", class: classe },
       !texto ? el("span", { class: "so-leitor" }, extenso)
         : extenso ? el("abbr", { title: extenso }, texto) : texto);
-    const legendaVagas = el("span", { id: "legenda-vagas" }, "Top 8");
+    const legendaVagas = el("span", { id: "legenda-vagas" }, "Top 8 vai para a fase final");
+    // Liga única: uma tabela. Fase de grupos: uma tabela por grupo e a semeadura (em `porGrupos`).
+    const tabelaUnica = el("div", { class: "tabela-rolagem" },
+      el("table", { class: "classificacao" }, cabecalhoTabela, corpo));
+    const porGrupos = el("div", { id: "classificacao-grupos" });
     raiz.append(el("section", { id: "tela-classificacao", class: "tela" },
       el("div", { class: "tela-cabecalho" },
         el("h2", {}, "Classificação ", rotulo),
@@ -35,7 +40,7 @@
             onclick: () => app.exportarPNG("classificacao"),
           }, Icones.svg("imagem"), "Baixar imagem")),
         el("p", { class: "legenda" },
-          el("span", { class: "amostra-classificado" }), " ", legendaVagas, " vai para a fase final"),
+          el("span", { class: "amostra-classificado" }), " ", legendaVagas),
         el("details", { class: "como-ler" },
           el("summary", {}, "Como ler"),
           el("ul", {},
@@ -46,8 +51,8 @@
               + "comparando pontos e vitórias. Saldo e gols pró só contam entre quem já não joga mais. "
               + "Só aparece na classificação ao vivo, quando faltam poucos jogos."))),
         resumoSituacao),
-      el("div", { class: "tabela-rolagem" },
-        el("table", { class: "classificacao" }, cabecalhoTabela, corpo))));
+      tabelaUnica,
+      porGrupos));
 
     // Semana escolhida para ver a classificação (null = ao vivo). Só leitura quando não é ao vivo.
     let semanaClassificacao = null;
@@ -66,28 +71,31 @@
       definirOrdemManual(nova);
     }
 
-    function celulaJogador(linha, editavel) {
-      const empate = linha.empateTecnico;
-      const nome = app.botaoJogador(linha.id, `ver-linha-${linha.id}`);
+    // `semeadura`: a célula da tabela da semeadura (fase de grupos), com o empate entre grupos e ids próprios.
+    function celulaJogador(linha, editavel, semeadura = false) {
+      const empate = semeadura ? linha.empateSemeadura : linha.empateTecnico;
+      const prefixo = semeadura ? "semeadura-" : "";
+      const nome = app.botaoJogador(linha.id, semeadura ? `ver-semeadura-${linha.id}` : `ver-linha-${linha.id}`);
       if (!empate) return el("td", { class: "col-jogador" }, nome);
 
       const nomes = empate.grupo.map((id) => nomePorId.get(id)).join(", ");
       const i = empate.grupo.indexOf(linha.id);
       const ultimo = empate.grupo.length - 1;
+      const qual = semeadura ? "Empate na semeadura, entre grupos" : "Empate técnico";
       const explicacao = empate.ordemManual
-        ? `Empate técnico (${nomes}). Ordem definida pelo organizador.`
-        : `Empate técnico (${nomes}). Ordem alfabética provisória: defina com as setas ou confirme a ordem atual.`;
+        ? `${qual} (${nomes}). Ordem definida pelo organizador.`
+        : `${qual} (${nomes}). Ordem alfabética provisória: defina com as setas ou confirme a ordem atual.`;
       return el("td", { class: "col-jogador" },
         nome,
         el("span", { class: "empate" + (empate.ordemManual ? "" : " provisorio"), title: explicacao },
           Icones.svg("empate"), el("span", { class: "so-leitor" }, explicacao)),
         editavel && el("span", { class: "controle-desempate" },
           botaoIcone({
-            icone: "subir", rotulo: `Subir ${linha.nome} no desempate`, id: `desempate-${linha.id}-sobe`, class: "mini",
+            icone: "subir", rotulo: `Subir ${linha.nome} no desempate`, id: `${prefixo}desempate-${linha.id}-sobe`, class: "mini",
             disabled: i === 0, onclick: () => moverNoDesempate(empate.grupo, linha.id, -1),
           }),
           botaoIcone({
-            icone: "descer", rotulo: `Descer ${linha.nome} no desempate`, id: `desempate-${linha.id}-desce`, class: "mini",
+            icone: "descer", rotulo: `Descer ${linha.nome} no desempate`, id: `${prefixo}desempate-${linha.id}-desce`, class: "mini",
             disabled: i === ultimo, onclick: () => moverNoDesempate(empate.grupo, linha.id, 1),
           }),
           !empate.ordemManual && i === 0 && botaoIcone({
@@ -148,26 +156,79 @@
         return;
       }
       const vagas = estado.atual().campeonato.config.vagasFaseFinal;
-      corpo.replaceChildren(
-        ...tabela.map((linha) => {
-          let classe = linha.posicao <= vagas ? "classificado" : "";
-          if (linha.posicao === vagas) classe += " linha-corte";
-          if (linha.empateTecnico) classe += " em-empate";
-          return el("tr", { class: classe.trim() || null, id: `linha-${linha.id}` },
-            el("td", { class: "col-pos" }, `${linha.posicao}º`),
-            celulaVariacao(linha.variacao),
-            celulaJogador(linha, editavel),
-            el("td", { class: "col-pts" }, String(linha.pontos)),
-            el("td", {}, String(linha.v)),
-            el("td", {}, String(linha.e)),
-            el("td", {}, String(linha.d)),
-            el("td", {}, String(linha.gp)),
-            el("td", {}, String(linha.gc)),
-            el("td", {}, formatarSaldo(linha.sg)),
-            el("td", {}, String(linha.jogos)),
-            porId && celulaSituacao(porId.get(linha.id), jogos));
-        })
-      );
+      corpo.replaceChildren(...tabela.map((linha) => linhaDaTabela(linha, vagas, editavel, porId, jogos)));
+    }
+
+    // Uma linha da classificação: os `vagas` primeiros em verde, com a linha de corte no último deles.
+    function linhaDaTabela(linha, vagas, editavel, porId, jogos) {
+      let classe = linha.posicao <= vagas ? "classificado" : "";
+      if (linha.posicao === vagas) classe += " linha-corte";
+      if (linha.empateTecnico) classe += " em-empate";
+      return el("tr", { class: classe.trim() || null, id: `linha-${linha.id}` },
+        el("td", { class: "col-pos" }, `${linha.posicao}º`),
+        celulaVariacao(linha.variacao),
+        celulaJogador(linha, editavel),
+        el("td", { class: "col-pts" }, String(linha.pontos)),
+        el("td", {}, String(linha.v)),
+        el("td", {}, String(linha.e)),
+        el("td", {}, String(linha.d)),
+        el("td", {}, String(linha.gp)),
+        el("td", {}, String(linha.gc)),
+        el("td", {}, formatarSaldo(linha.sg)),
+        el("td", {}, String(linha.jogos)),
+        porId && celulaSituacao(porId.get(linha.id), jogos));
+    }
+
+    // ---------- fase de grupos ----------
+    // Uma tabela por grupo (os classificados do grupo em verde, a Situação com as vagas do grupo) e, depois,
+    // a semeadura: os classificados de todos os grupos pela campanha, que formam as duplas do mata-mata.
+
+    function tabelaDoGrupo({ grupo, linhas }, k, editavel, doGrupo, jogos, aoVivo) {
+      const porId = doGrupo && doGrupo.situacoes && new Map(doGrupo.situacoes.map((s) => [s.id, s]));
+      const aviso = aoVivo && doGrupo && !doGrupo.situacoes
+        ? el("p", { class: "legenda" }, `Situação disponível quando faltarem até ${Regras.limitePendentesSituacoes(estado.atual().campeonato.config)} jogos do grupo (faltam ${doGrupo.pendentes}).`)
+        : null;
+      return el("section", { class: "classificacao-grupo", id: `classificacao-grupo-${grupo}` },
+        el("h3", {}, `Grupo ${grupo}`),
+        aviso,
+        el("div", { class: "tabela-rolagem" },
+          el("table", { class: "classificacao" },
+            el("thead", {}, el("tr", {}, colunas.map(cabecalho), porId && cabecalho(colunaSituacao))),
+            el("tbody", { id: `corpo-grupo-${grupo}` }, linhas.map((linha) => linhaDaTabela(linha, k, editavel, porId, jogos))))));
+    }
+
+    function tabelaDaSemeadura(lista, editavel) {
+      const classificados = lista.filter((l) => l.classificado);
+      const colunasSemeadura = [["Pos", "Posição na semeadura", "col-pos"], ["Jogador", null, "col-jogador"], ["Grupo", null],
+        ["Pts", "Pontos"], ["V", "Vitórias"], ["SG", "Saldo de gols"], ["GP", "Gols pró"]];
+      return el("section", { class: "semeadura", id: "semeadura" },
+        el("h3", {}, "Semeadura da fase final"),
+        el("p", { class: "legenda" }, "Provisória: os classificados de todos os grupos pela campanha (pontos, vitórias, saldo, gols pró e posição no grupo). "
+          + "Formam as duplas do mata-mata: 1º + último, 2º + penúltimo e assim por diante."),
+        el("div", { class: "tabela-rolagem" },
+          el("table", { class: "classificacao" },
+            el("thead", {}, el("tr", {}, colunasSemeadura.map(cabecalho))),
+            el("tbody", { id: "corpo-semeadura" }, classificados.map((l) =>
+              el("tr", { id: `semeadura-${l.id}`, class: l.empateSemeadura ? "em-empate" : null },
+                el("td", { class: "col-pos" }, `${l.posicao}º`),
+                celulaJogador(l, editavel, true),
+                el("td", {}, `${l.posicaoNoGrupo}º do Grupo ${l.grupo}`),
+                el("td", { class: "col-pts" }, String(l.pontos)),
+                el("td", {}, String(l.v)),
+                el("td", {}, formatarSaldo(l.sg)),
+                el("td", {}, String(l.gp))))))));
+    }
+
+    function renderizarGrupos(atual, aoVivo) {
+      const cfg = atual.campeonato.config;
+      const ate = aoVivo ? null : semanaClassificacao;
+      const tabelas = Regras.classificacaoDosGrupos(app.base(), atual.jogos, atual.desempatesManuais, cfg, ate);
+      const situacoes = aoVivo && atual.jogos.length ? Util.situacoesDosGrupos(app.base(), atual) : null;
+      const lista = Regras.semeaduraPorCampanha(tabelas, cfg, atual.desempatesManuais);
+      porGrupos.replaceChildren(
+        el("div", { class: "grupos-classificacao" }, tabelas.map((t, i) =>
+          tabelaDoGrupo(t, cfg.grupos.classificados, aoVivo, situacoes && situacoes[i], atual.jogos, aoVivo))),
+        atual.campeonato.jogadores.length ? tabelaDaSemeadura(lista, aoVivo) : null);
     }
 
     // `tabela` é a classificação ao vivo; com uma semana escolhida, mostra a daquela semana (sem a Situação).
@@ -176,11 +237,23 @@
       const ultimaSemana = Regras.ultimaSemanaComResultado(atual.jogos, cfg);
       if (semanaClassificacao !== null && (ultimaSemana === null || semanaClassificacao > ultimaSemana)) semanaClassificacao = null;
       const aoVivo = semanaClassificacao === null;
+      const comGrupos = Regras.usaGrupos(cfg);
+      tabelaUnica.hidden = comGrupos;
+      porGrupos.hidden = !comGrupos;
+      if (comGrupos) {
+        legendaVagas.textContent = `Os ${cfg.grupos.classificados} primeiros de cada grupo vão para a fase final`;
+        controleClassificacao(ultimaSemana);
+        rotulo.textContent = aoVivo ? "" : `após a semana ${semanaClassificacao}`;
+        resumoSituacao.hidden = true;
+        renderizarGrupos(atual, aoVivo);
+        return;
+      }
+      porGrupos.replaceChildren();
       const tabelaVista = aoVivo
         ? tabela
         : Regras.classificacaoPorSemana(app.base(), atual.jogos, atual.desempatesManuais, cfg, semanaClassificacao);
       const situacoes = aoVivo && atual.jogos.length ? Util.situacoes(app.base(), atual) : null;
-      legendaVagas.textContent = `Top ${cfg.vagasFaseFinal}`;
+      legendaVagas.textContent = `Top ${cfg.vagasFaseFinal} vai para a fase final`;
       controleClassificacao(ultimaSemana);
       rotulo.textContent = aoVivo ? "" : `após a semana ${semanaClassificacao}`;
       renderizarResumoSituacao(atual, situacoes);

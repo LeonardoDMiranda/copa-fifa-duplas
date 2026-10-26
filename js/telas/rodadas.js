@@ -39,6 +39,14 @@
 
     // ---------- cartões de jogo ----------
 
+    // Com fase de grupos, o grupo do jogo (o da dupla 1: o sorteio nunca mistura grupos); senão, null.
+    function grupoDoJogo(jogo) {
+      const camp = estado.atual().campeonato;
+      if (!Regras.usaGrupos(camp.config)) return null;
+      const jogador = camp.jogadores.find((j) => j.id === jogo.dupla1[0]);
+      return (jogador && jogador.grupo) || null;
+    }
+
     function cartaoJogo(jogo, numero) {
       const r = jogo.resultado;
       const ehWO = r && r.tipo === "wo";
@@ -113,6 +121,7 @@
       return el("article", { class: `jogo ${r ? "lancado" : "pendente"}`, id: `jogo-${jogo.id}` },
         el("div", { class: "jogo-topo" },
           el("h3", { class: "jogo-numero" }, el("span", { class: "so-leitor" }, `Semana ${Regras.semanaDoJogo(jogo)} · `), `Jogo ${numero}`),
+          grupoDoJogo(jogo) && el("span", { class: "marca-grupo" }, `Grupo ${grupoDoJogo(jogo)}`),
           Regras.jogoRemarcado(jogo) && el("span", { class: "marca-remarcado", title: "Este jogo foi combinado para outra semana" },
             `Remarcado da semana ${jogo.semanaOriginal}`),
           el("span", { class: "status" }, status)),
@@ -252,31 +261,45 @@
     }
 
     // Painel ao lado dos jogos: top 8 ao vivo e quem vem logo atrás, para acompanhar sem trocar de aba.
+    // Com fase de grupos: os classificados de cada grupo e quem vem logo atrás (1 por grupo).
     const PERSEGUIDORES = 2;
+    const PERSEGUIDORES_POR_GRUPO = 1;
+    function tabelaTop(linhas, vagas, perseguidores) {
+      return el("table", { class: "tabela-top" },
+        el("thead", {}, el("tr", {},
+          el("th", { scope: "col", class: "col-pos" }, el("abbr", { title: "Posição" }, "Pos")),
+          el("th", { scope: "col", class: "col-jogador" }, "Jogador"),
+          el("th", { scope: "col" }, el("abbr", { title: "Pontos" }, "Pts")),
+          el("th", { scope: "col" }, el("abbr", { title: "Vitórias" }, "V")),
+          el("th", { scope: "col" }, el("abbr", { title: "Saldo de gols" }, "SG")))),
+        el("tbody", {}, linhas.slice(0, vagas + perseguidores).map((l) => {
+          let classe = l.posicao <= vagas ? "classificado" : "perseguidor";
+          if (l.posicao === vagas) classe += " linha-corte";
+          return el("tr", { class: classe },
+            el("td", { class: "col-pos" }, `${l.posicao}º`),
+            el("td", { class: "col-jogador" }, app.botaoJogador(l.id, `ver-top-${l.id}`), l.empateTecnico && el("span", { class: "empate", title: "Empate técnico" },
+              Icones.svg("empate"), el("span", { class: "so-leitor" }, "empate técnico"))),
+            el("td", { class: "col-pts" }, String(l.pontos)),
+            el("td", {}, String(l.v)),
+            el("td", {}, formatarSaldo(l.sg)));
+        })));
+    }
+
     function painelTop(painel, tabela) {
-      const vagas = estado.atual().campeonato.config.vagasFaseFinal;
-      painel.replaceChildren(
-        el("h3", {}, `Top ${vagas} ao vivo`),
-        el("table", { class: "tabela-top" },
-          el("thead", {}, el("tr", {},
-            el("th", { scope: "col", class: "col-pos" }, el("abbr", { title: "Posição" }, "Pos")),
-            el("th", { scope: "col", class: "col-jogador" }, "Jogador"),
-            el("th", { scope: "col" }, el("abbr", { title: "Pontos" }, "Pts")),
-            el("th", { scope: "col" }, el("abbr", { title: "Vitórias" }, "V")),
-            el("th", { scope: "col" }, el("abbr", { title: "Saldo de gols" }, "SG")))),
-          el("tbody", {}, tabela.slice(0, vagas + PERSEGUIDORES).map((l) => {
-            let classe = l.posicao <= vagas ? "classificado" : "perseguidor";
-            if (l.posicao === vagas) classe += " linha-corte";
-            return el("tr", { class: classe },
-              el("td", { class: "col-pos" }, `${l.posicao}º`),
-              el("td", { class: "col-jogador" }, app.botaoJogador(l.id, `ver-top-${l.id}`), l.empateTecnico && el("span", { class: "empate", title: "Empate técnico" },
-                Icones.svg("empate"), el("span", { class: "so-leitor" }, "empate técnico"))),
-              el("td", { class: "col-pts" }, String(l.pontos)),
-              el("td", {}, String(l.v)),
-              el("td", {}, formatarSaldo(l.sg)));
-          }))),
-        el("button", { type: "button", id: "btn-ver-classificacao", class: "discreto mini", onclick: () => app.irParaAba("classificacao") },
-          "Ver classificação completa", Icones.svg("seguir")));
+      const atual = estado.atual();
+      const cfg = atual.campeonato.config;
+      const verTudo = el("button", { type: "button", id: "btn-ver-classificacao", class: "discreto mini", onclick: () => app.irParaAba("classificacao") },
+        "Ver classificação completa", Icones.svg("seguir"));
+      if (Regras.usaGrupos(cfg)) {
+        const tabelas = Regras.classificacaoDosGrupos(app.base(), atual.jogos, atual.desempatesManuais, cfg);
+        painel.replaceChildren(
+          el("h3", {}, "Classificados ao vivo"),
+          ...tabelas.map(({ grupo, linhas }) => el("div", { class: "top-grupo", id: `top-grupo-${grupo}` },
+            el("h4", {}, `Grupo ${grupo}`), tabelaTop(linhas, cfg.grupos.classificados, PERSEGUIDORES_POR_GRUPO))),
+          verTudo);
+        return;
+      }
+      painel.replaceChildren(el("h3", {}, `Top ${cfg.vagasFaseFinal} ao vivo`), tabelaTop(tabela, cfg.vagasFaseFinal, PERSEGUIDORES), verTudo);
     }
 
     function renderizarJogos(atual, tabela) {

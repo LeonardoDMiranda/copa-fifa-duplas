@@ -935,12 +935,29 @@
   // Classificação de cada grupo: [{ grupo, linhas }]. Cada grupo usa só os próprios jogos, e o empate técnico
   // é sinalizado quando começa entre os classificados do grupo. `ate` como em classificacaoPorSemana.
   function classificacaoDosGrupos(base, jogos, desempatesManuais = [], config = REGRAS_PADRAO, ate = null) {
+    return partesDosGrupos(base, jogos, config).map(({ grupo, base: baseDoGrupo, jogos: jogosDoGrupo, config: configDoGrupo }) =>
+      ({ grupo, linhas: classificacaoPorSemana(baseDoGrupo, jogosDoGrupo, desempatesManuais, configDoGrupo, ate) }));
+  }
+
+  // "O que está em jogo" grupo a grupo: cada grupo com os próprios jogos e as próprias vagas (garantido =
+  // entre os classificados do grupo). Retorna [{ grupo, pendentes, situacoes }]; situacoes é null quando o
+  // grupo tem jogos pendentes demais (ver calcularSituacoes).
+  function situacoesDosGrupos(base, jogos, desempatesManuais = [], config = REGRAS_PADRAO) {
+    return partesDosGrupos(base, jogos, config).map(({ grupo, base: baseDoGrupo, jogos: jogosDoGrupo, config: configDoGrupo }) => ({
+      grupo,
+      pendentes: jogosDoGrupo.filter((j) => !efeitosDoResultado(j.resultado, config)).length,
+      situacoes: calcularSituacoes(baseDoGrupo, jogosDoGrupo, desempatesManuais, configDoGrupo),
+    }));
+  }
+
+  // Cada grupo como um campeonato à parte: [{ grupo, base, jogos, config }], com as vagas do grupo na config.
+  // O jogo é do grupo da dupla 1 (o sorteio nunca mistura grupos).
+  function partesDosGrupos(base, jogos, config) {
     const configDoGrupo = { ...config, vagasFaseFinal: config.grupos.classificados };
     return letrasDosGrupos(config.grupos.quantidade).map((grupo) => {
       const baseDoGrupo = base.filter((l) => l.grupo === grupo);
       const ids = new Set(baseDoGrupo.map((l) => l.id));
-      const jogosDoGrupo = jogos.filter((j) => ids.has(j.dupla1[0]));
-      return { grupo, linhas: classificacaoPorSemana(baseDoGrupo, jogosDoGrupo, desempatesManuais, configDoGrupo, ate) };
+      return { grupo, base: baseDoGrupo, jogos: jogos.filter((j) => ids.has(j.dupla1[0])), config: configDoGrupo };
     });
   }
 
@@ -989,12 +1006,12 @@
 
   // Lista da fase final com grupos: os classificados de todos os grupos, ordenados pela campanha (é a ordem
   // que forma as duplas: 1º + último...), depois os demais na mesma ordem (de onde saem os substitutos) e, por
-  // último, os ausentes. Cada linha leva grupo, posicaoNoGrupo, classificado, ausente e empateSemeadura;
-  // `posicao` é a posição na lista.
+  // último, os ausentes. Cada linha leva grupo, posicaoNoGrupo (do ausente, a da tabela do grupo), classificado,
+  // ausente e empateSemeadura; `posicao` é a posição na lista.
   function semeaduraPorCampanha(tabelas, config, desempatesManuais = [], ausentes = []) {
     const candidatos = candidatosDaSemeadura(tabelas, config, ausentes);
     const fora = tabelas.flatMap(({ grupo, linhas }) => linhas.filter((l) => ausentes.includes(l.id))
-      .map((l) => ({ ...l, grupo, posicaoNoGrupo: null, classificado: false, ausente: true })));
+      .map((l) => ({ ...l, grupo, posicaoNoGrupo: l.posicao, classificado: false, ausente: true })));
     return [
       ...ordenarPelaCampanha(candidatos.filter((l) => l.classificado), desempatesManuais),
       ...ordenarPelaCampanha(candidatos.filter((l) => !l.classificado), desempatesManuais),
@@ -1994,6 +2011,7 @@
     moverJogadorDeGrupo,
     trocarJogadoresDeGrupo,
     classificacaoDosGrupos,
+    situacoesDosGrupos,
     semeaduraPorCampanha,
     classificacaoDaFaseFinal,
     semanaDoJogo,

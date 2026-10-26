@@ -1061,6 +1061,10 @@ body.telao-ativo { overflow: hidden; }
 .quadro-grupo h4 { margin: 0 0 4px; font-size: var(--fonte-sm); }
 .quadro-grupo h4 .contagem { font-weight: 400; color: var(--texto-suave); }
 .quadro-grupo p { margin: 0; font-size: var(--fonte-sm); }
+.classificacao-grupo, .semeadura { margin: var(--esp-4) 0 0; }
+.classificacao-grupo h3, .semeadura h3 { margin: 0 0 var(--esp-1); font-size: var(--fonte-base); }
+.classificacao-grupo .legenda, .semeadura .legenda { margin: 0 0 var(--esp-1); }
+.top-grupo h4 { margin: var(--esp-2) 0 2px; font-size: var(--fonte-xs); text-transform: uppercase; color: var(--texto-suave); }
 .troca-grupo { display: inline-flex; align-items: center; gap: var(--esp-1); }
 .marca-grupo { display: inline-block; padding: 1px var(--esp-2); margin-right: var(--esp-1); border-radius: var(--raio-pilula); background: var(--superficie); border: 1px solid var(--borda); font-size: var(--fonte-xs); font-weight: 600; color: var(--texto-suave); white-space: nowrap; }
 .sem-dupla { color: var(--texto-suave); }

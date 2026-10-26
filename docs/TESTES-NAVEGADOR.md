@@ -387,7 +387,29 @@ Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
 - 18.7 Sorteio: cada jogo com "Grupo X"; semanas com quase o mesmo número de jogos; a troca à mão lista só os jogadores do grupo; confirmar e voltar a Jogadores: grupos fixos, sem seletor.
 - 18.8 400 px: sem rolagem lateral em Configuração, Jogadores e Sorteio.
 
+## 19. Fase de grupos: temporada
+
+- 19.1 Classificação: uma tabela por grupo, os classificados de cada grupo em verde, legenda "Os 2 primeiros de cada grupo vão para a fase final".
+- 19.2 Situação: aparece em cada grupo quando faltam até 8 jogos dele; antes, uma linha no grupo diz quantos faltam. "Garantido" só entre os classificados do grupo.
+- 19.3 Semeadura da fase final: os classificados pela campanha, com "1º do Grupo B"...; empate entre grupos com as setas, e a ordem muda a semeadura.
+- 19.4 "Após a semana N": tabelas e semeadura daquela semana, sem Situação.
+- 19.5 Rodadas: "Grupo X" em cada cartão; ao lado, "Classificados ao vivo" com um quadro por grupo.
+- 19.6 Ficha: "2º no Grupo A", "entre os 2 classificados do Grupo A", "Situação no Grupo A (2 vagas)".
+- 19.7 400 px: Classificação e Rodadas sem rolagem lateral.
+
 ## Última execução
+
+**Fase 30 (fase de grupos na temporada), 2026-10-26**, Playwright (Chromium) por um servidor local temporário, antes do
+commit da fase. Massa: a edição de teste da Fase 29 (32 jogadores fictícios, 4 grupos × 2), calendário confirmado e
+placares fictícios até a semana 7 (42 de 48 jogos).
+
+- `testes.html`: 135 passaram, 0 falharam (G11 novo). `testes-telas.html`: 78 passaram, 0 falharam (V16.1 a V16.3 novos).
+- **Conferido no app real:** 19.1, 19.2 (grupo C com dois garantidos e o resto eliminado; nos outros, em disputa com
+  "depende do saldo"), 19.3 (8 classificados, do 1º do Grupo B com 15 pontos ao 2º do Grupo C), 19.5 e 19.7.
+- **Ajustado antes do commit:** os cartões das Rodadas não diziam o grupo do jogo; agora têm a marca.
+- **Cobertos só pelos testes automáticos:** 19.3 (setas na semeadura), 19.4 e 19.6.
+
+---
 
 **Fase 29 (fase de grupos na preparação), 2026-10-26**, Playwright (Chromium) por um servidor local temporário,
 antes do commit da fase. Massa: edição nova criada de um modelo com 32 jogadores fictícios ("Jogador 01" a "Jogador 32"),
