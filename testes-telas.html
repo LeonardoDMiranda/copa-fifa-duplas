@@ -1573,6 +1573,125 @@
       });
     });
 
+    // ---------- V15: fase de grupos na preparação (Fase 29) ----------
+
+    const GRUPOS_4X2 = { quantidade: 4, classificados: 2 };
+    // Cadastro pronto com fase de grupos (4 grupos × 2 classificados); com `formados`, os grupos já formados.
+    function dadosComGrupos({ formados = true } = {}) {
+      const dados = dadosCadastro();
+      dados.campeonato.config = { ...Regras.REGRAS_PADRAO, grupos: { ...GRUPOS_4X2 }, vagasFaseFinal: 8 };
+      if (formados) dados.campeonato.jogadores = Regras.formarGruposPorPotes(dados.campeonato.jogadores, 4, SEMENTE).jogadores;
+      return dados;
+    }
+    const gruposDe = (estado) => estado.atual().campeonato.jogadores.map((j) => j.grupo || null);
+
+    caso("V15.1 Configuração: formato com grupos, número de grupos e classificados por grupo", (t) => {
+      const { montar, estado } = criarAppFalso(dadosCadastro());
+      const raiz = montar("configuracao");
+      t.igual(buscar(raiz, "config-formato").value, "liga", "começa em liga única");
+      t.verdadeiro(!buscar(raiz, "config-grupos") && buscar(raiz, "config-vagas"), "sem o número de grupos; com o campo de classificados de sempre");
+      mudarCampo(buscar(raiz, "config-formato"), "grupos");
+      t.igual(estado.atual().campeonato.config.grupos, { quantidade: 2, classificados: 4 }, "fase de grupos: 2 grupos, 4 classificados por grupo (as 8 vagas de antes)");
+      t.igual(estado.atual().campeonato.config.vagasFaseFinal, 8, "8 vagas = 2 × 4");
+      t.verdadeiro(!buscar(raiz, "config-vagas") && buscar(raiz, "config-classificados-grupo").value === "4", "o campo vira classificados por grupo");
+      t.verdadeiro(raiz.querySelector("#fase-final .legenda").textContent.includes("2 grupos × 4 = 8 classificados"), "a legenda mostra a conta das vagas");
+      t.verdadeiro(texto(raiz, "diagnostico").includes("2 grupos de 16"), "o diagnóstico diz o tamanho dos grupos");
+      verificarLimpeza(t, raiz, "configuração com grupos");
+      verificarAcessibilidade(t, raiz, "configuração com grupos");
+      mudarCampo(buscar(raiz, "config-grupos"), "4");
+      t.igual([estado.atual().campeonato.config.grupos, estado.atual().campeonato.config.vagasFaseFinal], [{ quantidade: 4, classificados: 4 }, 16], "4 grupos × 4 = 16 vagas");
+      mudarCampo(buscar(raiz, "config-classificados-grupo"), "2");
+      t.igual([estado.atual().campeonato.config.grupos.classificados, estado.atual().campeonato.config.vagasFaseFinal], [2, 8], "2 por grupo: 8 vagas");
+      mudarCampo(buscar(raiz, "config-classificados-grupo"), "30");
+      t.verdadeiro(erroDoCampo(raiz, buscar(raiz, "config-classificados-grupo")), "4 × 30 = 120 vagas: erro junto do campo");
+      t.igual(estado.atual().campeonato.config.grupos.classificados, 2, "e o valor guardado não muda");
+      // Com os grupos formados (8 por grupo), não dá para classificar mais que 8 por grupo.
+      estado.modificar("formar", (s) => { s.campeonato.jogadores = Regras.formarGruposPorPotes(s.campeonato.jogadores, 4, 1).jogadores; });
+      mudarCampo(buscar(raiz, "config-classificados-grupo"), "9");
+      t.verdadeiro((erroDoCampo(raiz, buscar(raiz, "config-classificados-grupo")) || "").includes("menor grupo tem 8 jogadores"), "mais classificados que o menor grupo: erro");
+      estado.modificar("sorteio", (s) => { s.campeonato.sorteio = { semente: 1, confirmado: false, rascunho: [] }; });
+      mudarCampo(buscar(raiz, "config-grupos"), "2");
+      t.igual([gruposDe(estado).every((g) => g === null), estado.atual().campeonato.sorteio], [true, null], "mudar o número de grupos desfaz os grupos e o sorteio");
+      mudarCampo(buscar(raiz, "config-formato"), "liga");
+      t.igual(estado.atual().campeonato.config.grupos, null, "de volta à liga única");
+      estado.desfazer();
+      t.igual(estado.atual().campeonato.config.grupos.quantidade, 2, "desfazer volta à fase de grupos");
+    });
+
+    caso("V15.2 Configuração: com o calendário confirmado, o formato fica travado", (t) => {
+      const dados = dadosComGrupos();
+      dados.campeonato.sorteio = { semente: SEMENTE, confirmado: true };
+      dados.jogos = [{ id: "s1-j1", semana: 1, dupla1: [JOGADORES[0].id, JOGADORES[1].id], dupla2: [JOGADORES[2].id, JOGADORES[3].id], resultado: null }];
+      const raiz = criarAppFalso(dados).montar("configuracao");
+      t.verdadeiro(buscar(raiz, "config-formato").disabled && buscar(raiz, "config-grupos").disabled, "formato e número de grupos desabilitados");
+      t.verdadeiro(!buscar(raiz, "config-classificados-grupo").disabled, "classificados por grupo continua editável até gerar o chaveamento");
+    });
+
+    caso("V15.3 Jogadores: formar os grupos por potes, quadros dos grupos, mover e trocar", (t) => aceitandoConfirmacoes(async () => {
+      const { montar, estado, avisos } = criarAppFalso(dadosComGrupos({ formados: false }));
+      const raiz = montar("jogadores");
+      t.verdadeiro(raiz.textContent.includes("Forme os grupos"), "sem grupos formados: o diagnóstico pede para formar");
+      t.verdadeiro(!raiz.querySelector(".quadro-grupo"), "sem quadros de grupo ainda");
+      clicar(raiz, "btn-formar-grupos");
+      t.verdadeiro(gruposDe(estado).every(Boolean), "todos os jogadores ganham um grupo");
+      t.igual([...raiz.querySelectorAll(".quadro-grupo")].map((q) => q.id), ["quadro-grupo-A", "quadro-grupo-B", "quadro-grupo-C", "quadro-grupo-D"], "um quadro por grupo");
+      t.verdadeiro([...raiz.querySelectorAll(".quadro-grupo h4")].every((h) => h.textContent.includes("8 jogadores")), "4 grupos de 8");
+      t.verdadeiro(buscar(raiz, "btn-proximo-sorteio"), "cadastro pronto para sortear");
+      t.verdadeiro(estado.atual().historico[estado.atual().historico.length - 1].descricao.startsWith("formar grupos por potes (semente "), "o desfazer descreve a formação com a semente");
+      verificarLimpeza(t, raiz, "jogadores com grupos");
+      verificarAcessibilidade(t, raiz, "jogadores com grupos");
+
+      const [a, b] = estado.atual().campeonato.jogadores;
+      const deOutro = estado.atual().campeonato.jogadores.find((j) => j.grupo !== a.grupo);
+      const antes = gruposDe(estado);
+      mudarCampo(buscar(raiz, `grupo-${a.id}`), deOutro.grupo);
+      t.igual(gruposDe(estado), antes, "mover deixaria 7 e 9: recusado");
+      t.verdadeiro(avisos.some((x) => x.tipo === "erro" && x.texto.includes("Troque dois jogadores")), "o aviso sugere trocar");
+
+      clicar(raiz, `trocar-grupo-${a.id}`);
+      t.verdadeiro(buscar(raiz, "cancelar-troca-grupo"), "modo de troca: botão de cancelar no escolhido");
+      const opcoes = [...raiz.querySelectorAll("[id^='trocar-grupo-com-']")];
+      t.igual(opcoes.length, 24, "\"Trocar com\" só nos 24 jogadores dos outros grupos");
+      verificarAcessibilidade(t, raiz, "jogadores trocando de grupo");
+      clicar(raiz, `trocar-grupo-com-${deOutro.id}`);
+      const depois = estado.atual().campeonato.jogadores;
+      t.igual([depois.find((j) => j.id === a.id).grupo, depois.find((j) => j.id === deOutro.id).grupo], [deOutro.grupo, a.grupo], "os dois trocam de grupo");
+      t.verdadeiro(!buscar(raiz, "cancelar-troca-grupo") && buscar(raiz, `grupo-${b.id}`), "a troca termina e os seletores voltam");
+      clicar(raiz, `trocar-grupo-${a.id}`);
+      clicar(raiz, "cancelar-troca-grupo");
+      t.verdadeiro(!raiz.querySelector("[id^='trocar-grupo-com-']"), "cancelar sai do modo de troca");
+
+      clicar(raiz, "btn-formar-grupos");
+      await confirmarDialogo();
+      t.verdadeiro(estado.atual().historico[estado.atual().historico.length - 1].descricao.startsWith("formar grupos por potes"), "formar de novo, depois de confirmar");
+    }));
+
+    caso("V15.4 Sorteio com grupos: jogos marcados com o grupo, troca só no grupo; depois de confirmar, o grupo fica fixo", (t) => aceitandoConfirmacoes(async () => {
+      const ctx = criarAppFalso(dadosComGrupos());
+      const { estado } = ctx;
+      const raiz = ctx.montar("sorteio");
+      t.verdadeiro(raiz.textContent.includes("cada grupo tem o seu sorteio"), "a explicação fala dos grupos");
+      clicar(raiz, "btn-sortear");
+      await esperar(80);
+      const rascunho = estado.atual().campeonato.sorteio && estado.atual().campeonato.sorteio.rascunho;
+      t.verdadeiro(rascunho && rascunho.length === 48, "sorteou os 48 jogos");
+      const aval = Regras.avaliarCalendario(estado.atual().campeonato.jogadores, rascunho, estado.atual().campeonato.config);
+      t.verdadeiro(aval.pronto, `calendário respeita o regulamento ${aval.violacoes.join("; ")}`);
+      t.igual(aval.jogosPorSemana, [6, 6, 6, 6, 6, 6, 6, 6], "6 jogos em toda semana");
+      const itens = [...raiz.querySelectorAll(".semana-calendario li")];
+      t.verdadeiro(itens.length === 48 && itens.every((li) => /^Grupo [A-D]$/.test(li.querySelector(".marca-grupo").textContent)), "cada jogo mostra o seu grupo");
+      raiz.querySelector("button.nome-slot").click();
+      t.igual(buscar(raiz, "troca-jogador").options.length, 8, "a troca à mão oferece só os 8 jogadores do grupo");
+      verificarLimpeza(t, raiz, "sorteio com grupos");
+      verificarAcessibilidade(t, raiz, "sorteio com grupos");
+      clicar(raiz, "btn-confirmar-calendario");
+      await confirmarDialogo();
+      t.igual(estado.atual().jogos.length, 48, "calendário confirmado: 48 jogos");
+      const jogadores = ctx.montar("jogadores");
+      t.verdadeiro(!jogadores.querySelector("[id^='grupo-']") && !buscar(jogadores, "btn-formar-grupos"), "depois de confirmar: sem seletor de grupo nem formar de novo");
+      t.igual(jogadores.querySelectorAll(".lista-jogadores .marca-grupo").length, 32, "cada jogador mostra o grupo, fixo");
+    }));
+
     // ---------- execução e relatório ----------
 
     // Um caso pode ser assíncrono (ex.: esperar o "close" da ficha): os casos rodam um de cada vez.

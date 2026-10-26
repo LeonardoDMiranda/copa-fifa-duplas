@@ -1535,6 +1535,13 @@
       t.igual(Regras.jogosPorSemana(48, 8), [6, 6, 6, 6, 6, 6, 6, 6], "48 jogos em 8 semanas");
       t.igual(Regras.jogosPorSemana(45, 8), [6, 6, 6, 6, 6, 5, 5, 5], "45 jogos em 8 semanas");
       t.igual(Regras.jogosPorSemana(45, 8).reduce((a, b) => a + b, 0), 45, "a soma fecha");
+      t.igual(Regras.jogosPorSemanaDosGrupos([45], 8), [Regras.jogosPorSemana(45, 8)], "um grupo só (liga única): igual a jogosPorSemana");
+      t.igual(Regras.jogosPorSemanaDosGrupos([12, 12, 12, 12], 8), [
+        [2, 2, 2, 2, 1, 1, 1, 1], [1, 1, 1, 1, 2, 2, 2, 2], [2, 2, 2, 2, 1, 1, 1, 1], [1, 1, 1, 1, 2, 2, 2, 2],
+      ], "4 grupos de 12 jogos: as semanas com 1 a mais em rodízio");
+      const tres = Regras.jogosPorSemanaDosGrupos([12, 12, 12], 8);
+      t.igual(tres, [[2, 2, 2, 2, 1, 1, 1, 1], [1, 1, 1, 1, 2, 2, 2, 2], [2, 2, 2, 2, 1, 1, 1, 1]], "3 grupos de 12: o C volta ao começo");
+      t.igual(tres.map((l) => l.reduce((a, b) => a + b, 0)), [12, 12, 12], "cada grupo continua com o seu total");
     });
 
     caso("S2 Sorteio 32 jogadores × 6 jogos × 8 semanas respeita o regulamento", (t) => {
@@ -2494,7 +2501,7 @@
       const d = Regras.diagnosticarCampeonato(formados, cfg);
       t.verdadeiro(d.pronto, `grupos formados: pronto ${d.problemas.join("; ")}`);
       t.igual(d.grupos, ["A", "B", "C", "D"].map((grupo) => ({ grupo, jogadores: 8, totalJogos: 12 })), "4 grupos de 8, 12 jogos cada");
-      t.igual([d.totalJogos, d.jogosPorSemanaMin, d.jogosPorSemanaMax], [48, 4, 8], "48 jogos; semanas com 8 e com 4 (as sobras de cada grupo vão para as primeiras)");
+      t.igual([d.totalJogos, d.jogosPorSemanaMin, d.jogosPorSemanaMax], [48, 6, 6], "48 jogos, 6 em toda semana (as sobras de cada grupo em rodízio)");
       const trinta = Regras.diagnosticarCampeonato(jogadoresFicticios(30), cfg);
       t.verdadeiro(trinta.problemas.some((p) => p.startsWith("Grupos C e D: 7 jogadores × 6 jogos = 42 vagas")), `30 jogadores em 4 grupos: grupos de 7 não fecham (${trinta.problemas.join("; ")})`);
       const vinteQuatro = Regras.diagnosticarCampeonato(jogadoresFicticios(24), cfg);
@@ -2520,6 +2527,7 @@
         const grupo = new Map(jogadores.map((j) => [j.id, j.grupo]));
         t.verdadeiro(r.calendario.every((j) => new Set([...j.dupla1, ...j.dupla2].map((id) => grupo.get(id))).size === 1), `${n} em ${q} grupos: todo jogo é dentro de um grupo`);
         t.verdadeiro(r.calendario.every((j, i) => i === 0 || r.calendario[i - 1].semana <= j.semana), `${n} em ${q} grupos: calendário em ordem de semana`);
+        t.verdadeiro(Math.max(...a.jogosPorSemana) - Math.min(...a.jogosPorSemana) <= 1, `${n} em ${q} grupos: semanas com quase o mesmo total (${a.jogosPorSemana.join(", ")})`);
       }
       t.verdadeiro(Date.now() - inicio < 8000, `tempo total ${Date.now() - inicio} ms (< 8 s)`);
       const jogadores = Regras.formarGruposPorPotes(jogadoresFicticios(32), 4, 5).jogadores;

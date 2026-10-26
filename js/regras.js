@@ -415,10 +415,10 @@
       const nomes = semEstrelas.slice(0, 5).map((j) => j.nome).join(", ") + (semEstrelas.length > 5 ? ` e mais ${semEstrelas.length - 5}` : "");
       problemas.push(`Defina as estrelas (nível de ${ESTRELAS_MIN} a ${ESTRELAS_MAX}) de ${semEstrelas.length} ${semEstrelas.length === 1 ? "jogador" : "jogadores"}: ${nomes}.`);
     }
-    // Com grupos, cada semana soma os jogos de cada grupo (as sobras de cada um ficam nas primeiras semanas).
+    // Com grupos, cada semana soma os jogos de cada grupo (as sobras em rodízio, ver jogosPorSemanaDosGrupos).
     const totalJogos = grupos ? grupos.reduce((soma, g) => soma + g.totalJogos, 0) : Math.floor((n * jogos) / 4);
     const porSemana = grupos && semanas > 0
-      ? grupos.map((g) => jogosPorSemana(g.totalJogos, semanas)).reduce((soma, lista) => soma.map((v, i) => v + lista[i]))
+      ? jogosPorSemanaDosGrupos(grupos.map((g) => g.totalJogos), semanas).reduce((soma, lista) => soma.map((v, i) => v + lista[i]))
       : null;
     return {
       jogadores: n,
@@ -505,6 +505,20 @@
     const base = Math.floor(totalJogos / semanas);
     const sobra = totalJogos % semanas;
     return Array.from({ length: semanas }, (_, i) => base + (i < sobra ? 1 : 0));
+  }
+
+  // Com grupos: jogos por semana de cada grupo. As semanas com 1 jogo a mais seguem em rodízio de um grupo
+  // para o outro (o B começa onde as do A terminaram...), para todas as semanas terem quase o mesmo total.
+  // Ex.: 4 grupos de 12 jogos em 8 semanas: A e C com 2 jogos nas semanas 1 a 4, B e D nas 5 a 8.
+  function jogosPorSemanaDosGrupos(totais, semanas) {
+    let inicio = 0;
+    return totais.map((total) => {
+      const base = Math.floor(total / semanas);
+      const sobra = total % semanas;
+      const lista = Array.from({ length: semanas }, (_, i) => base + ((i - inicio + semanas) % semanas < sobra ? 1 : 0));
+      inicio = (inicio + sobra) % semanas;
+      return lista;
+    });
   }
 
   // Monta os jogos de uma semana com os 4×g jogadores `jogam`: primeiro duplas sorteadas (sem
@@ -635,9 +649,10 @@
     const estrelas = estrelasPorId(jogadores);
     const sorteio = criarSorteador(semente);
     const partes = grupos ? jogadoresPorGrupo(jogadores, grupos.quantidade) : [{ grupo: null, ids: jogadores.map((j) => j.id) }];
+    const semanasDe = jogosPorSemanaDosGrupos(partes.map((p) => (p.ids.length * jogosPorJogador) / 4), semanas);
     const calendarios = [];
-    for (const { grupo, ids } of partes) {
-      const tamanhos = jogosPorSemana((ids.length * jogosPorJogador) / 4, semanas);
+    for (const [i, { grupo, ids }] of partes.entries()) {
+      const tamanhos = semanasDe[i];
       let melhor = null;
       for (let t = 0; t < TENTATIVAS_SORTEIO || (!melhor && t < MAX_TENTATIVAS_SORTEIO); t++) {
         const tentativa = construirCalendario(ids, jogosPorJogador, tamanhos, sorteio, estrelas);
@@ -872,8 +887,8 @@
 
   // Forma os grupos por potes de estrelas: os jogadores, do maior para o menor nível (empates sorteados),
   // são cortados em potes do tamanho do número de grupos, e cada pote manda um jogador para cada grupo, por
-  // sorteio. O último pote pode ficar incompleto: alguns grupos têm 1 jogador a mais. Usa a semente do
-  // sorteio do calendário. Retorna { jogadores } (mesma ordem, com `grupo`) ou { erro }.
+  // sorteio. O último pote pode ficar incompleto: alguns grupos têm 1 jogador a mais. A mesma
+  // `semente` forma os mesmos grupos. Retorna { jogadores } (mesma ordem, com `grupo`) ou { erro }.
   function formarGruposPorPotes(jogadores, quantidade, semente) {
     if (!Number.isInteger(quantidade) || quantidade < MIN_GRUPOS || quantidade > MAX_GRUPOS) {
       return { erro: `Use de ${MIN_GRUPOS} a ${MAX_GRUPOS} grupos.` };
@@ -902,7 +917,7 @@
       const tamanhos = jogadoresPorGrupo(novos, quantidade).map((g) => g.ids.length);
       const maior = Math.max(...tamanhos), menor = Math.min(...tamanhos);
       if (maior - menor > 1) {
-        return { erro: `Os grupos ficariam com de ${menor} a ${maior} jogadores: a diferença pode ser de no máximo 1. Troque dois jogadores de grupo.` };
+        return { erro: `Os grupos ficariam com ${menor} a ${maior} jogadores, e a diferença pode ser de no máximo 1. Troque dois jogadores de grupo.` };
       }
     }
     return { jogadores: novos };
@@ -1996,6 +2011,7 @@
     classificacaoPorSemana,
     situacaoDoCampeonato,
     jogosPorSemana,
+    jogosPorSemanaDosGrupos,
     gerarCalendario,
     avaliarCalendario,
     trocarJogadorNoCalendario,

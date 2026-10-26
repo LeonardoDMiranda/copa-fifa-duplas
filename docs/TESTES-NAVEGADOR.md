@@ -376,7 +376,35 @@ Os PNGs saem pelo botão "Baixar imagem" da Classificação e do Mata-mata.
 
 ---
 
+## 18. Fase de grupos: preparação
+
+- 18.1 Configuração: "Temporada" em "Fase de grupos" mostra "Grupos" (2 a 8) e troca "Classificados" por "Classificados por grupo"; a legenda da fase final diz "4 grupos × 2 = 8 classificados" e o diagnóstico, "4 grupos de 8".
+- 18.2 Trocar o número de grupos ou voltar à liga única desfaz os grupos formados e o calendário sorteado; "Desfazer" volta.
+- 18.3 Classificados por grupo maior que o menor grupo ou com mais de 99 vagas: erro junto do campo, valor guardado não muda.
+- 18.4 Jogadores: "Formar grupos por potes" divide em grupos de tamanhos iguais (ou com 1 de diferença); os quadros mostram nomes e soma das estrelas, parecidas entre os grupos.
+- 18.5 Mudar o grupo de um jogador quando os grupos têm o mesmo tamanho: aviso pedindo para trocar dois jogadores; trocar pelo botão: "Trocar com …" nos jogadores dos outros grupos, "Cancelar troca".
+- 18.6 "Formar de novo" pede confirmação.
+- 18.7 Sorteio: cada jogo com "Grupo X"; semanas com quase o mesmo número de jogos; a troca à mão lista só os jogadores do grupo; confirmar e voltar a Jogadores: grupos fixos, sem seletor.
+- 18.8 400 px: sem rolagem lateral em Configuração, Jogadores e Sorteio.
+
 ## Última execução
+
+**Fase 29 (fase de grupos na preparação), 2026-10-26**, Playwright (Chromium) por um servidor local temporário,
+antes do commit da fase. Massa: edição nova criada de um modelo com 32 jogadores fictícios ("Jogador 01" a "Jogador 32"),
+estrelas em rodízio e 4 grupos × 2 classificados.
+
+- `testes.html`: 134 passaram, 0 falharam (S1, G4 e G5 com o rodízio das semanas). `testes-telas.html`: 75 passaram,
+  0 falharam (V15.1 a V15.4 novos).
+- **Conferido no app real:** 18.1 (formato, legenda e "4 grupos de 8"), 18.4 (grupos de 8 com 24, 23, 24 e 22 estrelas),
+  18.7 (48 jogos, 6 por semana, marca do grupo em cada jogo, regulamento respeitado) e 18.8 (Configuração, Jogadores e
+  Sorteio sem rolagem lateral a 400 px).
+- **Ajustado antes do commit:** com o seletor de grupo, o botão de remover caía para a linha de baixo na lista de
+  jogadores; a lista com grupos passou a usar colunas mais largas.
+- **Observado (esperado):** em grupos de 8, o equilíbrio por nível é pior que na liga única (18 de 48 jogos fora do
+  aceitável, maior diferença 4) e há mais adversários repetidos (60 pares, até 5 vezes).
+- **Cobertos só pelos testes automáticos:** 18.2, 18.3, 18.5 e 18.6.
+
+---
 
 **Fase 28 (regras da fase de grupos), 2026-10-26**, Playwright (Chromium) por um servidor local temporário,
 antes do commit da fase. Fase só de regras puras e estado: nada mudou na tela.

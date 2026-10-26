@@ -9,6 +9,12 @@
 
   const comMaiuscula = (texto) => texto[0].toUpperCase() + texto.slice(1);
 
+  // "8" ou "7 e 8" (os tamanhos dos grupos, do diagnóstico).
+  function tamanhosDosGrupos(grupos) {
+    const tamanhos = [...new Set(grupos.map((g) => g.jogadores))].sort((a, b) => a - b);
+    return tamanhos.length === 1 ? String(tamanhos[0]) : `${tamanhos.slice(0, -1).join(", ")} e ${tamanhos[tamanhos.length - 1]}`;
+  }
+
   function criar(app, raiz) {
     const { estado, avisar, renderizar, cadastroTravado } = app;
 
@@ -87,6 +93,91 @@
       mudarFaseFinal(`classificados para a fase final: ${vagas}`, (c) => ({ ...c, vagasFaseFinal: vagas }));
     }
 
+    // Com grupos, o total de classificados é grupos × classificados por grupo. O número por grupo não
+    // pode passar do menor grupo já formado.
+    function mudarClassificadosPorGrupo(texto) {
+      const id = "config-classificados-grupo";
+      const t = texto.trim();
+      const k = /^\d+$/.test(t) ? Number(t) : NaN;
+      const cfg = app.config();
+      const nova = { ...cfg, grupos: { ...cfg.grupos, classificados: k }, vagasFaseFinal: cfg.grupos.quantidade * k };
+      const jogadores = estado.atual().campeonato.jogadores;
+      const tamanhos = Regras.jogadoresPorGrupo(jogadores, cfg.grupos.quantidade).map((g) => g.ids.length).filter(Boolean);
+      const menor = jogadores.length && jogadores.every((j) => j.grupo) && tamanhos.length ? Math.min(...tamanhos) : Infinity;
+      const erro = !(k >= 1) ? "use um número de 1 a 99."
+        : k > menor ? `o menor grupo tem ${plural(menor, "jogador", "jogadores")}: no máximo ${menor} por grupo.`
+        : Regras.validarConfig(nova);
+      if (erro) {
+        marcarErro(id, comMaiuscula(erro), texto);
+        return;
+      }
+      errosCampo.delete(id);
+      mudarFaseFinal(`classificados por grupo: ${k}`, () => nova);
+    }
+
+    // ---------- formato (liga única ou fase de grupos) ----------
+    // Muda o sorteio: só antes de confirmar o calendário. Trocar o formato ou o número de grupos
+    // desfaz os grupos formados e o calendário sorteado.
+
+    function mudarFormato(comGrupos) {
+      if (cadastroTravado()) return;
+      const cfg = app.config();
+      if (comGrupos === Regras.usaGrupos(cfg)) return;
+      let nova;
+      if (comGrupos) {
+        const classificados = Math.max(2, Math.floor(cfg.vagasFaseFinal / 2));
+        nova = { ...cfg, grupos: { quantidade: 2, classificados }, vagasFaseFinal: 2 * classificados };
+      } else {
+        nova = { ...cfg, grupos: null };
+      }
+      const erro = Regras.validarConfig(nova);
+      if (erro) { marcarErro("config-formato", comMaiuscula(erro)); return; }
+      errosCampo.delete("config-formato");
+      estado.modificar(comGrupos ? "formato: fase de grupos" : "formato: liga única", (s) => {
+        s.campeonato.config = nova;
+        s.campeonato.jogadores = s.campeonato.jogadores.map(({ grupo, ...j }) => j);
+        s.campeonato.sorteio = null;
+      });
+    }
+
+    function mudarQuantidadeDeGrupos(quantidade) {
+      if (cadastroTravado()) return;
+      const cfg = app.config();
+      const nova = { ...cfg, grupos: { ...cfg.grupos, quantidade }, vagasFaseFinal: quantidade * cfg.grupos.classificados };
+      const erro = Regras.validarConfig(nova);
+      if (erro) { marcarErro("config-grupos", comMaiuscula(erro)); return; }
+      errosCampo.delete("config-grupos");
+      if (!estado.modificar(`número de grupos: ${quantidade}`, (s) => {
+        s.campeonato.config = nova;
+        s.campeonato.jogadores = s.campeonato.jogadores.map(({ grupo, ...j }) => j);
+        s.campeonato.sorteio = null;
+      })) {
+        renderizar();
+      }
+    }
+
+    function blocoFormato(atual) {
+      const cfg = atual.campeonato.config;
+      const travado = Regras.cadastroTravado(atual.campeonato, atual.jogos);
+      const grupos = cfg.grupos;
+      const quantidades = Array.from({ length: Regras.MAX_GRUPOS - Regras.MIN_GRUPOS + 1 }, (_, i) => Regras.MIN_GRUPOS + i);
+      return el("div", { class: "formato", id: "formato" },
+        el("span", { class: "rotulo-aparencia" }, "Formato"),
+        el("div", { class: "config-campeonato" },
+          campoConfig("formato-tipo", "Temporada", el("select", {
+            id: "config-formato", disabled: travado, ...atributosDeErro("config-formato"),
+            onchange: (ev) => mudarFormato(ev.target.value === "grupos"),
+          }, el("option", { value: "liga", selected: !grupos }, "Liga única"), el("option", { value: "grupos", selected: Boolean(grupos) }, "Fase de grupos"))),
+          grupos && campoConfig("numero", "Grupos", el("select", {
+            id: "config-grupos", disabled: travado, ...atributosDeErro("config-grupos"),
+            onchange: (ev) => mudarQuantidadeDeGrupos(Number(ev.target.value)),
+          }, quantidades.map((n) => el("option", { value: String(n), selected: n === grupos.quantidade }, String(n)))))),
+        el("span", { class: "legenda" }, grupos
+          ? `Cada grupo tem o seu sorteio, com parceiros e adversários só do próprio grupo; os ${grupos.classificados} primeiros de cada grupo vão para a fase final. `
+            + (travado ? "" : "Mudar o formato ou o número de grupos desfaz os grupos formados e o calendário sorteado.")
+          : "Todos jogam contra todos numa classificação única."));
+    }
+
     function mudarJogosDaRodada(id, nome, jogos) {
       mudarFaseFinal(`${nome}: ${OPCOES_JOGOS.find(([n]) => n === jogos)[1].toLowerCase()}`, (c) => {
         const melhorDe = { ...c.melhorDe, [id]: jogos };
@@ -107,16 +198,20 @@
         onchange: (ev) => mudarJogosDaRodada(id, `jogos (${nome})`, Number(ev.target.value)),
       }, OPCOES_JOGOS.map(([n, rotulo]) => el("option", { value: String(n), selected: n === jogosDe(id, padrao) }, rotulo))));
 
+      const campoNumerico = (id, valor, onchange) => el("input", {
+        id, type: "text", inputmode: "numeric", maxlength: "2", autocomplete: "off",
+        value: valorDo(id, String(valor)), disabled: gerado, ...atributosDeErro(id),
+        onchange: (ev) => onchange(ev.target.value),
+        onkeydown: (ev) => { if (ev.key === "Enter") { ev.preventDefault(); ev.target.blur(); } },
+        onfocus: (ev) => ev.target.select(),
+      });
+
       return el("div", { class: "fase-final", id: "fase-final" },
         el("span", { class: "rotulo-aparencia" }, "Fase final"),
         el("div", { class: "config-campeonato" },
-          campoConfig("numero", "Classificados", el("input", {
-            id: "config-vagas", type: "text", inputmode: "numeric", maxlength: "2", autocomplete: "off",
-            value: valorDo("config-vagas", String(cfg.vagasFaseFinal)), disabled: gerado, ...atributosDeErro("config-vagas"),
-            onchange: (ev) => mudarVagas(ev.target.value),
-            onkeydown: (ev) => { if (ev.key === "Enter") { ev.preventDefault(); ev.target.blur(); } },
-            onfocus: (ev) => ev.target.select(),
-          })),
+          cfg.grupos
+            ? campoConfig("numero", "Classificados por grupo", campoNumerico("config-classificados-grupo", cfg.grupos.classificados, mudarClassificadosPorGrupo))
+            : campoConfig("numero", "Classificados", campoNumerico("config-vagas", cfg.vagasFaseFinal, mudarVagas)),
           el("label", { class: "campo-aparencia", title: temSemifinais ? null : "A disputa de 3º lugar precisa de duas semifinais" },
             el("input", {
               id: "config-terceiro", type: "checkbox", checked: cfg.terceiroLugar && temSemifinais, disabled: gerado || !temSemifinais,
@@ -126,7 +221,8 @@
           estrutura.terceiro ? seletor("terceiro", "3º lugar", 1) : null),
         el("span", { class: "legenda" }, gerado
           ? "Chaveamento já gerado: para mudar a fase final, apague o chaveamento na aba Mata-mata."
-          : `${plural(Math.ceil(cfg.vagasFaseFinal / 2), "dupla", "duplas")} no mata-mata`
+          : (cfg.grupos ? `${cfg.grupos.quantidade} grupos × ${cfg.grupos.classificados} = ${plural(cfg.vagasFaseFinal, "classificado", "classificados")}, semeados pela campanha; ` : "")
+            + `${plural(Math.ceil(cfg.vagasFaseFinal / 2), "dupla", "duplas")} no mata-mata`
             + (cfg.vagasFaseFinal % 2 ? "; com número ímpar, um jogador fica sem dupla e você escolhe o parceiro dele." : ".")));
     }
 
@@ -224,9 +320,11 @@
           campoConfig("numero", "Jogos por jogador", numero("config-jogos", "jogosPorJogador", "Jogos por jogador")),
           campoConfig("numero", "Semanas", numero("config-semanas", "semanas", "Semanas"))),
         blocoAparencia(),
+        blocoFormato(atual),
         blocoFaseFinal(atual),
         el("p", { class: "diagnostico", id: "diagnostico" },
-          `${plural(diag.jogadores, "jogador", "jogadores")} × ${plural(camp.config.jogosPorJogador, "jogo", "jogos")} ÷ 4 = ${plural(diag.totalJogos, "jogo", "jogos")} · ${porSemana} por semana em ${plural(camp.config.semanas, "semana", "semanas")}`),
+          `${plural(diag.jogadores, "jogador", "jogadores")} × ${plural(camp.config.jogosPorJogador, "jogo", "jogos")} ÷ 4 = ${plural(diag.totalJogos, "jogo", "jogos")} · ${porSemana} por semana em ${plural(camp.config.semanas, "semana", "semanas")}`
+          + (diag.grupos ? ` · ${diag.grupos.length} grupos de ${tamanhosDosGrupos(diag.grupos)}` : "")),
         travado
           ? el("p", { class: "legenda" }, "Calendário confirmado: jogos e semanas não mudam mais. O nome e a aparência continuam editáveis.")
           : el("p", { class: "acoes-passo" },

@@ -20,6 +20,7 @@
 
     let editandoSlot = null; // { indice, lado, pos } do jogador do rascunho em troca
     let nivelPorId = new Map(); // id -> estrelas (ou null), refeito a cada desenho
+    let grupoPorId = new Map(); // id -> grupo ("A"...), só com fase de grupos; refeito a cada desenho
 
     // Estrelas ao lado do nome: só nesta tela e na de jogadores (nunca no telão nem nos PNGs).
     function nivel(id) {
@@ -48,7 +49,7 @@
       if (cadastroTravado()) return;
       const { jogadores, config: cfg } = estado.atual().campeonato;
       const semente = Math.floor(Math.random() * 2147483646) + 1;
-      const r = Regras.gerarCalendario(jogadores, { jogosPorJogador: cfg.jogosPorJogador, semanas: cfg.semanas, semente });
+      const r = Regras.gerarCalendario(jogadores, { jogosPorJogador: cfg.jogosPorJogador, semanas: cfg.semanas, semente, grupos: cfg.grupos });
       renderizar(); // devolve o botão ao normal (também quando dá erro)
       if (r.erro) {
         avisar(r.erro, "erro");
@@ -107,7 +108,9 @@
         for (const id of [...j.dupla1, ...j.dupla2]) doJogo.set(id, { numero, indice: i });
       });
       const atualId = jogo[`dupla${lado}`][pos];
-      const jogadores = [...nomePorId].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+      // Com grupos, só os jogadores do grupo do jogo (parceiros e adversários são do próprio grupo).
+      const grupo = grupoPorId.get(atualId);
+      const jogadores = [...nomePorId].filter(([id]) => !grupo || grupoPorId.get(id) === grupo).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
       return el("select", {
         id: "troca-jogador", "aria-label": "Trocar jogador",
         onchange: (ev) => trocarNoRascunho(indice, lado, pos, ev.target.value),
@@ -155,6 +158,7 @@
       return el("section", { class: "semana-calendario", id: `semana-${semana}` },
         el("h3", {}, `Semana ${semana} `, el("span", { class: "contagem" }, `(${plural(doJogo.length, "jogo", "jogos")})`)),
         el("ol", {}, doJogo.map(({ j, i }) => el("li", {},
+          grupoPorId.size ? el("span", { class: "marca-grupo" }, grupoPorId.has(j.dupla1[0]) ? `Grupo ${grupoPorId.get(j.dupla1[0])}` : "Sem grupo") : null,
           nomeNoCalendario(calendario, i, 1, 0, editavel), " + ", nomeNoCalendario(calendario, i, 1, 1, editavel),
           el("span", { class: "x" }, " × "),
           nomeNoCalendario(calendario, i, 2, 0, editavel), " + ", nomeNoCalendario(calendario, i, 2, 1, editavel),
@@ -202,6 +206,7 @@
       const diag = Regras.diagnosticarCampeonato(camp.jogadores, camp.config);
       const rascunho = !confirmado && camp.sorteio ? camp.sorteio.rascunho || null : null;
       nivelPorId = new Map(camp.jogadores.map((j) => [j.id, j.estrelas]));
+      grupoPorId = new Map(Regras.usaGrupos(camp.config) ? camp.jogadores.filter((j) => j.grupo).map((j) => [j.id, j.grupo]) : []);
       if (editandoSlot && (!rascunho || !rascunho[editandoSlot.indice])) editandoSlot = null;
 
       resumo.textContent = confirmado ? `confirmado · ${plural(atual.jogos.length, "jogo", "jogos")}` : rascunho ? "sorteio em análise" : "";
@@ -211,6 +216,7 @@
       if (!calendario) {
         const explicacao = el("p", { class: "legenda" },
           "Sorteia as duplas e os jogos de todas as semanas de uma vez: todos com o mesmo número de jogos, no máximo um por semana e sem repetir parceiro. "
+          + (Regras.usaGrupos(camp.config) ? "Com fase de grupos, cada grupo tem o seu sorteio, com parceiros e adversários só do próprio grupo. " : "")
           + "Também equilibra os jogos pelo nível (estrelas) de cada jogador. Depois você pode trocar jogadores à mão e confirmar.");
         const botaoSortear = el("button", { type: "button", id: "btn-sortear", class: "primario", disabled: !diag.pronto, onclick: sortear },
           Icones.svg("sortear"), "Sortear calendário");

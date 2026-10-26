@@ -1047,9 +1047,22 @@ body.telao-ativo { overflow: hidden; }
 
 .troca-indisponivel { font-style: italic; }
 #banner-troca { margin-bottom: var(--esp-3); }
-.fase-final { margin: var(--esp-2) 0; }
-.fase-final .config-campeonato { margin: var(--esp-1) 0 var(--esp-1); align-items: flex-end; }
-.fase-final select { font: inherit; font-size: var(--fonte-base); padding: 4px var(--esp-2); color: var(--texto); border: 1px solid var(--borda-forte); border-radius: var(--raio); background: var(--superficie); }
+.fase-final, .formato { margin: var(--esp-2) 0; }
+.fase-final .config-campeonato, .formato .config-campeonato { margin: var(--esp-1) 0 var(--esp-1); align-items: flex-end; }
+.fase-final select, .formato select, .troca-grupo select { font: inherit; font-size: var(--fonte-base); padding: 4px var(--esp-2); color: var(--texto); border: 1px solid var(--borda-forte); border-radius: var(--raio); background: var(--superficie); }
+.troca-grupo select { font-size: var(--fonte-sm); padding: 2px var(--esp-1); }
+/* Fase de grupos: quadros dos grupos na tela Jogadores e a marca do grupo nos jogos do calendário. */
+.grupos-jogadores { margin: var(--esp-3) 0; }
+.grupos-jogadores h3 { margin: 0 0 var(--esp-1); font-size: var(--fonte-base); }
+.acoes-grupos { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2) var(--esp-3); margin: 0 0 var(--esp-2); }
+.acoes-grupos .legenda { margin: 0; flex: 1 1 20em; }
+.quadros-grupos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: var(--esp-2); }
+.quadro-grupo { padding: var(--esp-2) var(--esp-3); border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie); }
+.quadro-grupo h4 { margin: 0 0 4px; font-size: var(--fonte-sm); }
+.quadro-grupo h4 .contagem { font-weight: 400; color: var(--texto-suave); }
+.quadro-grupo p { margin: 0; font-size: var(--fonte-sm); }
+.troca-grupo { display: inline-flex; align-items: center; gap: var(--esp-1); }
+.marca-grupo { display: inline-block; padding: 1px var(--esp-2); margin-right: var(--esp-1); border-radius: var(--raio-pilula); background: var(--superficie); border: 1px solid var(--borda); font-size: var(--fonte-xs); font-weight: 600; color: var(--texto-suave); white-space: nowrap; }
 .sem-dupla { color: var(--texto-suave); }
 .aparencia { display: flex; flex-wrap: wrap; align-items: center; gap: var(--esp-2) var(--esp-4); margin: var(--esp-1) 0 var(--esp-2); }
 .rotulo-aparencia { font-size: var(--fonte-sm); font-weight: 600; color: var(--texto-suave); }
@@ -1075,6 +1088,7 @@ body.telao-ativo { overflow: hidden; }
 .adicionar-jogadores textarea:focus, .campo-config input:focus { outline: 2px solid var(--destaque); outline-offset: 1px; }
 
 ol.lista-jogadores { columns: 3 300px; column-gap: var(--esp-6); margin: var(--esp-3) 0 0; padding-left: 2em; }
+ol.lista-jogadores.com-grupos { columns: 3 460px; } /* o seletor de grupo e o botão de trocar ocupam mais espaço */
 .lista-jogadores li { break-inside: avoid; padding: 3px 0; }
 .lista-jogadores li > * { vertical-align: middle; }
 .lista-jogadores .nome-jogador { display: inline-block; min-width: 8em; }
